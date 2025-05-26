@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnyAPI - PowerShell REST API Manager</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-container">
+            <div class="loading-spinner"></div>
+            <h2>AnyAPI</h2>
+            <p>Initializing PowerShell API Manager...</p>
+        </div>
+    </div>
+
+    <!-- Secret Store Password Modal -->
+    <div id="secret-password-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🔐 Unlock Secret Store</h3>
+            </div>
+            <div class="modal-body">
+                <p>The PowerShell Secret Store requires a password to access stored credentials.</p>
+                <div class="form-group">
+                    <label for="secret-password">Secret Store Password:</label>
+                    <input type="password" id="secret-password" class="form-control" placeholder="Enter your SecretStore password">
+                    <div class="form-help">This password is used to encrypt/decrypt your API credentials securely.</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="secretManager.skipSecretStore()">Skip</button>
+                <button type="button" class="btn btn-primary" onclick="secretManager.unlockSecretStore()">Unlock</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="app" class="app-container" style="display: none;">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <h1>
+                        <span class="logo">🚀</span>
+                        AnyAPI
+                        <span class="version">v2.0</span>
+                    </h1>
+                    <p class="tagline">PowerShell REST API Manager</p>
+                </div>
+                <div class="header-right">
+                    <div class="connection-status" id="connection-status">
+                        <div class="status-indicator" id="status-indicator"></div>
+                        <span id="status-text">Connecting...</span>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-outline" onclick="app.toggleDarkMode()" id="dark-mode-toggle" title="Toggle dark mode">
+                            🌙 Dark
+                        </button>
+                        <button class="btn btn-outline" onclick="app.exportProfiles()">
+                            📤 Export
+                        </button>
+                        <button class="btn btn-outline" onclick="app.importProfiles()">
+                            📥 Import
+                        </button>
+                        <button class="btn btn-outline" onclick="secretManager.showSecretInfo()">
+                            🔐 Secrets
+                        </button>
+                        <button class="btn btn-outline" onclick="app.showAppInfo()" title="About AnyAPI">
+                            ℹ️ About
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="app-body">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <div class="section-header">
+                        <h3>Navigation</h3>
+                    </div>
+                    <nav class="nav-menu">
+                        <a href="#" class="nav-item active" data-section="profiles">
+                            <span class="nav-icon">⚙️</span>
+                            Profiles
+                        </a>
+                        <a href="#" class="nav-item" data-section="tester">
+                            <span class="nav-icon">🧪</span>
+                            Endpoint Tester
+                        </a>
+                        <a href="#" class="nav-item" data-section="templates">
+                            <span class="nav-icon">📋</span>
+                            Templates
+                        </a>
+                        <a href="#" class="nav-item" data-section="history">
+                            <span class="nav-icon">📚</span>
+                            History
+                        </a>
+                    </nav>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="section-header">
+                        <h3>API Profiles</h3>
+                        <button class="btn btn-sm btn-primary" onclick="profileManager.showCreateModal()">
+                            ➕ New
+                        </button>
+                    </div>
+                    <div class="profile-search">
+                        <input type="text" id="profile-search" class="form-control" placeholder="Search profiles..." oninput="profileManager.filterProfiles()">
+                    </div>
+                    <div class="profile-list" id="profile-list">
+                        <!-- Profiles will be populated here -->
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Panel -->
+            <main class="main-panel">
+                <!-- Profiles Section -->
+                <section id="profiles-section" class="content-section active">
+                    <div class="section-header">
+                        <h2>API Profiles</h2>
+                        <div class="section-actions">
+                            <button class="btn btn-primary" onclick="profileManager.showCreateModal()">
+                                ➕ Create New Profile
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="profile-details" class="profile-details">
+                        <div class="empty-state">
+                            <div class="empty-icon">⚙️</div>
+                            <h3>Select a Profile</h3>
+                            <p>Choose a profile from the sidebar to view and edit its configuration</p>
+                        </div>
+                        <div id="profile-secrets-action" style="margin-top:1rem; display:none;">
+                            <button class="btn btn-outline" id="manage-profile-secrets-btn">
+                                🔑 Manage Secrets
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Endpoint Tester Section -->
+                <section id="tester-section" class="content-section">
+                    <div class="section-header">
+                        <h2>API Endpoint Tester</h2>
+                        <div class="section-actions">
+                            <button class="btn btn-outline" onclick="endpointTester.clearRequest()">
+                                🗑️ Clear
+                            </button>
+                            <button class="btn btn-outline" onclick="endpointTester.generateCode()">
+                                📋 Generate Code
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="tester-container">
+                        <div class="tester-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Profile:</label>
+                                    <select id="test-profile" class="form-control">
+                                        <option value="">Select a profile...</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="request-builder">
+                                <div class="method-bar">
+                                    <div class="method-selector">
+                                        <button class="method-btn active" data-method="GET">GET</button>
+                                        <button class="method-btn" data-method="POST">POST</button>
+                                        <button class="method-btn" data-method="PUT">PUT</button>
+                                        <button class="method-btn" data-method="PATCH">PATCH</button>
+                                        <button class="method-btn" data-method="DELETE">DELETE</button>
+                                    </div>
+                                </div>
+                                
+                                <div class="endpoint-bar">
+                                    <div class="endpoint-input-group">
+                                        <label for="endpoint-url" class="endpoint-label">Endpoint:</label>
+                                        <div class="endpoint-input">
+                                            <span class="base-url-preview" id="base-url-preview">Select a profile...</span>
+                                            <input type="text" id="endpoint-url" class="form-control" placeholder="/api/v1/users" title="Enter the endpoint path (e.g., /api/v1/users)">
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-primary send-btn" onclick="endpointTester.sendRequest()">
+                                        🚀 Send Request
+                                    </button>
+                                </div>
+
+                                <div class="request-sections">
+                                    <div class="section-tabs">
+                                        <button class="tab-btn active" data-tab="params">Query Params</button>
+                                        <button class="tab-btn" data-tab="headers">Headers</button>
+                                        <button class="tab-btn" data-tab="body">Body</button>
+                                        <button class="tab-btn" data-tab="options">Options</button>
+                                    </div>
+
+                                    <div class="tab-content">
+                                        <div class="tab-pane active" id="params-tab">
+                                            <div class="key-value-list" id="query-params">
+                                                <div class="key-value-pair">
+                                                    <input type="text" class="form-control" placeholder="Key">
+                                                    <input type="text" class="form-control" placeholder="Value">
+                                                    <button class="btn btn-sm btn-danger" onclick="this.closest('.key-value-pair').remove()">✕</button>
+                                                </div>
+                                            </div>
+                                            <button class="btn btn-sm btn-outline" onclick="endpointTester.addKeyValuePair('query-params')">
+                                                ➕ Add Parameter
+                                            </button>
+                                        </div>
+
+                                        <div class="tab-pane" id="headers-tab">
+                                            <div class="key-value-list" id="request-headers">
+                                                <div class="key-value-pair">
+                                                    <input type="text" class="form-control" placeholder="Header Name">
+                                                    <input type="text" class="form-control" placeholder="Header Value">
+                                                    <button class="btn btn-sm btn-danger" onclick="this.closest('.key-value-pair').remove()">✕</button>
+                                                </div>
+                                            </div>
+                                            <button class="btn btn-sm btn-outline" onclick="endpointTester.addKeyValuePair('request-headers')">
+                                                ➕ Add Header
+                                            </button>
+                                        </div>
+
+                                        <div class="tab-pane" id="body-tab">
+                                            <div class="form-group">
+                                                <label>Content Type:</label>
+                                                <select id="content-type" class="form-control">
+                                                    <option value="application/json">application/json</option>
+                                                    <option value="application/x-www-form-urlencoded">application/x-www-form-urlencoded</option>
+                                                    <option value="text/plain">text/plain</option>
+                                                    <option value="application/xml">application/xml</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label>Request Body:</label>
+                                                <textarea id="request-body" class="form-control code-editor" rows="10" placeholder="Request body (JSON, XML, etc.)"></textarea>
+                                            </div>
+                                        </div>
+
+                                        <div class="tab-pane" id="options-tab">
+                                            <div class="form-group">
+                                                <label class="checkbox-label">
+                                                    <input type="checkbox" id="get-all-pages">
+                                                    Get All Pages (Pagination)
+                                                </label>
+                                            </div>
+                                            <div class="form-row">
+                                                <div class="form-group">
+                                                    <label>Page Size:</label>
+                                                    <input type="number" id="page-size" class="form-control" value="50" min="1" max="1000">
+                                                </div>
+                                                <div class="form-group">
+                                                    <label>Max Pages:</label>
+                                                    <input type="number" id="max-pages" class="form-control" value="10" min="1" max="100">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="response-panel">
+                            <div class="response-header">
+                                <h3>Response</h3>
+                                <div class="response-meta" id="response-meta"></div>
+                            </div>
+                            <div class="response-content">
+                                <div id="response-viewer" class="response-viewer">
+                                    <div class="empty-response">
+                                        <div class="empty-icon">📡</div>
+                                        <p>Send a request to see the response</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Templates Section -->
+                <section id="templates-section" class="content-section">
+                    <div class="section-header">
+                        <h2>API Templates</h2>
+                        <div class="section-actions">
+                            <button class="btn btn-outline" onclick="templateManager.refreshTemplates()">
+                                🔄 Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="templates-grid" id="templates-grid">
+                        <!-- Templates will be populated here -->
+                    </div>
+                </section>
+
+                <!-- History Section -->
+                <section id="history-section" class="content-section">
+                    <div class="section-header">
+                        <h2>Request History</h2>
+                        <div class="section-actions">
+                            <input type="text" id="history-search" class="form-control" placeholder="Search history..." oninput="app.filterHistory()">
+                            <button class="btn btn-outline" onclick="app.clearHistory()">
+                                🗑️ Clear All
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="history-list" id="history-list">
+                        <!-- History will be populated here -->
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Profile Create/Edit Modal -->
+    <div id="profile-modal" class="modal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3 id="profile-modal-title">Create New Profile</h3>
+                <button class="modal-close" onclick="profileManager.closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="profile-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Profile Name:</label>
+                            <input type="text" id="profile-name" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Base URL:</label>
+                            <input type="url" id="profile-baseurl" class="form-control" placeholder="https://api.example.com" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Authentication Type:</label>
+                        <select id="profile-authtype" class="form-control" onchange="profileManager.updateAuthFields()">
+                            <option value="ApiKey">API Key</option>
+                            <option value="BearerToken">Bearer Token</option>
+                            <option value="CustomScript">Custom Script</option>
+                        </select>
+                    </div>
+
+                    <div id="auth-fields-container">
+                        <!-- Auth fields will be populated based on type -->
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Pagination Type:</label>
+                            <select id="profile-pagination" class="form-control">
+                                <option value="">Auto-detect</option>
+                                <option value="LinkHeader">Link Header</option>
+                                <option value="Cursor">Cursor-based</option>
+                                <option value="PageBased">Page-based</option>
+                                <option value="OffsetLimit">Offset/Limit</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="profile-session-only">
+                                Session Only (Don't persist to disk)
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="profileManager.closeModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="profileManager.saveProfile()">Save Profile</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PowerShell Code Modal -->
+    <div id="code-modal" class="modal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3>Generated PowerShell Code</h3>
+                <button class="modal-close" onclick="app.closeModal('code-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="code-header">
+                    <button class="btn btn-outline" onclick="app.copyToClipboard('generated-code')">
+                        📋 Copy to Clipboard
+                    </button>
+                </div>
+                <pre id="generated-code" class="code-block"></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notifications" class="notifications"></div>
+
+    <!-- JavaScript -->
+    <script src="js/api-client.js"></script>
+    <script src="js/secret-manager.js"></script>
+    <script src="js/profile-manager.js"></script>
+    <script src="js/endpoint-tester.js"></script>
+    <script src="js/template-manager.js"></script>
+    <script src="js/app.js"></script>
+
+    <script>
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            app.init();
+        });
+
+        // Hook up the Manage Secrets button when a profile is selected
+        function enableProfileSecretsButton(profileName) {
+            const actionDiv = document.getElementById('profile-secrets-action');
+            const btn = document.getElementById('manage-profile-secrets-btn');
+            if (actionDiv && btn) {
+                actionDiv.style.display = 'block';
+                btn.onclick = () => secretManager.showProfileSecrets(profileName);
+            }
+        }
+    </script>
+</body>
+</html>

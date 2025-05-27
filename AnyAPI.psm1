@@ -112,28 +112,29 @@ class ApiRequestBuilder {
 
     # Build method to create hashtable for existing functions
     [hashtable] Build() {
-        $params = @{
-            ProfileName      = $this.ProfileName
-            Endpoint         = $this.Endpoint
-            Method           = $this.Method
-            QueryParameters  = $this.QueryParameters
-            PathParameters   = $this.PathParameters
-            Headers          = $this.Headers
-            MaxRetries       = $this.MaxRetries
-            InitialBackoffMs = $this.InitialBackoffMs
-            SuppressErrors   = $this.SuppressErrors
-            SecureValues     = $this.SecureValues
-            GetAllPages      = $this.GetAllPages
-            MaxPages         = $this.MaxPages
-        }
-
-        if ($this.Body) { $params.Body = $this.Body }
-        if ($this.ContentType) { $params.ContentType = $this.ContentType }
-        if ($this.Stream) { $params.Stream = $this.Stream }
-        if ($this.PageSize -gt 0) { $params.PageSize = $this.PageSize }
-
-        return $params
+    $params = @{
+        ProfileName      = $this.ProfileName
+        Endpoint         = $this.Endpoint
+        Method           = $this.Method
+        QueryParameters  = $this.QueryParameters
+        PathParameters   = $this.PathParameters
+        Headers          = $this.Headers
+        MaxRetries       = $this.MaxRetries
+        InitialBackoffMs = $this.InitialBackoffMs
+        SuppressErrors   = $this.SuppressErrors
+        SecureValues     = $this.SecureValues
+        GetAllPages      = $this.GetAllPages
+        MaxPages         = $this.MaxPages
     }
+
+    # Add optional parameters only if they have values
+    if ($this.Body) { $params.Body = $this.Body }
+    if ($this.ContentType) { $params.ContentType = $this.ContentType }
+    if ($this.Stream) { $params.Stream = $this.Stream }
+    if ($this.PageSize -gt 0) { $params.PageSize = $this.PageSize }
+
+    return $params
+}
 
     # Validate required parameters
     [bool] IsValid() {
@@ -221,6 +222,60 @@ class ProfileInitializationBuilder {
         ![string]::IsNullOrWhiteSpace($this.BaseUrl) -and
         $this.AuthenticationDetails.Count -gt 0 -and
         $this.AuthenticationDetails.ContainsKey('AuthType')
+    }
+}
+
+function Clear-AuthHeaderCache {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $false)]
+        [string]$ProfileName
+    )
+    
+    if ($ProfileName) {
+        if ($script:AuthHeaderCache.ContainsKey($ProfileName)) {
+            $script:AuthHeaderCache.Remove($ProfileName)
+            Write-Verbose "Cleared authentication header cache for profile: $ProfileName"
+        }
+    } else {
+        $script:AuthHeaderCache.Clear()
+        Write-Verbose "Cleared all authentication header cache entries"
+    }
+}
+
+function Clear-PaginationTypeCache {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $false)]
+        [string]$ProfileName
+    )
+    
+    if ($ProfileName) {
+        if ($script:PaginationTypeCache.ContainsKey($ProfileName)) {
+            $script:PaginationTypeCache.Remove($ProfileName)
+            Write-Verbose "Cleared pagination type cache for profile: $ProfileName"
+        }
+    } else {
+        $script:PaginationTypeCache.Clear()
+        Write-Verbose "Cleared all pagination type cache entries"
+    }
+}
+
+function Clear-AllProfileCaches {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $false)]
+        [string]$ProfileName
+    )
+    
+    if ($ProfileName) {
+        Clear-AuthHeaderCache -ProfileName $ProfileName
+        Clear-PaginationTypeCache -ProfileName $ProfileName
+        Write-Verbose "Cleared all caches for profile: $ProfileName"
+    } else {
+        Clear-AuthHeaderCache
+        Clear-PaginationTypeCache
+        Write-Verbose "Cleared all profile caches"
     }
 }
 
@@ -971,13 +1026,35 @@ function Get-CachedAuthHeaders {
             }
         }
         "BearerToken" {
-            if ($authDetails.TokenValue) {
-                $token = Get-SecureValue -Value $authDetails.TokenValue -ProfileName $ProfileName
-                if ($token) {
-                    $authHeaders["Authorization"] = "Bearer $(ConvertFrom-SecureString $token -AsPlainText)"
+    if ($authDetails.TokenValue) {
+        $token = Get-SecureValue -Value $authDetails.TokenValue -ProfileName $ProfileName
+        if ($token) {
+            # Support custom token prefix for GitHub-style tokens
+            $tokenPrefix = $authDetails.TokenPrefix ?? "Bearer"
+            $authHeaders["Authorization"] = "$tokenPrefix $(ConvertFrom-SecureString $token -AsPlainText)"
+        }
+    }
+}
+"ApiKey" {
+    if ($authDetails.ApiKeyValue) {
+        $apiKey = Get-SecureValue -Value $authDetails.ApiKeyValue -ProfileName $ProfileName
+        if ($apiKey) {
+            $headerName = $authDetails.ApiKeyName ?? "X-API-Key"
+            $keyValue = ConvertFrom-SecureString $apiKey -AsPlainText
+            
+            # Handle GitHub-style token prefix - FIXED
+            if ($authDetails.TokenPrefix) {
+                # If TokenPrefix is specified, ensure it's applied
+                if (-not $keyValue.StartsWith($authDetails.TokenPrefix)) {
+                    $keyValue = "$($authDetails.TokenPrefix)$keyValue"
                 }
             }
+            
+            $authHeaders[$headerName] = $keyValue
+            Write-Verbose "ApiKey authentication header set: $headerName = $($keyValue.Substring(0, [Math]::Min(10, $keyValue.Length)))..."
         }
+    }
+}
         "CustomScript" {
             # Custom scripts are handled in Build-AuthenticationHeaders now
             return $null

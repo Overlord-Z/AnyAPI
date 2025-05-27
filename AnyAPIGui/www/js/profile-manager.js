@@ -22,25 +22,41 @@ class ProfileManager {
      */
     getProfileTemplates() {
     return {
-        github: {
-            name: "GitHub API",
-            baseUrl: "https://api.github.com",
-            authType: "Bearer",
-            headers: {
-                "Accept": "application/vnd.github.v3+json",
-                "User-Agent": "AnyAPI-PowerShell"
-            },
-            paginationType: "LinkHeader",
-            description: "GitHub REST API v3",
-            requiredSecrets: ["token"],
-            authFieldMapping: {
-                token: { field: "token", label: "GitHub Personal Access Token", type: "password" }
-            },
-            customSettings: {
-                "UserAgent": "AnyAPI-PowerShell",
-                "AcceptHeader": "application/vnd.github.v3+json"
-            }
+github: {
+    name: "GitHub API",
+    baseUrl: "https://api.github.com",
+    authType: "ApiKey",
+    headers: {
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "AnyAPI-PowerShell"
+    },
+    paginationType: "LinkHeader",
+    description: "GitHub REST API v3",
+    requiredSecrets: ["TokenValue"], // ← CHANGED from "apiKey" to "TokenValue"
+    authFieldMapping: {
+        TokenValue: {  // ← CHANGED from "apiKey" to "TokenValue"
+            field: "ApiKeyValue",  // ← This maps to the auth field in the profile
+            label: "GitHub Personal Access Token", 
+            type: "password" 
         },
+        headerName: { 
+            field: "ApiKeyName", 
+            label: "Header Name", 
+            type: "text", 
+            defaultValue: "Authorization" 
+        },
+        tokenPrefix: { 
+            field: "TokenPrefix", 
+            label: "Token Prefix", 
+            type: "text", 
+            defaultValue: "token " 
+        }
+    },
+    customSettings: {
+        "UserAgent": "AnyAPI-PowerShell",
+        "AcceptHeader": "application/vnd.github.v3+json"
+    }
+},
         microsoft_graph: {
             name: "Microsoft Graph",
             baseUrl: "https://graph.microsoft.com/v1.0",
@@ -1888,59 +1904,83 @@ applyTemplate() {
     showNotification(`Applied ${template.name} template`, 'success');
 }
 
+setFormValue(elementId, value) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.value = value || '';
+        return true;
+    }
+    console.warn(`Form element '${elementId}' not found`);
+    return false;
+}
+
+validateTemplateApplication(template) {
+    const requiredFields = ['name', 'baseUrl', 'authType'];
+    const missingFields = requiredFields.filter(field => !template[field]);
+    
+    if (missingFields.length > 0) {
+        showNotification(`Template missing required fields: ${missingFields.join(', ')}`, 'error');
+        return false;
+    }
+    
+    // Validate auth field mapping
+    if (template.requiredSecrets && template.requiredSecrets.length > 0) {
+        if (!template.authFieldMapping) {
+            showNotification('Template requires secrets but no auth field mapping defined', 'warning');
+        }
+    }
+    
+    return true;
+}
+
 /**
  * Apply template credentials in a coordinated way with auth types - NEW METHOD
  */
 applyTemplateCredentials(template) {
-    console.log('🔑 Applying template credentials...');
-    
-    const credentialsContainer = document.getElementById('profile-credentials-list');
-    if (!credentialsContainer) {
-        console.warn('⚠️ Credentials container not found');
-        return;
-    }
-
-    // Clear existing credential rows
-    credentialsContainer.innerHTML = '';
-
     if (template.authFieldMapping && template.requiredSecrets) {
-        console.log('🎯 Using auth field mapping for coordinated credentials');
-        
-        // Use the auth field mapping to create properly labeled credential fields
-        template.requiredSecrets.forEach(secretKey => {
-            const mapping = template.authFieldMapping[secretKey];
-            if (mapping) {
-                const label = mapping.label || secretKey;
-                console.log(`🔑 Adding credential field: ${secretKey} (${label})`);
-                this.addCredentialRow(credentialsContainer, secretKey, '', mapping.label, mapping.type);
-            } else {
-                // Fallback to default if no mapping
-                console.log(`🔑 Adding default credential field: ${secretKey}`);
-                this.addCredentialRow(credentialsContainer, secretKey, '');
-            }
-        });
-
-        // Add any non-secret auth fields (like headerName for API key)
-        Object.entries(template.authFieldMapping).forEach(([key, mapping]) => {
-            if (!template.requiredSecrets.includes(key)) {
-                console.log(`🔧 Adding non-secret auth field: ${key} (${mapping.label})`);
-                const defaultValue = mapping.defaultValue || '';
-                this.addCredentialRow(credentialsContainer, key, defaultValue, mapping.label, mapping.type);
-            }
-        });
-    } else if (template.requiredSecrets) {
-        console.log('🔑 Using basic required secrets (no mapping)');
-        
-        // Fallback to basic required secrets
-        template.requiredSecrets.forEach(secretName => {
-            this.addCredentialRow(credentialsContainer, secretName, '');
-        });
+        const credentialsContainer = document.getElementById('profile-credentials-list');
+        if (credentialsContainer) {
+            // Clear existing credentials
+            credentialsContainer.innerHTML = '';
+            
+            // Add credential rows based on template mapping
+            template.requiredSecrets.forEach(secretKey => {
+                if (template.authFieldMapping[secretKey]) {
+                    const mapping = template.authFieldMapping[secretKey];
+                    const inputType = mapping.type || 'password';
+                    
+                    this.addCredentialRow(
+                        credentialsContainer, 
+                        mapping.field || secretKey, 
+                        mapping.defaultValue || '',
+                        mapping.label || secretKey,
+                        inputType
+                    );
+                    
+                    // Set the label and make template fields readonly
+                    const lastRow = credentialsContainer.lastElementChild;
+                    if (lastRow && mapping.label) {
+                        const keyInput = lastRow.querySelector('.credential-key');
+                        if (keyInput) {
+                            keyInput.value = mapping.field || secretKey;
+                            keyInput.setAttribute('data-label', mapping.label);
+                            keyInput.title = mapping.label;
+                            if (mapping.defaultValue) {
+                                keyInput.style.backgroundColor = 'var(--bg-secondary)';
+                                keyInput.readOnly = true;
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Add one empty row for additional credentials
+            this.addCredentialRow(credentialsContainer, '', '');
+            console.log('✅ Template credentials applied successfully');
+        }
+    } else {
+        console.log('⚠️ No auth field mapping or required secrets found in template');
     }
-
-    // Always add one empty row at the end
-    this.addCredentialRow(credentialsContainer, '', '');
-    
-    console.log('✅ Template credentials applied successfully');
 }
 
     /**
@@ -2053,89 +2093,125 @@ applyTemplateCredentials(template) {
         }
     }
 
-    /**
-     * Collect form data into profile object
-     */
-    collectFormData() {
-        console.log('📊 Collecting form data...');
-        
-        const profileData = {
-            name: document.getElementById('profile-name')?.value?.trim() || '',
-            baseUrl: document.getElementById('profile-baseurl')?.value?.trim() || '',
-            description: document.getElementById('profile-description')?.value?.trim() || '',
-            authType: document.getElementById('profile-authtype')?.value || 'None',
-            paginationType: document.getElementById('profile-pagination')?.value || 'Auto',
-            isSessionOnly: document.getElementById('profile-session-only')?.checked || false,
-            headers: {},
-            credentials: {}
-        };
+/**
+ * Fixed collectFormData method for profile-manager.js
+ * This replaces the existing collectFormData method
+ */
+collectFormData() {
+    console.log('📊 Collecting form data...');
+    
+    const profileData = {
+        name: document.getElementById('profile-name')?.value?.trim() || '',
+        baseUrl: document.getElementById('profile-baseurl')?.value?.trim() || '',
+        description: document.getElementById('profile-description')?.value?.trim() || '',
+        authType: document.getElementById('profile-authtype')?.value || 'None',
+        paginationType: document.getElementById('profile-pagination')?.value || 'Auto',
+        isSessionOnly: document.getElementById('profile-session-only')?.checked || false,
+        headers: {},
+        credentials: {}
+    };
 
-        console.log('📋 Basic profile data collected:', profileData);
+    console.log('📋 Basic profile data collected:', profileData);
 
-        // Parse headers JSON
-        try {
-            const headersText = document.getElementById('profile-headers')?.value?.trim();
-            if (headersText) {
-                profileData.headers = JSON.parse(headersText);
-            }
-        } catch (error) {
-            console.warn('⚠️ Invalid JSON in headers, using empty object');
-            profileData.headers = {};
+    // Parse headers JSON
+    try {
+        const headersText = document.getElementById('profile-headers')?.value?.trim();
+        if (headersText) {
+            profileData.headers = JSON.parse(headersText);
         }
-
-        // Parse pagination details JSON
-        try {
-            const paginationDetailsText = document.getElementById('profile-pagination-details')?.value?.trim();
-            if (paginationDetailsText) {
-                profileData.paginationDetails = JSON.parse(paginationDetailsText);
-            }
-        } catch (error) {
-            console.warn('⚠️ Invalid JSON in pagination details, using empty object');
-            profileData.paginationDetails = {};
-        }
-
-        // Collect custom settings
-        const customSettings = {};
-        const customSettingsRows = document.querySelectorAll('#profile-customsettings-list .customsetting-row');
-        customSettingsRows.forEach(row => {
-            const key = row.querySelector('.customsetting-key')?.value?.trim();
-            const value = row.querySelector('.customsetting-value')?.value?.trim();
-            if (key) {
-                customSettings[key] = value;
-            }
-        });
-        if (Object.keys(customSettings).length > 0) {
-            profileData.customSettings = customSettings;
-        }
-
-        // Collect credentials
-        const credentials = {};
-        const credRows = document.querySelectorAll('#profile-credentials-list .credential-row');
-        credRows.forEach(row => {
-            const key = row.querySelector('.credential-key')?.value?.trim();
-            const valueInput = row.querySelector('.credential-value');
-            let value = valueInput?.value?.trim();
-            // If secret and masked, treat as unchanged (do not overwrite)
-            if (valueInput && valueInput.type === 'password' && value === '********') {
-                value = '***MASKED***';
-            }
-            if (key) {
-                credentials[key] = value;
-            }
-        });
-        if (Object.keys(credentials).length > 0) {
-            profileData.credentials = credentials;
-        }
-
-        // Handle custom auth script
-        const authScript = document.getElementById('auth-script')?.value?.trim();
-        if (authScript) {
-            profileData.customAuthScript = authScript;
-        }
-
-        console.log('✅ Final profile data:', JSON.stringify(profileData, null, 2));
-        return profileData;
+    } catch (error) {
+        console.warn('⚠️ Invalid JSON in headers, using empty object');
+        profileData.headers = {};
     }
+
+    // Parse pagination details JSON
+    try {
+        const paginationDetailsText = document.getElementById('profile-pagination-details')?.value?.trim();
+        if (paginationDetailsText) {
+            profileData.paginationDetails = JSON.parse(paginationDetailsText);
+        }
+    } catch (error) {
+        console.warn('⚠️ Invalid JSON in pagination details, using empty object');
+        profileData.paginationDetails = {};
+    }
+
+    // Collect custom settings
+    const customSettings = {};
+    const customSettingsRows = document.querySelectorAll('#profile-customsettings-list .customsetting-row');
+    customSettingsRows.forEach(row => {
+        const key = row.querySelector('.customsetting-key')?.value?.trim();
+        const value = row.querySelector('.customsetting-value')?.value?.trim();
+        if (key) {
+            customSettings[key] = value;
+        }
+    });
+    if (Object.keys(customSettings).length > 0) {
+        profileData.customSettings = customSettings;
+    }
+
+    // FIXED: Collect credentials with proper masking handling
+    const credentials = {};
+    const credRows = document.querySelectorAll('#profile-credentials-list .credential-row');
+    credRows.forEach(row => {
+        const key = row.querySelector('.credential-key')?.value?.trim();
+        const valueInput = row.querySelector('.credential-value');
+        
+        if (!key) return; // Skip rows without keys
+        
+        let value = valueInput?.value?.trim();
+        
+        // FIXED: Handle masked credentials properly
+        if (valueInput && valueInput.type === 'password') {
+            // Check if this is a masked placeholder (various possible formats)
+            const isMasked = value === '********' || 
+                           value === '••••••••' || 
+                           value === '***MASKED***' ||
+                           value === '' ||
+                           (value && value.match(/^[•*]{6,}$/));
+            
+            if (isMasked && this.isEditing && this.currentEditProfile) {
+                // For editing: if field appears masked and user didn't change it, 
+                // don't include it in the update (backend will keep existing)
+                console.log(`🔒 Credential '${key}' appears masked, excluding from update`);
+                return; // Skip this credential - backend will keep existing value
+            }
+            
+            // If we reach here, it's either:
+            // 1. A new profile (create mode)
+            // 2. An edit where user actually entered a new value
+            if (value && !isMasked) {
+                credentials[key] = value;
+                console.log(`🔑 Including credential '${key}' with new value`);
+            } else if (!this.isEditing) {
+                // For new profiles, require non-empty values
+                console.log(`⚠️ New profile missing required credential '${key}'`);
+            }
+        } else {
+            // Non-password fields (like headerName for API keys)
+            if (value) {
+                credentials[key] = value;
+                console.log(`🔧 Including non-secret credential field '${key}': ${value}`);
+            }
+        }
+    });
+    
+    // Only set credentials if we have any
+    if (Object.keys(credentials).length > 0) {
+        profileData.credentials = credentials;
+        console.log('🔑 Final credentials keys:', Object.keys(credentials));
+    } else {
+        console.log('🔑 No credentials to include in request');
+    }
+
+    // Handle custom auth script
+    const authScript = document.getElementById('auth-script')?.value?.trim();
+    if (authScript) {
+        profileData.customAuthScript = authScript;
+    }
+
+    console.log('✅ Final profile data:', JSON.stringify(profileData, null, 2));
+    return profileData;
+}
 
     /**
      * Test profile connection

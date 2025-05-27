@@ -372,33 +372,44 @@ class TemplateManager {
      * Fill profile form with template data
      */
     fillProfileFormFromTemplate(template, profileName) {
-        // Basic fields
-        profileManager.setFormValue('profile-name', profileName);
-        profileManager.setFormValue('profile-baseurl', template.baseUrl);
-        profileManager.setFormValue('profile-authtype', template.authType);
-        profileManager.setFormValue('profile-pagination', template.paginationType || '');
+    // Basic fields
+    profileManager.setFormValue('profile-name', profileName);
+    profileManager.setFormValue('profile-baseurl', template.baseUrl);
+    profileManager.setFormValue('profile-authtype', template.authType);
+    profileManager.setFormValue('profile-pagination', template.paginationType || 'Auto');
+    profileManager.setFormValue('profile-description', template.description || '');
+    
+    // Set headers if available
+    if (template.headers) {
+        profileManager.setFormValue('profile-headers', JSON.stringify(template.headers, null, 2));
+    }
+    
+    // Update auth fields to show the correct form sections
+    profileManager.updateAuthFields();
+    
+    // Wait for auth fields to render, then apply template-specific auth configuration
+    setTimeout(() => {
+        if (template.authFieldMapping && template.requiredSecrets) {
+            profileManager.applyTemplateCredentials(template);
+        }
         
-        // Update auth fields
-        profileManager.updateAuthFields();
-        
-        // Fill auth-specific fields
+        // Handle custom auth script
         if (template.authType === 'CustomScript' && template.customAuthScript) {
-            const scriptElement = document.getElementById('auth-custom-script');
+            const scriptElement = document.getElementById('auth-script');
             if (scriptElement) {
                 scriptElement.value = template.customAuthScript;
             }
-            
-            if (template.requiredSecrets) {
-                const secretsElement = document.getElementById('auth-required-secrets');
-                if (secretsElement) {
-                    secretsElement.value = template.requiredSecrets.join(', ');
-                }
-            }
         }
         
-        // Note: For security reasons, we don't pre-fill actual secret values
-        // Users will need to enter their own API keys, tokens, etc.
-    }
+        // Handle pagination details
+        if (template.paginationDetails) {
+            const paginationDetailsField = document.getElementById('profile-pagination-details');
+            if (paginationDetailsField) {
+                paginationDetailsField.value = JSON.stringify(template.paginationDetails, null, 2);
+            }
+        }
+    }, 200);
+}
 
     /**
      * Refresh templates from backend

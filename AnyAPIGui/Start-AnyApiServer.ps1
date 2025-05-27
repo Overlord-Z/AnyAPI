@@ -212,6 +212,7 @@ function Handle-CreateProfile {
         $secretStorePassword = $Request.Headers["X-SecretStore-Password"]
         if ($secretStorePassword) {
             $script:secretStorePassword = ConvertTo-SecureString $secretStorePassword -AsPlainText -Force
+            Write-Host "SecretStore password provided in headers" -ForegroundColor Green
         }
         
         # Validate required fields
@@ -222,84 +223,118 @@ function Handle-CreateProfile {
             throw "Base URL is required"
         }
         
-        # Build authentication details based on type
+        # Build authentication details and secure values
         $authDetails = @{
             AuthType = $Body.authType ?? "None"
         }
         
+        # Prepare SecureValues hashtable for sensitive data
+        $secureValues = @{}
+        
+        Write-Host "🔧 Building auth details for type: $($Body.authType)" -ForegroundColor Magenta
+        
         switch ($Body.authType) {
             "ApiKey" {
-                if ($Body.credentials.apiKey) {
+                Write-Host "Processing API Key authentication..." -ForegroundColor Green
+                if ($Body.credentials -and $Body.credentials.apiKey) {
                     $authDetails.ApiKeyName = $Body.credentials.headerName ?? "X-API-Key"
-                    $authDetails.ApiKeyValue = $Body.credentials.apiKey
                     $authDetails.ApiKeyLocation = "Header"
+                    # Mark for secure storage but set placeholder
+                    $authDetails.ApiKeyValue = "<<SECRET_NEEDS_RUNTIME_PROVISIONING>>"
+                    # Add to secure values for proper secret storage
+                    $secureValues["ApiKeyValue"] = $Body.credentials.apiKey
+                    Write-Host "  ApiKeyName: $($authDetails.ApiKeyName)" -ForegroundColor Cyan
+                    Write-Host "  ApiKeyValue: [Will be stored securely]" -ForegroundColor Cyan
+                } else {
+                    Write-Host "  WARNING: No apiKey found in credentials!" -ForegroundColor Red
                 }
             }
             "Bearer" {
-                if ($Body.credentials.token) {
-                    $authDetails.TokenValue = $Body.credentials.token
+                Write-Host "Processing Bearer Token authentication..." -ForegroundColor Green
+                if ($Body.credentials -and $Body.credentials.token) {
+                    # Mark for secure storage but set placeholder
+                    $authDetails.TokenValue = "<<SECRET_NEEDS_RUNTIME_PROVISIONING>>"
+                    # Add to secure values for proper secret storage
+                    $secureValues["TokenValue"] = $Body.credentials.token
+                    Write-Host "  TokenValue: [Will be stored securely]" -ForegroundColor Cyan
+                } else {
+                    Write-Host "  WARNING: No token found in credentials!" -ForegroundColor Red
                 }
             }
             "Basic" {
-                if ($Body.credentials.username -and $Body.credentials.password) {
+                Write-Host "Processing Basic authentication..." -ForegroundColor Green
+                if ($Body.credentials -and $Body.credentials.username -and $Body.credentials.password) {
                     $authDetails.Username = $Body.credentials.username
-                    $authDetails.Password = $Body.credentials.password
+                    # Mark password for secure storage but set placeholder
+                    $authDetails.Password = "<<SECRET_NEEDS_RUNTIME_PROVISIONING>>"
+                    # Add to secure values for proper secret storage
+                    $secureValues["Password"] = $Body.credentials.password
+                    Write-Host "  Username: $($Body.credentials.username)" -ForegroundColor Cyan
+                    Write-Host "  Password: [Will be stored securely]" -ForegroundColor Cyan
+                } else {
+                    Write-Host "  WARNING: Missing username or password in credentials!" -ForegroundColor Red
                 }
             }
             "Custom" {
+                Write-Host "Processing Custom authentication..." -ForegroundColor Green
                 if ($Body.customAuthScript) {
                     $authDetails.AuthScriptBlock = [ScriptBlock]::Create($Body.customAuthScript)
+                    Write-Host "  Custom script: [${($Body.customAuthScript.Length)} chars]" -ForegroundColor Cyan
                 }
-                # Add any additional credentials for custom auth
+                
+                # Handle additional credentials for custom auth
                 if ($Body.credentials) {
+                    Write-Host "  Processing custom credentials:" -ForegroundColor Cyan
                     foreach ($key in $Body.credentials.Keys) {
                         if ($key -notin @('username', 'password', 'token', 'apiKey', 'headerName')) {
-                            $authDetails[$key] = $Body.credentials[$key]
+                            # Check if this is a sensitive field that should be stored securely
+                            if ($key -match "(Key|Secret|Token|Password)") {
+                                $authDetails[$key] = "<<SECRET_NEEDS_RUNTIME_PROVISIONING>>"
+                                $secureValues[$key] = $Body.credentials[$key]
+                                Write-Host "    $key`: [Will be stored securely]" -ForegroundColor Green
+                            } else {
+                                $authDetails[$key] = $Body.credentials[$key]
+                                Write-Host "    $key`: '$($Body.credentials[$key])'" -ForegroundColor Cyan
+                            }
                         }
                     }
                 }
             }
+            default {
+                Write-Host "No authentication or unknown type: $($Body.authType)" -ForegroundColor Yellow
+            }
+        }
+        
+        Write-Host "🔧 Final auth details structure:" -ForegroundColor Magenta
+        foreach ($authKey in $authDetails.Keys) {
+            $authValue = $authDetails[$authKey]
+            if ($authKey -match "(Value|Password|Token|Secret)" -and $authValue) {
+                Write-Host "  $authKey = $authValue" -ForegroundColor Cyan
+            } elseif ($authKey -eq "AuthScriptBlock") {
+                Write-Host "  $authKey = [ScriptBlock ${($authValue.ToString().Length)} chars]" -ForegroundColor Cyan
+            } else {
+                Write-Host "  $authKey = '$authValue'" -ForegroundColor Cyan
+            }
+        }
+        
+        Write-Host "🔐 Secure values prepared:" -ForegroundColor Magenta
+        foreach ($secureKey in $secureValues.Keys) {
+            Write-Host "  $secureKey = [REDACTED ${($secureValues[$secureKey].Length)} chars]" -ForegroundColor Green
         }
         
         # Build pagination details
-$paginationDetails = @{}
-
-if ($Body.paginationType -and $Body.paginationType -ne "Auto") {
-    $paginationDetails.Type = $Body.paginationType
-    
-    # Check if frontend sent paginationDetails object directly
-    if ($Body.paginationDetails -and $Body.paginationDetails -is [hashtable]) {
-        Write-Host "📋 Using paginationDetails object from frontend" -ForegroundColor Green
-        # Use the frontend-provided pagination details
-        foreach ($key in $Body.paginationDetails.Keys) {
-            $paginationDetails[$key] = $Body.paginationDetails[$key]
-        }
-        # Ensure Type is set
-        $paginationDetails.Type = $Body.paginationType
-    }
-    else {
-        Write-Host "📋 Using individual pagination fields (legacy)" -ForegroundColor Yellow
-        # Fallback to individual fields for backward compatibility
-        switch ($Body.paginationType) {
-            "PageBased" {
-                if ($Body.pageParameter) { $paginationDetails.PageParameter = $Body.pageParameter }
-                if ($Body.pageSizeParameter) { $paginationDetails.PageSizeParameter = $Body.pageSizeParameter }
-                if ($Body.totalPagesField) { $paginationDetails.TotalPagesField = $Body.totalPagesField }
-            }
-            "OffsetLimit" {
-                if ($Body.offsetParameter) { $paginationDetails.OffsetParameter = $Body.offsetParameter }
-                if ($Body.limitParameter) { $paginationDetails.LimitParameter = $Body.limitParameter }
-                if ($Body.totalField) { $paginationDetails.TotalField = $Body.totalField }
-            }
-            "Cursor" {
-                if ($Body.nextTokenField) { $paginationDetails.NextTokenField = $Body.nextTokenField }
-                if ($Body.tokenParameter) { $paginationDetails.TokenParameter = $Body.tokenParameter }
+        $paginationDetails = @{}
+        if ($Body.paginationType -and $Body.paginationType -ne "Auto") {
+            $paginationDetails.Type = $Body.paginationType
+            
+            if ($Body.paginationDetails -and $Body.paginationDetails -is [hashtable]) {
+                Write-Host "📋 Using paginationDetails object from frontend" -ForegroundColor Green
+                foreach ($key in $Body.paginationDetails.Keys) {
+                    $paginationDetails[$key] = $Body.paginationDetails[$key]
+                }
+                $paginationDetails.Type = $Body.paginationType
             }
         }
-    }
-    
-    Write-Host "🔧 Final pagination details: $($paginationDetails | ConvertTo-Json -Depth 3)" -ForegroundColor Cyan
-}
         
         # Create profile parameters
         $profileParams = @{
@@ -307,6 +342,12 @@ if ($Body.paginationType -and $Body.paginationType -ne "Auto") {
             BaseUrl               = $Body.baseUrl
             AuthenticationDetails = $authDetails
             Force                 = $true
+        }
+        
+        # Add SecureValues if we have any
+        if ($secureValues.Count -gt 0) {
+            $profileParams.SecureValues = $secureValues
+            Write-Host "🔐 Adding SecureValues to profile creation" -ForegroundColor Green
         }
         
         if ($paginationDetails.Count -gt 0) {
@@ -317,7 +358,6 @@ if ($Body.paginationType -and $Body.paginationType -ne "Auto") {
             $profileParams.DefaultHeaders = $Body.headers
         }
 
-        # --- Description fix: store in CustomSettings ---
         if ($Body.description) {
             if (-not $profileParams.ContainsKey('CustomSettings') -or -not $profileParams.CustomSettings) {
                 $profileParams.CustomSettings = @{}
@@ -329,10 +369,13 @@ if ($Body.paginationType -and $Body.paginationType -ne "Auto") {
             $profileParams.NoLocalFilePersistence = $true
         }
         
-        Write-Host "🔧 Profile parameters: $($profileParams | ConvertTo-Json -Depth 3)" -ForegroundColor Yellow
+        Write-Host "🚀 Calling Initialize-AnyApiProfile..." -ForegroundColor Green
+        Write-Host "Parameters: $($profileParams.Keys -join ', ')" -ForegroundColor Gray
         
         # Create the profile
-        Initialize-AnyApiProfile @profileParams
+        $result = Initialize-AnyApiProfile @profileParams
+        
+        Write-Host "✅ Initialize-AnyApiProfile completed successfully" -ForegroundColor Green
         
         Send-JsonResponse -Response $Response -Data @{
             success = $true
@@ -380,6 +423,15 @@ function Handle-UpdateProfile {
             return
         }
         
+        # Get the existing profile to preserve credentials not being updated
+        Write-Host "🔍 Loading existing profile for credential preservation..." -ForegroundColor Yellow
+        $existingProfile = $null
+        if ($existingProfiles -is [hashtable] -and $existingProfiles.ContainsKey($ProfileName)) {
+            $existingProfile = $existingProfiles[$ProfileName]
+        } elseif ($existingProfiles -is [array] -and $existingProfiles.Count -gt 0) {
+            $existingProfile = $existingProfiles[0]
+        }
+        
         # If the profile name is changing, we need to handle it
         if ($Body.name -ne $ProfileName) {
             # Check if the new name already exists
@@ -398,67 +450,167 @@ function Handle-UpdateProfile {
             AuthType = $Body.authType ?? "None"
         }
         
+        # Prepare SecureValues hashtable for sensitive data (same as create)
+        $secureValues = @{}
+        
+        Write-Host "🔧 Building auth details for update. Auth Type: $($Body.authType)" -ForegroundColor Magenta
+        
+        # Handle credentials with proper secure storage approach
+        $hasNewCredentials = $Body.credentials -and $Body.credentials.Count -gt 0
+        Write-Host "New credentials provided: $hasNewCredentials" -ForegroundColor $(if ($hasNewCredentials) { 'Green' } else { 'Yellow' })
+        
+        if ($hasNewCredentials) {
+            Write-Host "New credentials keys: $($Body.credentials.Keys -join ', ')" -ForegroundColor Cyan
+        }
+        
         switch ($Body.authType) {
             "ApiKey" {
-                if ($Body.credentials.apiKey) {
-                    $authDetails.ApiKeyName = $Body.credentials.headerName ?? "X-API-Key"
-                    $authDetails.ApiKeyValue = $Body.credentials.apiKey
-                    $authDetails.ApiKeyLocation = "Header"
+                Write-Host "Processing API Key authentication update..." -ForegroundColor Green
+                
+                # Set the basic structure
+                $authDetails.ApiKeyLocation = "Header"
+                $authDetails.ApiKeyName = if ($Body.credentials -and $Body.credentials.headerName) { 
+                    $Body.credentials.headerName 
+                } elseif ($existingProfile -and $existingProfile.AuthenticationDetails -and $existingProfile.AuthenticationDetails.ApiKeyName) {
+                    $existingProfile.AuthenticationDetails.ApiKeyName
+                } else { 
+                    "X-API-Key" 
                 }
+                
+                # Handle the API key value with secure storage
+                if ($Body.credentials -and $Body.credentials.apiKey) {
+                    # New API key provided - use secure storage
+                    $authDetails.ApiKeyValue = "<<SECRET_NEEDS_RUNTIME_PROVISIONING>>"
+                    $secureValues["ApiKeyValue"] = $Body.credentials.apiKey
+                    Write-Host "  New ApiKey provided: [Will be stored securely]" -ForegroundColor Green
+                } elseif ($existingProfile -and $existingProfile.AuthenticationDetails -and $existingProfile.AuthenticationDetails.ApiKeyValue) {
+                    # Keep existing API key (user didn't provide a new one)
+                    $authDetails.ApiKeyValue = $existingProfile.AuthenticationDetails.ApiKeyValue
+                    Write-Host "  Preserving existing ApiKey" -ForegroundColor Yellow
+                } else {
+                    Write-Host "  WARNING: No API key available (neither new nor existing)!" -ForegroundColor Red
+                }
+                
+                Write-Host "  Final ApiKeyName: $($authDetails.ApiKeyName)" -ForegroundColor Cyan
             }
+            
             "Bearer" {
-                if ($Body.credentials.token) {
-                    $authDetails.TokenValue = $Body.credentials.token
+                Write-Host "Processing Bearer Token authentication update..." -ForegroundColor Green
+                
+                if ($Body.credentials -and $Body.credentials.token) {
+                    # New token provided - use secure storage
+                    $authDetails.TokenValue = "<<SECRET_NEEDS_RUNTIME_PROVISIONING>>"
+                    $secureValues["TokenValue"] = $Body.credentials.token
+                    Write-Host "  New Token provided: [Will be stored securely]" -ForegroundColor Green
+                } elseif ($existingProfile -and $existingProfile.AuthenticationDetails -and $existingProfile.AuthenticationDetails.TokenValue) {
+                    # Keep existing token
+                    $authDetails.TokenValue = $existingProfile.AuthenticationDetails.TokenValue
+                    Write-Host "  Preserving existing Token" -ForegroundColor Yellow
+                } else {
+                    Write-Host "  WARNING: No token available (neither new nor existing)!" -ForegroundColor Red
                 }
             }
+            
             "Basic" {
-                if ($Body.credentials.username -and $Body.credentials.password) {
+                Write-Host "Processing Basic authentication update..." -ForegroundColor Green
+                
+                # Handle username
+                if ($Body.credentials -and $Body.credentials.username) {
                     $authDetails.Username = $Body.credentials.username
-                    $authDetails.Password = $Body.credentials.password
+                    Write-Host "  New Username: $($Body.credentials.username)" -ForegroundColor Green
+                } elseif ($existingProfile -and $existingProfile.AuthenticationDetails -and $existingProfile.AuthenticationDetails.Username) {
+                    $authDetails.Username = $existingProfile.AuthenticationDetails.Username
+                    Write-Host "  Preserving existing Username: $($existingProfile.AuthenticationDetails.Username)" -ForegroundColor Yellow
+                }
+                
+                # Handle password with secure storage
+                if ($Body.credentials -and $Body.credentials.password) {
+                    $authDetails.Password = "<<SECRET_NEEDS_RUNTIME_PROVISIONING>>"
+                    $secureValues["Password"] = $Body.credentials.password
+                    Write-Host "  New Password provided: [Will be stored securely]" -ForegroundColor Green
+                } elseif ($existingProfile -and $existingProfile.AuthenticationDetails -and $existingProfile.AuthenticationDetails.Password) {
+                    $authDetails.Password = $existingProfile.AuthenticationDetails.Password
+                    Write-Host "  Preserving existing Password" -ForegroundColor Yellow
                 }
             }
+            
             "Custom" {
+                Write-Host "Processing Custom authentication update..." -ForegroundColor Green
+                
+                # Handle custom script
                 if ($Body.customAuthScript) {
                     $authDetails.AuthScriptBlock = [ScriptBlock]::Create($Body.customAuthScript)
+                    Write-Host "  New Custom script: [${($Body.customAuthScript.Length)} chars]" -ForegroundColor Green
+                } elseif ($existingProfile -and $existingProfile.AuthenticationDetails -and $existingProfile.AuthenticationDetails.AuthScriptBlock) {
+                    $authDetails.AuthScriptBlock = $existingProfile.AuthenticationDetails.AuthScriptBlock
+                    Write-Host "  Preserving existing Custom script" -ForegroundColor Yellow
                 }
-                # Add any additional credentials for custom auth
+                
+                # Handle additional credentials for custom auth with secure storage
                 if ($Body.credentials) {
+                    Write-Host "  Processing custom credentials:" -ForegroundColor Cyan
                     foreach ($key in $Body.credentials.Keys) {
                         if ($key -notin @('username', 'password', 'token', 'apiKey', 'headerName')) {
-                            $authDetails[$key] = $Body.credentials[$key]
+                            # Check if this is a sensitive field that should be stored securely
+                            if ($key -match "(Key|Secret|Token|Password)") {
+                                $authDetails[$key] = "<<SECRET_NEEDS_RUNTIME_PROVISIONING>>"
+                                $secureValues[$key] = $Body.credentials[$key]
+                                Write-Host "    NEW $key`: [Will be stored securely]" -ForegroundColor Green
+                            } else {
+                                $authDetails[$key] = $Body.credentials[$key]
+                                Write-Host "    NEW $key`: '$($Body.credentials[$key])'" -ForegroundColor Green
+                            }
+                        }
+                    }
+                }
+                
+                # Preserve existing custom credentials that weren't updated
+                if ($existingProfile -and $existingProfile.AuthenticationDetails) {
+                    foreach ($key in $existingProfile.AuthenticationDetails.Keys) {
+                        if ($key -notin @('AuthType', 'AuthScriptBlock', 'username', 'password', 'token', 'apiKey', 'headerName') -and
+                            -not $authDetails.ContainsKey($key)) {
+                            $authDetails[$key] = $existingProfile.AuthenticationDetails[$key]
+                            Write-Host "    PRESERVED $key`: [existing value]" -ForegroundColor Yellow
                         }
                     }
                 }
             }
         }
         
-        # Build pagination details
-        $paginationDetails = @{
+        Write-Host "🔧 Final auth details structure:" -ForegroundColor Magenta
+        foreach ($authKey in $authDetails.Keys) {
+            $authValue = $authDetails[$authKey]
+            if ($authKey -match "(Value|Password|Token|Secret)" -and $authValue) {
+                Write-Host "  $authKey = $authValue" -ForegroundColor Cyan
+            } elseif ($authKey -eq "AuthScriptBlock") {
+                Write-Host "  $authKey = [ScriptBlock ${($authValue.ToString().Length)} chars]" -ForegroundColor Cyan
+            } else {
+                Write-Host "  $authKey = '$authValue'" -ForegroundColor Cyan
+            }
         }
+        
+        Write-Host "🔐 Secure values prepared:" -ForegroundColor Magenta
+        foreach ($secureKey in $secureValues.Keys) {
+            Write-Host "  $secureKey = [REDACTED ${($secureValues[$secureKey].Length)} chars]" -ForegroundColor Green
+        }
+        
+        # Build pagination details
+        $paginationDetails = @{}
         if ($Body.paginationType -and $Body.paginationType -ne "Auto") {
             $paginationDetails.Type = $Body.paginationType
             
             # Add pagination-specific fields
-            switch ($Body.paginationType) {
-                "PageBased" {
-                    if ($Body.pageParameter) { $paginationDetails.PageParameter = $Body.pageParameter }
-                    if ($Body.pageSizeParameter) { $paginationDetails.PageSizeParameter = $Body.pageSizeParameter }
-                    if ($Body.totalPagesField) { $paginationDetails.TotalPagesField = $Body.totalPagesField }
+            if ($Body.paginationDetails -and $Body.paginationDetails -is [hashtable]) {
+                foreach ($key in $Body.paginationDetails.Keys) {
+                    $paginationDetails[$key] = $Body.paginationDetails[$key]
                 }
-                "OffsetLimit" {
-                    if ($Body.offsetParameter) { $paginationDetails.OffsetParameter = $Body.offsetParameter }
-                    if ($Body.limitParameter) { $paginationDetails.LimitParameter = $Body.limitParameter }
-                    if ($Body.totalField) { $paginationDetails.TotalField = $Body.totalField }
-                }
-                "Cursor" {
-                    if ($Body.nextTokenField) { $paginationDetails.NextTokenField = $Body.nextTokenField }
-                    if ($Body.tokenParameter) { $paginationDetails.TokenParameter = $Body.tokenParameter }
-                }
+                $paginationDetails.Type = $Body.paginationType
             }
         }
         
         # If the profile name is changing, remove the old one first
         if ($Body.name -ne $ProfileName) {
+            Write-Host "Profile name changing from '$ProfileName' to '$($Body.name)' - removing old profile" -ForegroundColor Yellow
             Remove-AnyApiProfile -ProfileName $ProfileName -Confirm:$false
         }
         
@@ -470,6 +622,12 @@ function Handle-UpdateProfile {
             Force                 = $true
         }
         
+        # Add SecureValues if we have any (same as create)
+        if ($secureValues.Count -gt 0) {
+            $profileParams.SecureValues = $secureValues
+            Write-Host "🔐 Adding SecureValues to profile update" -ForegroundColor Green
+        }
+        
         if ($paginationDetails.Count -gt 0) {
             $profileParams.PaginationDetails = $paginationDetails
         }
@@ -478,7 +636,6 @@ function Handle-UpdateProfile {
             $profileParams.DefaultHeaders = $Body.headers
         }
 
-        # --- Description fix: store in CustomSettings ---
         if ($Body.description) {
             if (-not $profileParams.ContainsKey('CustomSettings') -or -not $profileParams.CustomSettings) {
                 $profileParams.CustomSettings = @{}
@@ -490,10 +647,12 @@ function Handle-UpdateProfile {
             $profileParams.NoLocalFilePersistence = $true
         }
         
-        Write-Host "🔧 Profile update parameters: $($profileParams | ConvertTo-Json -Depth 3)" -ForegroundColor Yellow
+        Write-Host "🚀 Calling Initialize-AnyApiProfile for update..." -ForegroundColor Green
         
         # Update the profile
         Initialize-AnyApiProfile @profileParams
+        
+        Write-Host "✅ Profile update completed successfully" -ForegroundColor Green
         
         Send-JsonResponse -Response $Response -Data @{
             success = $true
@@ -511,7 +670,6 @@ function Handle-UpdateProfile {
         } -StatusCode 500
     }
 }
-
 function Handle-TestEndpoint {
     param($Request, $Response, $Body)
     

@@ -383,7 +383,7 @@ function Handle-CreateProfile {
         # ✅ Call Initialize-AnyApiProfile EXACTLY like your working code
         $result = Initialize-AnyApiProfile @profileParams
         
-        Write-Host "✅ Profile created successfully!" -ForegroundColor Green
+        Write-Host "✅ Profile created successfully" -ForegroundColor Green
         
         # ✅ CRITICAL FIX: Force reload the profile to verify it was created correctly
         try {
@@ -511,36 +511,60 @@ function Handle-UpdateProfile {
         Write-Host "New credentials provided: $hasNewCredentials" -ForegroundColor $(if ($hasNewCredentials) { 'Green' } else { 'Yellow' })
 
                 if ($hasNewCredentials) {
-            Write-Host "Processing credentials for update..." -ForegroundColor Cyan
+            Write-Host "Processing credentials for update... (fetching secrets if needed)" -ForegroundColor Cyan
             foreach ($key in $Body.credentials.Keys) {
                 $newValue = $Body.credentials[$key]
-        
-                # ✅ FIXED: Skip preserve markers completely - don't touch existing values
-                if ($newValue -eq '***PRESERVE_EXISTING***') {
-                    Write-Host "  $key`: PRESERVING existing value - no changes" -ForegroundColor Yellow
-                    continue  # Skip - existing value already in $authDetails
+                # If masked or preserve marker, fetch from vault and use; fallback to existing profile if vault is missing
+                if ($newValue -in @('***HIDDEN***', '***MASKED***', '***SECRET***', '***PRESERVE_EXISTING***')) {
+                    $vaultKey = "AnyAPI.$ProfileName.$key"
+                    $secret = $null
+                    Write-Host "  [DEBUG] Attempting to fetch secret with key: '$vaultKey' from vault 'AnyAPI'" -ForegroundColor DarkGray
+                    try {
+                        $secret = Get-Secret -Name $vaultKey -Vault "AnyAPI" -ErrorAction Stop
+                        Write-Host "  $key`: fetched from vault and set for update (masked or preserve marker)" -ForegroundColor Yellow
+                    } catch {
+                        Write-Host "  $key`: could not fetch from vault with key '$vaultKey', will try alternate casing and existing profile value" -ForegroundColor Red
+                        # Try alternate casing (lowercase key)
+                        $altVaultKey = "AnyAPI.$ProfileName.$($key.ToLower())"
+                        try {
+                            $secret = Get-Secret -Name $altVaultKey -Vault "AnyAPI" -ErrorAction Stop
+                            Write-Host "  $key`: fetched from vault with alternate key '$altVaultKey' (lowercase)" -ForegroundColor Yellow
+                        } catch {
+                            Write-Host "  $key`: still could not fetch from vault with alternate key, will try existing profile value" -ForegroundColor Red
+                            # For debugging, list all available keys in the vault
+                            try {
+                                $allVaultSecrets = Get-SecretInfo -Vault "AnyAPI" | Select-Object -ExpandProperty Name
+                                Write-Host "  [DEBUG] Available secrets in vault: $($allVaultSecrets -join ', ')" -ForegroundColor DarkGray
+                            } catch {
+                                Write-Host "  [DEBUG] Could not list secrets in vault 'AnyAPI'" -ForegroundColor DarkGray
+                            }
+                        }
+                    }
+                    if (-not $secret -and $existingProfile -and $existingProfile.AuthenticationDetails -and $existingProfile.AuthenticationDetails.ContainsKey($key)) {
+                        $fallback = $existingProfile.AuthenticationDetails[$key]
+                        if ($fallback -and $fallback -notin @('***HIDDEN***', '***MASKED***', '***SECRET***')) {
+                            $secret = $fallback
+                            Write-Host "  $key`: using value from existing profile as fallback" -ForegroundColor Magenta
+                        } else {
+                            Write-Host "  $key`: fallback in profile is masked, not using" -ForegroundColor Red
+                        }
+                    }
+                    if ($secret) {
+                        $authDetails[$key] = $secret
+                        $secureValues[$key] = $secret
+                    } else {
+                        Write-Host "  $key`: no value found in vault or profile, leaving unset" -ForegroundColor Red
+                    }
+                    continue
                 }
-        
-                # ✅ FIXED: Only update non-preserve fields
-                Write-Host "  $key`: UPDATING with new value" -ForegroundColor Cyan
-        
-                # Check if this is a sensitive field that should go to secure storage
+                # Otherwise, update as normal
                 if ($key -in @('PrivateKey', 'ClientSecret', 'Password', 'Token', 'ApiKey', 'apiKey', 'token', 'password', 'TokenValue', 'ApiKeyValue')) {
-                    $authDetails[$key] = "<<SECRET_NEEDS_RUNTIME_PROVISIONING>>"
+                    $authDetails[$key] = $newValue
                     $secureValues[$key] = $newValue
                     Write-Host "    $key`: [NEW SECURE VALUE]" -ForegroundColor Green
-                }
-                else {
+                } else {
                     $authDetails[$key] = $newValue
                     Write-Host "    $key`: '$newValue' [NON-SENSITIVE]" -ForegroundColor Cyan
-                }
-            }
-
-            # 🟢 CRITICAL PATCH: Preserve any credential keys that were in the existing profile but missing from the update
-            foreach ($key in $existingProfile.AuthenticationDetails.Keys) {
-                if (-not $authDetails.ContainsKey($key)) {
-                    $authDetails[$key] = $existingProfile.AuthenticationDetails[$key]
-                    Write-Host "  $key`: PRESERVED (not present in update)" -ForegroundColor Yellow
                 }
             }
         }

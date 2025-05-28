@@ -37,9 +37,10 @@ class ProfileManager {
         this.isEditing = false;
         this.searchTerm = '';
         this.templates = this.getProfileTemplates();
-        this.currentEditProfile = null;
-        this.modalSaveHandler = null;
         this.currentSharedProfile = null;
+        
+        // Initialize the edit modal component
+        this.editModal = null;
         
         this.init();
     }
@@ -298,6 +299,15 @@ $RequestContext.Headers["Accept"] = "application/json"`
                 console.log('🔍 Initializing Profile Manager...');
                 await this.loadProfiles();
                 this.setupEventListeners();
+                
+                // Initialize edit modal component
+                this.editModal = new ProfileEditModal(this);
+                
+                // Make modal globally accessible for onclick handlers
+                if (typeof window !== 'undefined') {
+                    window.profileEditModal = this.editModal;
+                }
+                
                 console.log('✅ Profile Manager initialized successfully');
             },
             'Failed to initialize profile manager'
@@ -516,346 +526,63 @@ $RequestContext.Headers["Accept"] = "application/json"`
 
     // Form creation with better abstraction
     showCreateModal() {
-        const modalConfig = {
-            title: 'Create New Profile',
-            content: this.renderCreateForm(),
-            width: '700px',
-            onSave: () => this.handleCreateProfile(),
-            saveText: 'Create Profile'
-        };
-
-        this.createModal(modalConfig);
-        setTimeout(() => this.initializeModalSections(), 200);
+        this.editModal.showCreateModal();
     }
 
-    // Modal sections initialization
-    initializeModalSections() {
-        const sections = [
-            { id: 'profile-credentials-list', method: 'addCredentialRow' },
-            { id: 'profile-customsettings-list', method: 'addCustomSettingRow' }
-        ];
+    // Edit existing profile
+    async editProfile(profileName) {
+        await this.handleAsync(async () => {
+            showNotification('Loading profile details...', 'info', 2000);
 
-        sections.forEach(({ id, method }) => {
-            const container = this.domUtils.getElement(id);
-            if (container) {
-                container.innerHTML = '';
-                this[method](container, '', '');
+            const response = await apiClient.getProfileDetails(profileName, true);
+            if (!response.success) {
+                throw new Error(response.error || 'Failed to load profile');
             }
-        });
 
-        this.attachButtonHandlers();
-        this.updatePaginationVisibility();
-    }
-
-    // Button handler attachment
-    attachButtonHandlers() {
-        const handlers = [
-            { id: 'add-credential-btn', method: 'addCredentialRow' },
-            { id: 'add-customsetting-btn', method: 'addCustomSettingRow' }
-        ];
-
-        handlers.forEach(({ id, method }) => {
-            const btn = this.domUtils.getElement(id);
-            if (btn && !btn._handlerAttached) {
-                btn.onclick = () => this[method]();
-                btn._handlerAttached = true;
-            }
-        });
-    }
-
-    // Enhanced form data collection
-    collectFormData() {
-        console.log('📊 Collecting form data...');
-        
-        const formFields = [
-            { id: 'profile-name', key: 'name', required: true },
-            { id: 'profile-baseurl', key: 'baseUrl', required: true },
-            { id: 'profile-description', key: 'description' },
-            { id: 'profile-authtype', key: 'authType', default: 'None' },
-            { id: 'profile-pagination', key: 'paginationType', default: 'Auto' },
-            { id: 'profile-session-only', key: 'isSessionOnly', type: 'checkbox' }
-        ];
-
-        const profileData = formFields.reduce((data, field) => {
-            const element = this.domUtils.getElement(field.id);
-            if (element) {
-                const value = field.type === 'checkbox' 
-                    ? element.checked 
-                    : (element.value?.trim() || field.default || '');
-                data[field.key] = value;
-            }
-            return data;
-        }, {});
-
-        // Parse JSON fields
-        profileData.headers = this.parseJSONField('profile-headers', {});
-        
-        if (this.domUtils.getElement('show-pagination-details')?.checked) {
-            profileData.paginationDetails = this.parseJSONField('profile-pagination-details');
-        }
-
-        // Collect dynamic sections
-        profileData.customSettings = this.collectCustomSettings();
-        profileData.credentials = this.collectCredentials();
-
-        // Handle custom auth script
-        const authScript = this.domUtils.getElement('auth-script')?.value?.trim();
-        if (authScript) {
-            profileData.customAuthScript = authScript;
-        }
-
-        console.log('✅ Form data collected:', profileData);
-        return profileData;
-    }
-
-    // JSON field parsing utility
-    parseJSONField(fieldId, defaultValue = null) {
-        try {
-            const text = this.domUtils.getElement(fieldId)?.value?.trim();
-            return text ? JSON.parse(text) : defaultValue;
-        } catch (error) {
-            console.warn(`⚠️ Invalid JSON in ${fieldId}, using default`);
-            return defaultValue;
-        }
-    }
-
-    // Custom settings collection
-    collectCustomSettings() {
-        const settings = {};
-        const rows = this.domUtils.getElements('#profile-customsettings-list .customsetting-row');
-        
-        rows.forEach(row => {
-            const key = row.querySelector('.customsetting-key')?.value?.trim();
-            const value = row.querySelector('.customsetting-value')?.value?.trim();
-            if (key) settings[key] = value;
-        });
-
-        return settings;
-    }
-
-    // Enhanced credentials collection with masking support
-    collectCredentials() {
-        const credentials = {};
-        const rows = this.domUtils.getElements('#profile-credentials-list .credential-row');
-        
-        rows.forEach((row, index) => {
-            const keyInput = row.querySelector('.credential-key');
-            const valueInput = row.querySelector('.credential-value');
+            const profile = response.profile;
             
-            const key = keyInput?.value?.trim();
-            const value = valueInput?.value?.trim();
-            
-            if (!key) return;
-            
-            const isMasked = this.textUtils.isMaskedValue(value) ||
-                           valueInput?.placeholder?.includes('masked');
-            
-            if (this.isEditing && isMasked) {
-                credentials[key] = '***PRESERVE_EXISTING***';
-            } else {
-                credentials[key] = value || '';
+            // Map backend fields to frontend profile object
+            let customAuthScript = null;
+            if (typeof profile.customAuthScript === 'string' && profile.customAuthScript.trim()) {
+                customAuthScript = profile.customAuthScript;
+            } else if (typeof profile.AuthenticationDetails === 'object' && profile.AuthenticationDetails && profile.AuthenticationDetails.AuthScriptBlock) {
+                if (typeof profile.AuthenticationDetails.AuthScriptBlock === 'string') {
+                    customAuthScript = profile.AuthenticationDetails.AuthScriptBlock;
+                } else if (typeof profile.AuthenticationDetails.AuthScriptBlock.ToString === 'function') {
+                    customAuthScript = profile.AuthenticationDetails.AuthScriptBlock.ToString();
+                }
             }
-        });
 
-        return credentials;
-    }
+            // Compose the profile object for editing
+            const editProfile = {
+                name: profile.name || profile.ProfileName || '',
+                baseUrl: profile.baseUrl || profile.BaseUrl || '',
+                description: profile.description || profile.Description || '',
+                authType: profile.authType || profile.AuthType || '',
+                paginationType: profile.paginationType || profile.PaginationType || '',
+                headers: profile.headers || profile.DefaultHeaders || {},
+                isSessionOnly: profile.isSessionOnly ?? profile.IsSessionOnly ?? false,
+                credentials: profile.credentials || {},
+                customAuthScript: customAuthScript,
+                customSettings: profile.customSettings || {},
+                paginationDetails: profile.paginationDetails || profile.PaginationDetails || {}
+            };
 
-    // Generic row addition method
-    addRow(containerId, rowClass, fields, removeCallback = null) {
-        const container = typeof containerId === 'string' 
-            ? this.domUtils.getElement(containerId) 
-            : containerId;
-        
-        if (!container) return;
-
-        const row = this.domUtils.createElement('div', {
-            className: rowClass,
-            style: 'display: flex; gap: 0.5em; margin-bottom: 0.5em;'
-        });
-
-        const fieldElements = fields.map(field => 
-            `<input type="${field.type || 'text'}" 
-                    class="form-control ${field.class}" 
-                    placeholder="${this.textUtils.safeEscape(field.placeholder)}" 
-                    value="${this.textUtils.safeEscape(field.value || '')}" 
-                    ${field.readonly ? 'readonly' : ''}
-                    style="flex: ${field.flex || 1};">`
-        );
-
-        const removeButton = `
-            <button type="button" class="btn btn-outline btn-sm" 
-                    title="Remove" style="flex: 0;" 
-                    onclick="${removeCallback || 'this.parentElement.remove()'}">🗑️</button>
-        `;
-
-        row.innerHTML = fieldElements.join('') + removeButton;
-        container.appendChild(row);
-
-        return row;
-    }
-
-    // Simplified credential row addition
-    addCredentialRow(container, key = '', value = '', label = '', inputType = 'password') {
-        const fields = [
-            {
-                class: 'credential-key',
-                placeholder: label ? `${label} (${key})` : (key || 'Key'),
-                value: key,
-                readonly: !!key,
-                flex: 1
-            },
-            {
-                type: inputType === 'password' ? 'password' : 'text',
-                class: 'credential-value',
-                placeholder: label || 'Value',
-                value: value,
-                flex: 2
-            }
-        ];
-
-        const row = this.addRow(container, 'credential-row', fields);
-        this.enhanceCredentialRow(row, inputType);
-        return row;
-    }
-
-    // Enhance credential row with toggle functionality
-    enhanceCredentialRow(row, inputType) {
-        if (inputType !== 'password') return;
-
-        const valueInput = row.querySelector('.credential-value');
-        const toggleBtn = this.domUtils.createElement('button', {
-            type: 'button',
-            className: 'btn btn-outline btn-sm credential-toggle',
-            title: 'Show/Hide',
-            style: 'flex: 0;',
-            innerHTML: '<span class="credential-eye">👁️</span>'
-        });
-
-        toggleBtn.onclick = () => {
-            const isPassword = valueInput.type === 'password';
-            valueInput.type = isPassword ? 'text' : 'password';
-            toggleBtn.title = isPassword ? 'Hide' : 'Show';
-            toggleBtn.querySelector('.credential-eye').textContent = isPassword ? '🙈' : '👁️';
-        };
-
-        row.insertBefore(toggleBtn, row.lastElementChild);
-    }
-
-    // Simplified custom setting row addition
-    addCustomSettingRow(container, key = '', value = '') {
-        const fields = [
-            { class: 'customsetting-key', placeholder: 'Key', value: key },
-            { class: 'customsetting-value', placeholder: 'Value', value: value, flex: 2 }
-        ];
-
-        return this.addRow(container, 'customsetting-row', fields);
-    }
-
-    // Enhanced modal creation
-    createModal({ title, content, width = '500px', onSave, saveText = 'Save' }) {
-        this.removeExistingModal();
-
-        const modal = this.domUtils.createElement('div', {
-            id: 'profile-modal',
-            className: 'modal-overlay',
-            style: `position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                   background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; 
-                   justify-content: center; z-index: 1000;`,
-            innerHTML: this.renderModalContent(title, content, width, saveText)
-        });
-
-        document.body.appendChild(modal);
-        this.modalSaveHandler = onSave;
-        
-        // Focus first input
-        setTimeout(() => {
-            const firstInput = modal.querySelector('input, select, textarea');
-            firstInput?.focus();
-        }, 100);
-    }
-
-    // Modal content rendering
-    renderModalContent(title, content, width, saveText) {
-        const { safeEscape } = this.textUtils;
-        
-        return `
-            <div class="modal-dialog" style="width: ${width}; max-width: 90vw; max-height: 90vh; 
-                 overflow-y: auto; background: var(--bg-primary); border-radius: 8px; 
-                 box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
-                <div class="modal-header" style="padding: 1rem; border-bottom: 1px solid var(--border-color); 
-                     display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="margin: 0;">${safeEscape(title)}</h3>
-                    <button class="modal-close" onclick="profileManager.closeModal()" 
-                            style="background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 0.25rem;">&times;</button>
-                </div>
-                <div class="modal-body" style="padding: 1rem; max-height: 70vh; overflow-y: auto;">
-                    ${content}
-                </div>
-                <div class="modal-footer" style="padding: 1rem; border-top: 1px solid var(--border-color); 
-                     display: flex; justify-content: flex-end; gap: 0.5rem;">
-                    <button class="btn btn-outline" onclick="profileManager.closeModal()">Cancel</button>
-                    <button class="btn btn-primary" onclick="profileManager.modalSave()">${safeEscape(saveText)}</button>
-                </div>
-            </div>
-        `;
-    }
-
-    // Utility methods
-    removeExistingModal() {
-        const existing = this.domUtils.getElement('profile-modal');
-        existing?.remove();
-    }
-
-    modalSave() {
-        this.modalSaveHandler?.();
-    }
-
-    closeModal() {
-        this.removeExistingModal();
-        this.isEditing = false;
-        this.currentEditProfile = null;
-        this.modalSaveHandler = null;
+            console.log('🛠️ Edit modal profile object:', editProfile);
+            
+            await this.editModal.showEditModal(editProfile);
+        }, 'Error editing profile');
     }
 
     // Profile operations with enhanced error handling
     async createProfile() {
-        await this.handleAsync(async () => {
-            const profileData = this.collectFormData();
-            const errors = this.validateProfile(profileData);
-            
-            if (errors.length > 0) {
-                throw new Error(`Validation failed: ${errors.join(', ')}`);
-            }
-
-            const response = await apiClient.createProfile(profileData);
-            if (!response.success) {
-                throw new Error(response.error || 'Failed to create profile');
-            }
-
-            showNotification('Profile created successfully', 'success');
-            this.closeModal();
-            await this.loadProfiles();
-        }, 'Failed to create profile');
+        // Delegate to edit modal
+        await this.editModal.handleCreateProfile();
     }
 
     async updateProfile() {
-        await this.handleAsync(async () => {
-            const profileData = this.collectFormData();
-            const errors = this.validateProfile(profileData);
-            
-            if (errors.length > 0) {
-                throw new Error(`Validation failed: ${errors.join(', ')}`);
-            }
-
-            const response = await apiClient.updateProfile(this.currentEditProfile.name, profileData);
-            if (!response.success) {
-                throw new Error(response.error || 'Failed to update profile');
-            }
-
-            showNotification('Profile updated successfully', 'success');
-            this.closeModal();
-            await this.loadProfiles();
-        }, 'Failed to update profile');
+        // Delegate to edit modal
+        await this.editModal.handleEditProfile();
     }
 
     async deleteProfile(profileName) {
@@ -1269,566 +996,6 @@ $RequestContext.Headers["Accept"] = "application/json"`
         }
     }
 
-    // Render create profile form
-    renderCreateForm() {
-        const templateOptions = Object.entries(this.templates)
-            .map(([key, template]) => `<option value="${key}">${this.textUtils.safeEscape(template.name || key)}</option>`)
-            .join('');
-
-        return `
-            <form id="create-profile-form" class="profile-form">
-                <div class="form-section">
-                    <h4>📋 Template Selection</h4>
-                    <div class="form-group">
-                        <label for="profile-template">Choose Template:</label>
-                        <select id="profile-template" class="form-control" onchange="profileManager.applyTemplate()">
-                            <option value="">Select a template...</option>
-                            ${templateOptions}
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-section">
-                    <h4>⚙️ Basic Configuration</h4>
-                    <div class="form-group">
-                        <label for="profile-name">Profile Name: *</label>
-                        <input type="text" id="profile-name" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="profile-baseurl">Base URL: *</label>
-                        <input type="url" id="profile-baseurl" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="profile-description">Description:</label>
-                        <textarea id="profile-description" class="form-control" rows="2"></textarea>
-                    </div>
-                </div>
-
-                <div class="form-section">
-                    <h4>🔐 Authentication</h4>
-                    <div class="form-group">
-                        <label for="profile-authtype">Authentication Type:</label>
-                        <select id="profile-authtype" class="form-control" onchange="profileManager.toggleAuthFields()">
-                            <option value="None">None</option>
-                            <option value="Bearer">Bearer Token</option>
-                            <option value="Basic">Basic Authentication</option>
-                            <option value="ApiKey">API Key</option>
-                            <option value="CustomScript">Custom Script</option>
-                        </select>
-                    </div>
-                    <div id="auth-fields"></div>
-                </div>
-
-                <div class="form-section">
-                    <h4>📄 Headers & Pagination</h4>
-                    <div class="form-group">
-                        <label for="profile-headers">Default Headers (JSON):</label>
-                        <textarea id="profile-headers" class="form-control" rows="3"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="profile-pagination">Pagination Type:</label>
-                        <select id="profile-pagination" class="form-control" onchange="profileManager.updatePaginationVisibility()">
-                            <option value="Auto">Auto-detect</option>
-                            <option value="LinkHeader">Link Header</option>
-                            <option value="NextLink">NextLink</option>
-                            <option value="Cursor">Cursor-based</option>
-                            <option value="PageNumber">Page Number</option>
-                            <option value="None">No pagination</option>
-                            <option value="Custom">Custom</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="show-pagination-details" onchange="profileManager.togglePaginationDetailsField()"> 
-                            Show Advanced Pagination Details
-                        </label>
-                    </div>
-                    <div class="form-group" id="pagination-details-group" style="display: none;">
-                        <label for="profile-pagination-details">Pagination Details (JSON):</label>
-                        <textarea id="profile-pagination-details" class="form-control" rows="3"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="profile-session-only"> 
-                            Session only (don't save credentials)
-                        </label>
-                    </div>
-                </div>
-
-                <div class="form-section">
-                    <h4>🔑 Credentials</h4>
-                    <div id="profile-credentials-list"></div>
-                    <button type="button" id="add-credential-btn" class="btn btn-outline btn-sm">➕ Add Credential</button>
-                </div>
-
-                <div class="form-section">
-                    <h4>⚙️ Custom Settings</h4>
-                    <div id="profile-customsettings-list"></div>
-                    <button type="button" id="add-customsetting-btn" class="btn btn-outline btn-sm">➕ Add Setting</button>
-                </div>
-            </form>
-        `;
-    }
-
-    // Render edit profile form
-    renderEditForm(profile) {
-        console.log('🎨 Rendering edit form for profile:', profile.name);
-        
-        const credentialsSection = `
-            <div class="form-section">
-                <h4>🔑 Credentials</h4>
-                <div class="form-help" style="margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px;">
-                    <strong>💡 Credentials work with your authentication type:</strong>
-                    <ul style="margin: 0.5rem 0 0 1rem; padding: 0;">
-                        <li><strong>Bearer:</strong> Add a "token" credential</li>
-                        <li><strong>Basic:</strong> Add "username" and "password" credentials</li>
-                        <li><strong>API Key:</strong> Add "apiKey" and optionally "headerName" credentials</li>
-                        <li><strong>Custom:</strong> Add any credentials your script needs</li>
-                    </ul>
-                </div>
-                <div id="profile-credentials-list"></div>
-                <button type="button" id="add-credential-btn" class="btn btn-outline btn-sm">➕ Add Credential</button>
-                <small class="form-help">Credentials are stored securely. Sensitive values are hidden by default.</small>
-            </div>
-        `;
-
-        const customSettingsSection = `
-            <div class="form-section">
-                <h4>⚙️ Custom Settings</h4>
-                <div id="profile-customsettings-list"></div>
-                <button type="button" id="add-customsetting-btn" class="btn btn-outline btn-sm">➕ Add Setting</button>
-                <small class="form-help">Custom settings are sent with every request and may be required by some APIs.</small>
-            </div>
-        `;
-
-        // Pagination type options - handle PageBased mapping
-        let paginationOptions = '';
-        const paginationTypes = [
-            { value: 'Auto', label: 'Auto-detect' },
-            { value: 'LinkHeader', label: 'Link Header (GitHub style)' },
-            { value: 'NextLink', label: 'NextLink (Microsoft style)' },
-            { value: 'Cursor', label: 'Cursor-based' },
-            { value: 'PageNumber', label: 'Page Number' },
-            { value: 'None', label: 'No pagination' },
-            { value: 'Custom', label: 'Custom' }
-        ];
-
-        // Determine which option should be selected
-        let selectedPaginationType = 'Auto';
-        if (profile && profile.paginationType) {
-            const profilePaginationType = String(profile.paginationType).toLowerCase();
-            switch (profilePaginationType) {
-                case 'pagebased':
-                case 'pagenumber':
-                    selectedPaginationType = 'PageNumber';
-                    break;
-                case 'linkheader':
-                    selectedPaginationType = 'LinkHeader';
-                    break;
-                case 'nextlink':
-                    selectedPaginationType = 'NextLink';
-                    break;
-                case 'cursor':
-                case 'cursorbased':
-                    selectedPaginationType = 'Cursor';
-                    break;
-                case 'none':
-                    selectedPaginationType = 'None';
-                    break;
-                case 'custom':
-                    selectedPaginationType = 'Custom';
-                    break;
-                default:
-                    selectedPaginationType = profile.paginationType;
-            }
-        }
-
-        paginationTypes.forEach(type => {
-            const selected = type.value === selectedPaginationType ? ' selected' : '';
-            paginationOptions += `<option value="${type.value}"${selected}>${type.label}</option>`;
-        });
-
-        return `
-            <form id="edit-profile-form" class="profile-form">
-                <div class="form-section">
-                    <h4>⚙️ Basic Configuration</h4>
-                    <div class="form-group">
-                        <label for="profile-name">Profile Name: *</label>
-                        <input type="text" id="profile-name" class="form-control" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="profile-baseurl">Base URL: *</label>
-                        <input type="url" id="profile-baseurl" class="form-control" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="profile-description">Description:</label>
-                        <textarea id="profile-description" class="form-control" rows="2"></textarea>
-                    </div>
-                </div>
-
-                <div class="form-section">
-                    <h4>🔐 Authentication</h4>
-                    <div class="form-group">
-                        <label for="profile-authtype">Authentication Type:</label>
-                        <select id="profile-authtype" class="form-control" onchange="profileManager.toggleAuthFields()">
-                            <option value="None">None</option>
-                            <option value="Bearer">Bearer Token</option>
-                            <option value="Basic">Basic Authentication</option>
-                            <option value="ApiKey">API Key</option>
-                            <option value="CustomScript">Custom Script</option>
-                        </select>
-                    </div>
-                    
-                    <div id="auth-fields">
-                        <!-- Auth fields will be populated by toggleAuthFields -->
-                    </div>
-                </div>
-
-                <div class="form-section">
-                    <h4>📄 Headers & Pagination</h4>
-                    <div class="form-group">
-                        <label for="profile-headers">Default Headers (JSON):</label>
-                        <textarea id="profile-headers" class="form-control" rows="4"></textarea>
-                        <small class="form-help">Optional: Default headers to include with requests</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="profile-pagination-type">Pagination Type:</label>
-                        <select id="profile-pagination" class="form-control" onchange="profileManager.updatePaginationVisibility()">
-                            ${paginationOptions}
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="show-pagination-details" onchange="profileManager.togglePaginationDetailsField()"> 
-                            Show Advanced Pagination Details
-                        </label>
-                        <small class="form-help">Check this to customize pagination behavior beyond the default settings</small>
-                    </div>
-                    
-                    <div class="form-group" id="pagination-details-group" style="display: none;">
-                        <label for="profile-pagination-details">Pagination Details (JSON):</label>
-                        <textarea id="profile-pagination-details" class="form-control" rows="3" placeholder='{"PageParameter":"page","PageSizeParameter":"pageSize","DefaultPageSize":100}'></textarea>
-                        <small class="form-help">Advanced pagination configuration as JSON</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="profile-session-only"> 
-                            Session only (don't save credentials)
-                        </label>
-                    </div>
-                </div>
-
-                ${credentialsSection}
-                ${customSettingsSection}
-            </form>
-        `;
-    }
-
-    // Handle create profile
-    async handleCreateProfile() {
-        await this.createProfile();
-    }
-
-    // Handle edit profile
-    async handleEditProfile() {
-        await this.updateProfile();
-    }
-
-    // Edit existing profile
-    async editProfile(profileName) {
-        await this.handleAsync(async () => {
-            showNotification('Loading profile details...', 'info', 2000);
-
-            const response = await apiClient.getProfileDetails(profileName, true);
-            if (!response.success) {
-                throw new Error(response.error || 'Failed to load profile');
-            }
-
-            const profile = response.profile;
-            
-            // Map backend fields to frontend profile object, including customAuthScript
-            let customAuthScript = null;
-            if (typeof profile.customAuthScript === 'string' && profile.customAuthScript.trim()) {
-                customAuthScript = profile.customAuthScript;
-            } else if (typeof profile.AuthenticationDetails === 'object' && profile.AuthenticationDetails && profile.AuthenticationDetails.AuthScriptBlock) {
-                // If backend ever returns AuthenticationDetails, fallback
-                if (typeof profile.AuthenticationDetails.AuthScriptBlock === 'string') {
-                    customAuthScript = profile.AuthenticationDetails.AuthScriptBlock;
-                } else if (typeof profile.AuthenticationDetails.AuthScriptBlock.ToString === 'function') {
-                    customAuthScript = profile.AuthenticationDetails.AuthScriptBlock.ToString();
-                }
-            }
-
-            // Compose the profile object for editing
-            const editProfile = {
-                name: profile.name || profile.ProfileName || '',
-                baseUrl: profile.baseUrl || profile.BaseUrl || '',
-                description: profile.description || profile.Description || '',
-                authType: profile.authType || profile.AuthType || '',
-                paginationType: profile.paginationType || profile.PaginationType || '',
-                headers: profile.headers || profile.DefaultHeaders || {},
-                isSessionOnly: profile.isSessionOnly ?? profile.IsSessionOnly ?? false,
-                credentials: profile.credentials || {},
-                customAuthScript: customAuthScript,
-                customSettings: profile.customSettings || {},
-                paginationDetails: profile.paginationDetails || profile.PaginationDetails || {}
-            };
-
-            console.log('🛠️ Edit modal profile object:', editProfile);
-            
-            this.currentEditProfile = JSON.parse(JSON.stringify(editProfile)); // Deep copy for editing
-            this.isEditing = true;
-
-            const modalConfig = {
-                title: 'Edit Profile',
-                content: this.renderEditForm(this.currentEditProfile),
-                width: '700px',
-                onSave: () => this.handleEditProfile(),
-                saveText: 'Save Changes'
-            };
-
-            this.createModal(modalConfig);
-            setTimeout(() => {
-                this.initializeModalSections();
-                this.populateAllEditFields(this.currentEditProfile);
-            }, 300);
-        }, 'Error editing profile');
-    }
-
-    // Populate all edit fields
-    populateAllEditFields(profile) {
-        console.log('🔧 Populating all edit fields for:', profile.name);
-        
-        try {
-            // Basic fields
-            const fieldMappings = [
-                { id: 'profile-name', value: profile.name },
-                { id: 'profile-baseurl', value: profile.baseUrl },
-                { id: 'profile-description', value: profile.description }
-            ];
-
-            fieldMappings.forEach(({ id, value }) => {
-                const element = this.domUtils.getElement(id);
-                if (element) element.value = value || '';
-            });
-
-            // Auth type with normalization
-            const authTypeField = this.domUtils.getElement('profile-authtype');
-            if (authTypeField) {
-                let authTypeValue = profile.authType || 'None';
-                
-                // Normalize for selector
-                switch ((authTypeValue || '').toLowerCase()) {
-                    case 'bearer':
-                    case 'bearertoken':
-                        authTypeValue = 'Bearer';
-                        break;
-                    case 'basic':
-                        authTypeValue = 'Basic';
-                        break;
-                    case 'apikey':
-                    case 'api_key':
-                        authTypeValue = 'ApiKey';
-                        break;
-                    case 'custom':
-                    case 'customscript':
-                    case 'custom_script':
-                        authTypeValue = 'CustomScript';
-                        break;
-                    case 'none':
-                    default:
-                        authTypeValue = 'None';
-                        break;
-                }
-                authTypeField.value = authTypeValue;
-                console.log('✅ Auth type set to:', authTypeValue);
-            }
-
-            // Pagination type with normalization
-            const paginationField = this.domUtils.getElement('profile-pagination');
-            if (paginationField) {
-                let selectedPaginationType = 'Auto';
-                if (profile.paginationType) {
-                    const profilePaginationType = String(profile.paginationType).toLowerCase();
-                    switch (profilePaginationType) {
-                        case 'pagebased':
-                        case 'pagenumber':
-                            selectedPaginationType = 'PageNumber';
-                            break;
-                        case 'linkheader':
-                            selectedPaginationType = 'LinkHeader';
-                            break;
-                        case 'nextlink':
-                            selectedPaginationType = 'NextLink';
-                            break;
-                        case 'cursor':
-                        case 'cursorbased':
-                            selectedPaginationType = 'Cursor';
-                            break;
-                        case 'none':
-                            selectedPaginationType = 'None';
-                            break;
-                        case 'custom':
-                            selectedPaginationType = 'Custom';
-                            break;
-                        default:
-                            selectedPaginationType = profile.paginationType;
-                    }
-                }
-                paginationField.value = selectedPaginationType;
-                console.log('✅ Pagination type set to:', selectedPaginationType);
-            }
-
-            // Headers
-            const headersField = this.domUtils.getElement('profile-headers');
-            if (headersField && profile.headers) {
-                headersField.value = JSON.stringify(profile.headers, null, 2);
-            }
-
-            // Pagination details
-            if (profile.paginationDetails) {
-                const paginationDetailsField = this.domUtils.getElement('profile-pagination-details');
-                const checkbox = this.domUtils.getElement('show-pagination-details');
-                if (paginationDetailsField && checkbox) {
-                    paginationDetailsField.value = JSON.stringify(profile.paginationDetails, null, 2);
-                    checkbox.checked = true;
-                    this.togglePaginationDetailsField();
-                }
-            }
-
-            // Session only
-            const sessionOnlyField = this.domUtils.getElement('profile-session-only');
-            if (sessionOnlyField) {
-                sessionOnlyField.checked = Boolean(profile.isSessionOnly);
-            }
-
-            // Auth fields
-            this.toggleAuthFields();
-            
-            // Handle custom auth script - needs to be done after toggleAuthFields
-            setTimeout(() => {
-                if (profile.authType === 'CustomScript' && profile.customAuthScript) {
-                    const scriptField = this.domUtils.getElement('auth-script');
-                    if (scriptField) {
-                        scriptField.value = profile.customAuthScript;
-                        console.log('✅ Custom auth script populated (length:', profile.customAuthScript.length, ')');
-                    } else {
-                        console.error('❌ Script field not found!');
-                    }
-                }
-            }, 200);
-            
-            // Credentials
-            this.populateCredentials(profile.credentials || {});
-            
-            // Custom settings
-            this.populateCustomSettings(profile.customSettings || {});
-
-            console.log('✅ All edit fields populated successfully');
-        } catch (error) {
-            console.error('🚨 Error populating edit fields:', error);
-        }
-    }
-
-    // Populate credentials section
-    populateCredentials(credentials) {
-        const container = this.domUtils.getElement('profile-credentials-list');
-        if (!container) return;
-
-        container.innerHTML = '';
-        
-        Object.entries(credentials).forEach(([key, value]) => {
-            const inputType = this.textUtils.isSensitive(key) ? 'password' : 'text';
-            const displayValue = this.textUtils.isMaskedValue(value) ? '••••••••' : value;
-            this.addCredentialRow(container, key, displayValue, key, inputType);
-        });
-
-        // Add empty row
-        this.addCredentialRow(container, '', '');
-    }
-
-    // Populate custom settings section
-    populateCustomSettings(customSettings) {
-        const container = this.domUtils.getElement('profile-customsettings-list');
-        if (!container) return;
-
-        container.innerHTML = '';
-        
-        Object.entries(customSettings).forEach(([key, value]) => {
-            this.addCustomSettingRow(container, key, value);
-        });
-
-        // Add empty row
-        this.addCustomSettingRow(container, '', '');
-    }
-
-    // Test profile connection
-    async testProfile(profileName) {
-        await this.handleAsync(async () => {
-            const profile = this.findProfile(profileName);
-            if (!profile) {
-                throw new Error(`Profile "${profileName}" not found`);
-            }
-
-            showNotification('Testing connection...', 'info');
-            
-            const response = await apiClient.testProfile(profileName);
-            if (response.success) {
-                showNotification('✅ Connection successful', 'success');
-            } else {
-                throw new Error(response.error?.message || 'Connection test failed');
-            }
-        }, 'Test failed');
-    }
-
-    // Render empty profile details
-    renderEmptyProfileDetails() {
-        const container = this.domUtils.getElement('profile-details');
-        if (container) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">⚙️</div>
-                    <h3>Select a Profile</h3>
-                    <p>Choose a profile from the sidebar to view its configuration</p>
-                </div>
-            `;
-        }
-    }
-
-    // Additional utility methods for completeness
-    filterProfiles() {
-        const searchInput = this.domUtils.getElement('profile-search');
-        this.searchTerm = searchInput?.value || '';
-        this.renderProfileList();
-    }
-
-    updateTestProfileDropdown() {
-        const select = this.domUtils.getElement('test-profile');
-        if (!select) return;
-
-        const currentValue = select.value;
-        select.innerHTML = '<option value="">Select a profile...</option>';
-        
-        this.profiles.forEach(profile => {
-            if (profile?.name) {
-                const option = this.domUtils.createElement('option', {
-                    value: profile.name,
-                    textContent: profile.name
-                });
-                select.appendChild(option);
-            }
-        });
-
-        if (currentValue && this.findProfile(currentValue)) {
-            select.value = currentValue;
-        }
-    }
-
     // Import profiles from JSON file
     async importProfiles() {
         try {
@@ -2101,6 +1268,159 @@ $RequestContext.Headers["Accept"] = "application/json"`
 
         if (currentValue && this.findProfile(currentValue)) {
             filterSelect.value = currentValue;
+        }
+    }
+
+    // Enhanced form data collection
+    collectFormData() {
+        console.log('📊 Collecting form data...');
+        
+        const formFields = [
+            { id: 'profile-name', key: 'name', required: true },
+            { id: 'profile-baseurl', key: 'baseUrl', required: true },
+            { id: 'profile-description', key: 'description' },
+            { id: 'profile-authtype', key: 'authType', default: 'None' },
+            { id: 'profile-pagination', key: 'paginationType', default: 'Auto' },
+            { id: 'profile-session-only', key: 'isSessionOnly', type: 'checkbox' }
+        ];
+
+        const profileData = formFields.reduce((data, field) => {
+            const element = this.domUtils.getElement(field.id);
+            if (element) {
+                const value = field.type === 'checkbox' 
+                    ? element.checked 
+                    : (element.value?.trim() || field.default || '');
+                data[field.key] = value;
+            }
+            return data;
+        }, {});
+
+        // Parse JSON fields
+        profileData.headers = this.parseJSONField('profile-headers', {});
+        
+        if (this.domUtils.getElement('show-pagination-details')?.checked) {
+            profileData.paginationDetails = this.parseJSONField('profile-pagination-details');
+        }
+
+        // Collect dynamic sections
+        profileData.customSettings = this.collectCustomSettings();
+        profileData.credentials = this.collectCredentials();
+
+        // Handle custom auth script
+        const authScript = this.domUtils.getElement('auth-script')?.value?.trim();
+        if (authScript) {
+            profileData.customAuthScript = authScript;
+        }
+
+        console.log('✅ Form data collected:', profileData);
+        return profileData;
+    }
+
+    // JSON field parsing utility
+    parseJSONField(fieldId, defaultValue = null) {
+        try {
+            const text = this.domUtils.getElement(fieldId)?.value?.trim();
+            return text ? JSON.parse(text) : defaultValue;
+        } catch (error) {
+            console.warn(`⚠️ Invalid JSON in ${fieldId}, using default`);
+            return defaultValue;
+        }
+    }
+
+    // Custom settings collection
+    collectCustomSettings() {
+        const settings = {};
+        const rows = this.domUtils.getElements('#profile-customsettings-list .customsetting-row');
+        
+        rows.forEach(row => {
+            const key = row.querySelector('.customsetting-key')?.value?.trim();
+            const value = row.querySelector('.customsetting-value')?.value?.trim();
+            if (key) settings[key] = value;
+        });
+
+        return settings;
+    }
+
+    // Simplified credentials collection - no masking logic
+    collectCredentials() {
+        const credentials = {};
+        const rows = this.domUtils.getElements('#profile-credentials-list .credential-row');
+        
+        rows.forEach(row => {
+            const keyInput = row.querySelector('.credential-key');
+            const valueInput = row.querySelector('.credential-value');
+            
+            const key = keyInput?.value?.trim();
+            const value = valueInput?.value?.trim();
+            
+            if (key) {
+                // Store the actual value - no special handling for masked values
+                credentials[key] = value || '';
+            }
+        });
+
+        console.log('🔐 Collected credentials:', Object.keys(credentials).reduce((acc, key) => {
+            acc[key] = credentials[key] ? '[VALUE SET]' : '[EMPTY]';
+            return acc;
+        }, {}));
+
+        return credentials;
+    }
+
+    // Test profile connection
+    async testProfile(profileName) {
+        await this.handleAsync(async () => {
+            const profile = this.findProfile(profileName);
+            if (!profile) {
+                throw new Error(`Profile "${profileName}" not found`);
+            }
+
+            showNotification('Testing connection...', 'info');
+            
+            const response = await apiClient.testProfile(profileName);
+            if (response.success) {
+                showNotification('✅ Connection successful', 'success');
+            } else {
+                throw new Error(response.error?.message || 'Connection test failed');
+            }
+        }, 'Test failed');
+    }
+
+    // Update test profile dropdown
+    updateTestProfileDropdown() {
+        const testSelect = this.domUtils.getElement('test-profile');
+        if (!testSelect) return;
+
+        const currentValue = testSelect.value;
+        testSelect.innerHTML = '<option value="">Select Profile...</option>';
+        
+        this.profiles.forEach(profile => {
+            if (profile?.name) {
+                const option = this.domUtils.createElement('option', {
+                    value: profile.name,
+                    textContent: profile.name
+                });
+                testSelect.appendChild(option);
+            }
+        });
+
+        // Restore previous selection if still valid
+        if (currentValue && this.findProfile(currentValue)) {
+            testSelect.value = currentValue;
+        }
+    }
+
+    // Render empty profile details
+    renderEmptyProfileDetails() {
+        const container = this.domUtils.getElement('profile-details');
+        if (container) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">⚙️</div>
+                    <h3>Select a Profile</h3>
+                    <p>Choose a profile from the sidebar to view its configuration</p>
+                </div>
+            `;
         }
     }
 }

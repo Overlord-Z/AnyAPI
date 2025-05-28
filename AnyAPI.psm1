@@ -1018,43 +1018,40 @@ function Get-CachedAuthHeaders {
 
     switch ($authDetails.AuthType) {
         "ApiKey" {
-            if ($authDetails.ApiKeyLocation -eq "Header" -and $authDetails.ApiKeyName -and $authDetails.ApiKeyValue) {
-                $keyValue = Get-SecureValue -Value $authDetails.ApiKeyValue -ProfileName $ProfileName
-                if ($keyValue) {
-                    $authHeaders[$authDetails.ApiKeyName] = ConvertFrom-SecureString $keyValue -AsPlainText
+            if ($authDetails.ApiKeyValue) {
+                $apiKey = Get-SecureValue -Value $authDetails.ApiKeyValue -ProfileName $ProfileName
+                if ($apiKey) {
+                    $headerName = $authDetails.ApiKeyName ?? "X-API-Key"
+                    $keyValue = ConvertFrom-SecureString $apiKey -AsPlainText
+
+                    # Handle TokenPrefix for ApiKey (e.g., GitHub "token [PAT]")
+                    if ($authDetails.TokenPrefix) {
+                        # Only prepend if not already present
+                        if (-not $keyValue.StartsWith($authDetails.TokenPrefix)) {
+                            $keyValue = "$($authDetails.TokenPrefix) $keyValue"
+                        }
+                    }
+
+                    $authHeaders[$headerName] = $keyValue
+                    Write-Verbose "ApiKey authentication header set: $headerName = $($keyValue.Substring(0, [Math]::Min(10, $keyValue.Length)))..."
                 }
             }
         }
         "BearerToken" {
-    if ($authDetails.TokenValue) {
-        $token = Get-SecureValue -Value $authDetails.TokenValue -ProfileName $ProfileName
-        if ($token) {
-            # Support custom token prefix for GitHub-style tokens
-            $tokenPrefix = $authDetails.TokenPrefix ?? "Bearer"
-            $authHeaders["Authorization"] = "$tokenPrefix $(ConvertFrom-SecureString $token -AsPlainText)"
-        }
-    }
-}
-"ApiKey" {
-    if ($authDetails.ApiKeyValue) {
-        $apiKey = Get-SecureValue -Value $authDetails.ApiKeyValue -ProfileName $ProfileName
-        if ($apiKey) {
-            $headerName = $authDetails.ApiKeyName ?? "X-API-Key"
-            $keyValue = ConvertFrom-SecureString $apiKey -AsPlainText
-            
-            # Handle GitHub-style token prefix - FIXED
-            if ($authDetails.TokenPrefix) {
-                # If TokenPrefix is specified, ensure it's applied
-                if (-not $keyValue.StartsWith($authDetails.TokenPrefix)) {
-                    $keyValue = "$($authDetails.TokenPrefix)$keyValue"
+            if ($authDetails.TokenValue) {
+                $token = Get-SecureValue -Value $authDetails.TokenValue -ProfileName $ProfileName
+                if ($token) {
+                    # Use TokenPrefix if present, default to "Bearer"
+                    $tokenPrefix = $authDetails.TokenPrefix ?? "Bearer"
+                    # Only prepend if not already present
+                    $tokenValue = ConvertFrom-SecureString $token -AsPlainText
+                    if (-not $tokenValue.StartsWith($tokenPrefix)) {
+                        $tokenValue = "$tokenPrefix $tokenValue"
+                    }
+                    $authHeaders["Authorization"] = $tokenValue
                 }
             }
-            
-            $authHeaders[$headerName] = $keyValue
-            Write-Verbose "ApiKey authentication header set: $headerName = $($keyValue.Substring(0, [Math]::Min(10, $keyValue.Length)))..."
         }
-    }
-}
         "CustomScript" {
             # Custom scripts are handled in Build-AuthenticationHeaders now
             return $null
@@ -1589,7 +1586,7 @@ function Get-NextPageParameters {
                 if ($responseItems.Count -eq 0) {
                     $hasMore = $false
                 }
-                # If we got fewer items than page size, we're likely done
+                # If we got fewer items than page size, we might be done
                 elseif ($responseItems.Count -lt $pageSize) {
                     $hasMore = $false
                 }
@@ -2493,6 +2490,157 @@ function New-ProfileInitializationBuilder {
     )
 
     return [ProfileInitializationBuilder]::new($ProfileName, $BaseUrl, $AuthenticationDetails)
+}
+
+function Debug-AnyApiSecrets {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [string]$ProfileName,
+        [Parameter()]
+        [switch]$ShowValues
+    )
+    
+    Write-Host "🔍 AnyAPI Secret Storage Debug Report" -ForegroundColor Cyan
+    Write-Host "=" * 50 -ForegroundColor Cyan
+    
+    # Get secret storage provider
+    $provider = Get-SecretStorageProvider
+    Write-Host "📦 Secret Storage Provider: $provider" -ForegroundColor Yellow
+    
+    # If specific profile requested, filter secrets
+    $searchPattern = if ($ProfileName) { "AnyAPI.$ProfileName.*" } else { "AnyAPI.*" }
+    
+    switch ($provider) {
+        'SecretManagement' {
+            try {
+                $vaultName = 'AnyAPI-SecretStore'
+                Write-Host "🏦 Using vault: $vaultName" -ForegroundColor Green
+                
+                # Get all AnyAPI secrets
+                $secrets = Get-SecretInfo -Vault $vaultName | Where-Object Name -like $searchPattern
+                
+                if ($secrets) {
+                    Write-Host "🔑 Found $($secrets.Count) secret(s):" -ForegroundColor Green
+                    foreach ($secret in $secrets) {
+                        $parts = $secret.Name -split '\.'
+                        $profile = $parts[1]
+                        $keyName = $parts[2]
+                        
+                        Write-Host "  📋 Profile: $profile" -ForegroundColor White
+                        Write-Host "     🔑 Key: $keyName" -ForegroundColor White
+                        Write-Host "     📅 Modified: $($secret.Metadata.LastModified)" -ForegroundColor Gray
+                        
+                        if ($ShowValues) {
+                            try {
+                                $value = Get-Secret -Name $secret.Name -Vault $vaultName -AsPlainText
+                                $maskedValue = if ($value.Length -gt 20) { 
+                                    "$($value.Substring(0, 10))...$($value.Substring($value.Length - 10))" 
+                                } else { 
+                                    "•" * $value.Length 
+                                }
+                                Write-Host "     💎 Value: $maskedValue" -ForegroundColor Magenta
+                            }
+                            catch {
+                                Write-Host "     ❌ Failed to retrieve value: $($_.Exception.Message)" -ForegroundColor Red
+                            }
+                        }
+                        Write-Host ""
+                    }
+                } else {
+                    Write-Host "❌ No secrets found matching pattern: $searchPattern" -ForegroundColor Red
+                }
+            }
+            catch {
+                Write-Host "❌ Error accessing SecretManagement: $($_.Exception.Message)" -ForegroundColor Red
+            }
+        }
+        'Keychain' {
+            Write-Host "🍎 macOS Keychain - checking for AnyAPI entries..." -ForegroundColor Green
+            if ($ProfileName) {
+                $serviceName = "AnyAPI.$ProfileName"
+                $result = & security find-generic-password -s $serviceName 2>&1
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Host "✅ Found keychain entries for profile: $ProfileName" -ForegroundColor Green
+                } else {
+                    Write-Host "❌ No keychain entries found for profile: $ProfileName" -ForegroundColor Red
+                }
+            } else {
+                Write-Host "ℹ️ Specify -ProfileName to check specific profile keychain entries" -ForegroundColor Gray
+            }
+        }
+        'SecretService' {
+            Write-Host "🐧 Linux Secret Service - checking for AnyAPI entries..." -ForegroundColor Green
+            if ($ProfileName) {
+                try {
+                    $result = & secret-tool search profile "$ProfileName" 2>$null
+                    if ($LASTEXITCODE -eq 0 -and $result) {
+                        Write-Host "✅ Found secret service entries for profile: $ProfileName" -ForegroundColor Green
+                    } else {
+                        Write-Host "❌ No secret service entries found for profile: $ProfileName" -ForegroundColor Red
+                    }
+                }
+                catch {
+                    Write-Host "❌ Error checking secret service: $($_.Exception.Message)" -ForegroundColor Red
+                }
+            } else {
+                Write-Host "ℹ️ Specify -ProfileName to check specific profile secret service entries" -ForegroundColor Gray
+            }
+        }
+        default {
+            Write-Host "⚠️ In-memory only storage - secrets not persisted" -ForegroundColor Yellow
+        }
+    }
+    
+    # Show profiles and their auth configuration
+    Write-Host "`n📋 Profile Authentication Configuration:" -ForegroundColor Cyan
+    $profiles = Get-AnyApiProfile
+    
+    if ($ProfileName) {
+        $profiles = $profiles | Where-Object { $_.Keys -contains $ProfileName }
+        if ($profiles) {
+            $profiles = @{ $ProfileName = $profiles[$ProfileName] }
+        }
+    }
+    
+    foreach ($profileEntry in $profiles.GetEnumerator()) {
+        $profile = $profileEntry.Value
+        Write-Host "`n  🔧 Profile: $($profileEntry.Key)" -ForegroundColor White
+        Write-Host "     Auth Type: $($profile.AuthenticationDetails.AuthType)" -ForegroundColor Gray
+        
+        switch ($profile.AuthenticationDetails.AuthType) {
+            'ApiKey' {
+                Write-Host "     API Key Name: $($profile.AuthenticationDetails.ApiKeyName)" -ForegroundColor Gray
+                Write-Host "     Token Prefix: $($profile.AuthenticationDetails.TokenPrefix)" -ForegroundColor Gray
+                Write-Host "     API Key Status: $(if ($profile.AuthenticationDetails.ApiKeyValue) { 'Configured' } else { 'Missing' })" -ForegroundColor Gray
+            }
+            'Bearer' {
+                Write-Host "     Token Prefix: $($profile.AuthenticationDetails.TokenPrefix)" -ForegroundColor Gray
+                Write-Host "     Token Status: $(if ($profile.AuthenticationDetails.TokenValue) { 'Configured' } else { 'Missing' })" -ForegroundColor Gray
+            }
+            'Basic' {
+                Write-Host "     Username: $($profile.AuthenticationDetails.Username)" -ForegroundColor Gray
+                Write-Host "     Password Status: $(if ($profile.AuthenticationDetails.Password) { 'Configured' } else { 'Missing' })" -ForegroundColor Gray
+            }
+            'Custom' {
+                Write-Host "     Script Status: $(if ($profile.AuthenticationDetails.AuthScriptBlock) { 'Configured' } else { 'Missing' })" -ForegroundColor Gray
+                # Show custom credentials
+                $customCreds = $profile.AuthenticationDetails.Keys | Where-Object { $_ -notin @('AuthType', 'AuthScriptBlock') }
+                if ($customCreds) {
+                    Write-Host "     Custom Credentials: $($customCreds -join ', ')" -ForegroundColor Gray
+                }
+            }
+        }
+    }
+    
+    Write-Host "`n💡 Recommendations:" -ForegroundColor Cyan
+    Write-Host "   • Use Debug-AnyApiSecrets -ProfileName 'YourProfile' -ShowValues to see masked values" -ForegroundColor White
+    Write-Host "   • Check template field mappings match backend expectations" -ForegroundColor White
+    Write-Host "   • Ensure no duplicate credential keys in templates" -ForegroundColor White
+    
+    if ($provider -ne 'SecretManagement') {
+        Write-Host "   • Consider running Initialize-SecretStore for better secret management" -ForegroundColor Yellow
+    }
 }
 
 # Add pipeline support functions for ProfileInitializationBuilder

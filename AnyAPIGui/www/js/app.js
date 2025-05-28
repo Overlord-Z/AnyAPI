@@ -559,12 +559,15 @@ class AnyApiApp {
                     });
                 }
                 break;
-                
-            case 'history':
+                  case 'history':
                 console.log('📚 Activating History section');
                 // Update history display
                 if (typeof endpointTester !== 'undefined' && endpointTester.updateHistoryDisplay) {
                     endpointTester.updateHistoryDisplay();
+                }
+                // Update profile filter dropdown
+                if (typeof profileManager !== 'undefined' && profileManager.updateHistoryProfileFilter) {
+                    profileManager.updateHistoryProfileFilter();
                 }
                 break;
                 
@@ -780,24 +783,123 @@ class AnyApiApp {
                 resolve(strategy);
             };
         });
-    }
-
-    /**
-     * Filter history - ENHANCED WITH MANAGER CHECK
+    }    /**
+     * Filter history - ENHANCED WITH MANAGER CHECK AND PROFILE FILTERING
      */
     filterHistory() {
         if (typeof endpointTester !== 'undefined' && endpointTester.updateHistoryDisplay) {
             const searchTerm = document.getElementById('history-search')?.value?.toLowerCase() || '';
+            const selectedProfile = document.getElementById('history-profile-filter')?.value || '';
             
             const historyItems = document.querySelectorAll('.history-item');
             historyItems.forEach(item => {
                 const text = item.textContent.toLowerCase();
-                if (text.includes(searchTerm)) {
+                const itemProfile = this.extractProfileFromHistoryItem(item);
+                
+                // Check both search term and profile filter
+                const matchesSearch = !searchTerm || text.includes(searchTerm);
+                const matchesProfile = !selectedProfile || itemProfile === selectedProfile;
+                
+                if (matchesSearch && matchesProfile) {
                     item.style.display = 'block';
+                    item.classList.remove('filtered-out');
                 } else {
                     item.style.display = 'none';
+                    item.classList.add('filtered-out');
                 }
             });
+            
+            // Update filter status
+            this.updateHistoryFilterStatus();
+        }
+    }
+
+    /**
+     * Filter history by profile only
+     */
+    filterHistoryByProfile() {
+        this.filterHistory(); // Use the enhanced filter method
+    }
+
+    /**
+     * Extract profile name from history item
+     */
+    extractProfileFromHistoryItem(historyItem) {
+        try {
+            // Look for "Profile: [name]" pattern in the text
+            const text = historyItem.textContent;
+            const match = text.match(/Profile:\s*([^•]+)/);
+            return match ? match[1].trim() : '';
+        } catch (error) {
+            console.warn('Error extracting profile from history item:', error);
+            return '';
+        }
+    }
+
+    /**
+     * Update history filter status display
+     */
+    updateHistoryFilterStatus() {
+        try {
+            const visibleItems = document.querySelectorAll('.history-item:not(.filtered-out)').length;
+            const totalItems = document.querySelectorAll('.history-item').length;
+            const searchTerm = document.getElementById('history-search')?.value || '';
+            const selectedProfile = document.getElementById('history-profile-filter')?.value || '';
+            
+            // Create or update status element
+            let statusEl = document.getElementById('history-filter-status');
+            if (!statusEl) {
+                statusEl = document.createElement('div');
+                statusEl.id = 'history-filter-status';
+                statusEl.className = 'history-filter-status';
+                
+                const historyList = document.getElementById('history-list');
+                if (historyList && historyList.parentNode) {
+                    historyList.parentNode.insertBefore(statusEl, historyList);
+                }
+            }
+            
+            // Update status text
+            if (searchTerm || selectedProfile) {
+                const filters = [];
+                if (searchTerm) filters.push(`search: "${searchTerm}"`);
+                if (selectedProfile) filters.push(`profile: "${selectedProfile}"`);
+                
+                statusEl.innerHTML = `
+                    <div class="filter-status-text">
+                        Showing ${visibleItems} of ${totalItems} requests 
+                        (filtered by ${filters.join(', ')})
+                        <button class="btn-clear-filters" onclick="app.clearHistoryFilters()">
+                            Clear filters
+                        </button>
+                    </div>
+                `;
+                statusEl.style.display = 'block';
+            } else {
+                statusEl.style.display = 'none';
+            }
+            
+        } catch (error) {
+            console.error('Error updating history filter status:', error);
+        }
+    }
+
+    /**
+     * Clear all history filters
+     */
+    clearHistoryFilters() {
+        try {
+            const searchInput = document.getElementById('history-search');
+            const profileFilter = document.getElementById('history-profile-filter');
+            
+            if (searchInput) searchInput.value = '';
+            if (profileFilter) profileFilter.value = '';
+            
+            this.filterHistory();
+            showNotification('History filters cleared', 'success');
+            
+        } catch (error) {
+            console.error('Error clearing history filters:', error);
         }
     }
 

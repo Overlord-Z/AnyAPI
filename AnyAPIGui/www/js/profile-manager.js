@@ -20,7 +20,7 @@ class ProfileManager {
     /**
      * Get profile templates for common APIs - ENHANCED WITH AUTH FIELD MAPPING
      */
-    getProfileTemplates() {
+getProfileTemplates() {
     return {
 github: {
     name: "GitHub API",
@@ -32,25 +32,30 @@ github: {
     },
     paginationType: "LinkHeader",
     description: "GitHub REST API v3",
-    requiredSecrets: ["TokenValue"], // ← CHANGED from "apiKey" to "TokenValue"
+    requiredSecrets: ["apiKey"],
     authFieldMapping: {
-        TokenValue: {  // ← CHANGED from "apiKey" to "TokenValue"
-            field: "ApiKeyValue",  // ← This maps to the auth field in the profile
-            label: "GitHub Personal Access Token", 
+        apiKey: {
+            field: "apiKey",
+            label: "GitHub Personal Access Token (without 'token ' prefix)", 
             type: "password" 
         },
         headerName: { 
-            field: "ApiKeyName", 
+            field: "headerName",
             label: "Header Name", 
             type: "text", 
-            defaultValue: "Authorization" 
+            defaultValue: "Authorization"  // ✅ GitHub uses Authorization header
         },
         tokenPrefix: { 
-            field: "TokenPrefix", 
+            field: "tokenPrefix",
             label: "Token Prefix", 
             type: "text", 
-            defaultValue: "token " 
+            defaultValue: "token "  // ✅ GitHub needs "token " prefix
         }
+    },
+    // ✅ ADD THESE TEMPLATE DEFAULTS TO BE APPLIED DIRECTLY
+    templateDefaults: {
+        headerName: "Authorization",
+        tokenPrefix: "token "
     },
     customSettings: {
         "UserAgent": "AnyAPI-PowerShell",
@@ -72,7 +77,11 @@ github: {
             description: "Microsoft Graph API",
             requiredSecrets: ["token"],
             authFieldMapping: {
-                token: { field: "token", label: "Access Token", type: "password" }
+                token: { 
+                    field: "token",  // Backend expects credentials.token for Bearer
+                    label: "Access Token", 
+                    type: "password" 
+                }
             },
             customSettings: {
                 "ConsistencyLevel": "eventual",
@@ -94,44 +103,60 @@ github: {
             description: "Slack Web API",
             requiredSecrets: ["token"],
             authFieldMapping: {
-                token: { field: "token", label: "Bot User OAuth Token", type: "password" }
+                token: { 
+                    field: "token", 
+                    label: "Bot User OAuth Token", 
+                    type: "password" 
+                }
             }
         },
         connectwise: {
-            name: "ConnectWise Manage",
-            baseUrl: "https://your-domain.com/v4_6_release/apis/3.0",
-            authType: "Custom",
-            headers: {
-                "Accept": "application/json",
-                "Content-Type": "application/json"
-            },
-            paginationType: "PageNumber",
-            paginationDetails: {
-                "PageParameter": "page",
-                "PageSizeParameter": "pageSize",
-                "DefaultPageSize": 100
-            },
-            description: "ConnectWise PSA REST API with custom authentication",
-            customSettings: {
-                "Company": "your-company-id",
-                "Environment": "production"
-            },
-            requiredSecrets: ["PublicKey", "PrivateKey", "ClientId"],
-            authFieldMapping: {
-                PublicKey: { field: "PublicKey", label: "Public Key", type: "text" },
-                PrivateKey: { field: "PrivateKey", label: "Private Key", type: "password" },
-                ClientId: { field: "ClientId", label: "Client ID", type: "text" }
-            },
-            customAuthScript: `param($RequestContext, $Profile)
+    name: "ConnectWise Manage",
+    baseUrl: "https://your-domain.com/v4_6_release/apis/3.0",
+    authType: "CustomScript",
+    headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+    },
+    paginationType: "PageNumber",
+    paginationDetails: {
+        "PageParameter": "page",
+        "PageSizeParameter": "pageSize",
+        "DefaultPageSize": 100
+    },
+    description: "ConnectWise PSA REST API with custom authentication",
+    customSettings: {
+        "Company": "your-company-id",
+        "Environment": "production"
+    },
+    requiredSecrets: ["PublicKey", "PrivateKey", "ClientId"],
+    authFieldMapping: {
+        PublicKey: { 
+            field: "PublicKey", 
+            label: "Public Key", 
+            type: "text" 
+        },
+        PrivateKey: { 
+            field: "PrivateKey", 
+            label: "Private Key", 
+            type: "password" 
+        },
+        ClientId: { 
+            field: "ClientId", 
+            label: "Client ID", 
+            type: "text" 
+        }
+    },
+    customAuthScript: `param($RequestContext, $Profile)
 
 # ConnectWise authentication
 $company = $Profile.CustomSettings.Company
-$publicKey = $RequestContext.GetPlainTextSecret.Invoke('PublicKey')
+$publicKey = $Profile.AuthenticationDetails.PublicKey
 $privateKey = $RequestContext.GetPlainTextSecret.Invoke('PrivateKey')
-$clientId = $RequestContext.GetPlainTextSecret.Invoke('ClientId')
+$clientId = $Profile.AuthenticationDetails.ClientId
 
 if (-not $company -or -not $publicKey -or -not $privateKey -or -not $clientId) {
-    throw "Missing required ConnectWise credentials"
+    throw "Missing required ConnectWise credentials. Company: $company, PublicKey: $publicKey, PrivateKey: $(if($privateKey){'[SET]'}else{'[MISSING]'}), ClientId: $clientId"
 }
 
 $authString = "$company+$publicKey\`:$privateKey"
@@ -140,26 +165,7 @@ $encodedAuth = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($
 $RequestContext.Headers["Authorization"] = "Basic $encodedAuth"
 $RequestContext.Headers["clientId"] = $clientId
 $RequestContext.Headers["Accept"] = "application/json"`
-        },
-        openai: {
-            name: "OpenAI API",
-            baseUrl: "https://api.openai.com/v1",
-            authType: "Bearer",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            paginationType: "None",
-            description: "OpenAI REST API with Bearer token authentication",
-            customSettings: {
-                "Organization": "org-XXXXXXXX",
-                "DefaultModel": "gpt-4",
-                "MaxTokens": "2000"
-            },
-            requiredSecrets: ["token"],
-            authFieldMapping: {
-                token: { field: "token", label: "OpenAI API Key", type: "password" }
-            }
-        },
+},
         jira: {
             name: "Jira Cloud",
             baseUrl: "https://your-domain.atlassian.net/rest/api/3",
@@ -182,7 +188,11 @@ $RequestContext.Headers["Accept"] = "application/json"`
             },
             requiredSecrets: ["token"],
             authFieldMapping: {
-                token: { field: "token", label: "API Token", type: "password" }
+                token: { 
+                    field: "token", 
+                    label: "API Token", 
+                    type: "password" 
+                }
             }
         },
         stripe: {
@@ -205,7 +215,11 @@ $RequestContext.Headers["Accept"] = "application/json"`
             },
             requiredSecrets: ["token"],
             authFieldMapping: {
-                token: { field: "token", label: "Secret Key", type: "password" }
+                token: { 
+                    field: "token", 
+                    label: "Secret Key", 
+                    type: "password" 
+                }
             }
         },
         basic_auth_example: {
@@ -219,8 +233,16 @@ $RequestContext.Headers["Accept"] = "application/json"`
             description: "Example API using Basic Authentication",
             requiredSecrets: ["username", "password"],
             authFieldMapping: {
-                username: { field: "username", label: "Username", type: "text" },
-                password: { field: "password", label: "Password", type: "password" }
+                username: { 
+                    field: "username", 
+                    label: "Username", 
+                    type: "text" 
+                },
+                password: { 
+                    field: "password", 
+                    label: "Password", 
+                    type: "password" 
+                }
             }
         },
         api_key_example: {
@@ -234,8 +256,17 @@ $RequestContext.Headers["Accept"] = "application/json"`
             description: "Example API using API Key authentication",
             requiredSecrets: ["apiKey"],
             authFieldMapping: {
-                apiKey: { field: "apiKey", label: "API Key", type: "password" },
-                headerName: { field: "headerName", label: "Header Name", type: "text", defaultValue: "X-API-Key" }
+                apiKey: { 
+                    field: "apiKey", 
+                    label: "API Key", 
+                    type: "password" 
+                },
+                headerName: { 
+                    field: "headerName", 
+                    label: "Header Name", 
+                    type: "text", 
+                    defaultValue: "X-API-Key" 
+                }
             }
         },
         custom: {
@@ -298,9 +329,9 @@ $RequestContext.Headers["Accept"] = "application/json"`
                 baseUrl: p?.baseUrl || 'NO_URL',
                 authType: p?.authType || 'NO_AUTH'
             })));
-            
-            this.renderProfileList();
+              this.renderProfileList();
             this.updateTestProfileDropdown();
+            this.initializeSharedProfileManagement();
             
         } catch (error) {
             console.error('❌ Failed to load profiles:', error);
@@ -364,114 +395,241 @@ $RequestContext.Headers["Accept"] = "application/json"`
         }
     }
 
-    /**
-     * Render profile list in sidebar with extensive debugging
-     */
-    renderProfileList() {
-        console.log('🎨 Rendering profile list...');
-        
-        const container = document.getElementById('profile-list');
-        if (!container) {
-            console.error('❌ Profile list container not found');
-            return;
-        }
+// Enhanced profile rendering with dynamic text scaling and auth chips
+renderProfileList() {
+    console.log('🎨 Rendering enhanced profile list...');
+    
+    const container = document.getElementById('profile-list');
+    if (!container) {
+        console.error('❌ Profile list container not found');
+        return;
+    }
 
-        try {
-            if (!Array.isArray(this.profiles) || this.profiles.length === 0) {
-                console.log('📝 No profiles to display');
-                container.innerHTML = `
-                    <div class="empty-state" style="padding: 1rem;">
-                        <p style="text-align: center; color: var(--text-muted);">No profiles configured</p>
-                        <p style="text-align: center; color: var(--text-muted); font-size: 0.75rem;">
-                            Profiles loaded: ${this.profiles.length}
-                        </p>
-                    </div>
-                `;
-                return;
-            }
-
-            console.log('🔍 Processing profiles for display:', this.profiles.length);
-
-            // Filter profiles safely
-            const filteredProfiles = this.profiles.filter(profile => {
-                try {
-                    if (!profile) return false;
-                    
-                    const name = String(profile.name || '').toLowerCase();
-                    const baseUrl = String(profile.baseUrl || '').toLowerCase();
-                    const authType = String(profile.authType || '').toLowerCase();
-                    const searchTerm = String(this.searchTerm || '').toLowerCase();
-                    
-                    return name.includes(searchTerm) || 
-                           baseUrl.includes(searchTerm) || 
-                           authType.includes(searchTerm);
-                } catch (error) {
-                    console.error('🚨 Error filtering profile:', error, profile);
-                    return false;
-                }
-            });
-
-            console.log(`📋 Displaying ${filteredProfiles.length} filtered profiles`);
-
-            // Generate HTML safely
-            const htmlParts = [];
-            
-            filteredProfiles.forEach((profile, index) => {
-                try {
-                    const safeName = this.safeEscape(profile.name || `Profile ${index + 1}`);
-                    const safeUrl = this.safeEscape(profile.baseUrl || 'No URL configured');
-                    const safeAuth = this.safeEscape(profile.authType || 'Unknown');
-                    const jsName = this.safeJsEscape(profile.name || '');
-                    
-                    const isActive = this.currentProfile?.name === profile.name;
-                    
-                    const itemHtml = `
-                        <div class="profile-item ${isActive ? 'active' : ''}" 
-                             onclick="profileManager.selectProfile('${jsName}')">
-                            <div class="profile-name">${safeName}</div>
-                            <div class="profile-url">${safeUrl}</div>
-                            <div class="profile-auth">${safeAuth}</div>
-                            <div class="profile-actions" onclick="event.stopPropagation();">
-                                <button class="btn btn-sm btn-outline" onclick="profileManager.editProfile('${jsName}')" title="Edit">
-                                    ✏️
-                                </button>
-                                <button class="btn btn-sm btn-danger" onclick="profileManager.deleteProfile('${jsName}')" title="Delete">
-                                    🗑️
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                    
-                    htmlParts.push(itemHtml);
-                    
-                } catch (error) {
-                    console.error('🚨 Error rendering profile item:', error, profile);
-                    // Add a safe fallback item
-                    htmlParts.push(`
-                        <div class="profile-item error">
-                            <div class="profile-name">Error loading profile</div>
-                            <div class="profile-url">Check console for details</div>
-                        </div>
-                    `);
-                }
-            });
-
-            // Set the HTML
-            container.innerHTML = htmlParts.join('');
-            console.log('✅ Profile list rendered successfully');
-            
-        } catch (error) {
-            console.error('🚨 Critical error in renderProfileList:', error);
+    try {
+        if (!Array.isArray(this.profiles) || this.profiles.length === 0) {
+            console.log('📝 No profiles to display');
             container.innerHTML = `
                 <div class="empty-state" style="padding: 1rem;">
-                    <p style="text-align: center; color: var(--color-danger);">Error loading profiles</p>
+                    <p style="text-align: center; color: var(--text-muted);">No profiles configured</p>
                     <p style="text-align: center; color: var(--text-muted); font-size: 0.75rem;">
-                        Check browser console for details
+                        Profiles loaded: ${this.profiles.length}
                     </p>
                 </div>
             `;
+            return;
         }
+
+        console.log('🔍 Processing profiles for enhanced display:', this.profiles.length);
+
+        // Filter profiles safely
+        const filteredProfiles = this.profiles.filter(profile => {
+            try {
+                if (!profile) return false;
+                
+                const name = String(profile.name || '').toLowerCase();
+                const baseUrl = String(profile.baseUrl || '').toLowerCase();
+                const authType = String(profile.authType || '').toLowerCase();
+                const searchTerm = String(this.searchTerm || '').toLowerCase();
+                
+                return name.includes(searchTerm) || 
+                       baseUrl.includes(searchTerm) || 
+                       authType.includes(searchTerm);
+            } catch (error) {
+                console.error('🚨 Error filtering profile:', error, profile);
+                return false;
+            }
+        });
+
+        console.log(`📋 Displaying ${filteredProfiles.length} filtered profiles`);
+
+        // Generate enhanced HTML
+        const htmlParts = [];
+        
+        filteredProfiles.forEach((profile, index) => {
+            try {
+                const safeName = this.safeEscape(profile.name || `Profile ${index + 1}`);
+                const safeUrl = this.safeEscape(profile.baseUrl || 'No URL configured');
+                const safeDescription = this.safeEscape(profile.description || '');
+                const authType = profile.authType || 'None';
+                const jsName = this.safeJsEscape(profile.name || '');
+                
+                const isActive = this.currentProfile?.name === profile.name;
+                
+                // Determine text scaling based on length
+                const nameLength = safeName.length;
+                const urlLength = safeUrl.length;
+                
+                let nameScaling = '';
+                let urlScaling = '';
+                
+                if (nameLength > 25) nameScaling = 'data-very-long="true"';
+                else if (nameLength > 15) nameScaling = 'data-long="true"';
+                
+                if (urlLength > 50) urlScaling = 'data-very-long="true"';
+                else if (urlLength > 30) urlScaling = 'data-long="true"';
+                
+                // Generate auth chip with appropriate styling
+                const authChipClass = this.getAuthChipClass(authType);
+                const authChipText = this.getAuthChipText(authType);
+                
+                const itemHtml = `
+                    <div class="profile-item ${isActive ? 'active' : ''}" 
+                         onclick="profileManager.selectProfile('${jsName}')">
+                        
+                        <div class="profile-item-header">
+                            <div class="profile-item-name-container">
+                                <h4 class="profile-item-name" ${nameScaling}>${safeName}</h4>
+                            </div>
+                            <div class="profile-auth-chip ${authChipClass}">
+                                ${authChipText}
+                            </div>
+                        </div>
+                        
+                        <div class="profile-item-url" ${urlScaling}>${safeUrl}</div>
+                        
+                        ${safeDescription ? `
+                            <div class="profile-item-description">${safeDescription}</div>
+                        ` : ''}
+                        
+                        <div class="profile-item-actions" onclick="event.stopPropagation();">
+                            <button class="btn btn-outline btn-sm" onclick="profileManager.editProfile('${jsName}')" title="Edit Profile">
+                                ✏️ Edit
+                            </button>
+                            <button class="btn btn-outline btn-sm" onclick="profileManager.testProfile('${jsName}')" title="Test Connection">
+                                🧪 Test
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="profileManager.deleteProfile('${jsName}')" title="Delete Profile">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                htmlParts.push(itemHtml);
+                
+            } catch (error) {
+                console.error('🚨 Error rendering profile item:', error, profile);
+                // Add a safe fallback item
+                htmlParts.push(`
+                    <div class="profile-item error">
+                        <div class="profile-item-name">Error loading profile</div>
+                        <div class="profile-item-url">Check console for details</div>
+                    </div>
+                `);
+            }
+        });
+
+        // Set the HTML
+        container.innerHTML = htmlParts.join('');
+        
+        // Apply dynamic text scaling after DOM insertion
+        setTimeout(() => this.applyDynamicTextScaling(), 50);
+        
+        console.log('✅ Enhanced profile list rendered successfully');
+        
+    } catch (error) {
+        console.error('🚨 Critical error in renderProfileList:', error);
+        container.innerHTML = `
+            <div class="empty-state" style="padding: 1rem;">
+                <p style="text-align: center; color: var(--color-danger);">Error loading profiles</p>
+                <p style="text-align: center; color: var(--text-muted); font-size: 0.75rem;">
+                    Check browser console for details
+                </p>
+            </div>
+        `;
     }
+}
+
+/**
+ * Get CSS class for auth chip based on auth type
+ */
+getAuthChipClass(authType) {
+    const type = (authType || 'none').toLowerCase();
+    switch (type) {
+        case 'bearer':
+        case 'bearertoken':
+            return 'auth-bearer';
+        case 'basic':
+            return 'auth-basic';
+        case 'apikey':
+        case 'api_key':
+            return 'auth-apikey';
+        case 'custom':
+            return 'auth-custom';
+        case 'customscript':
+        case 'custom_script':
+            return 'auth-customscript';
+        case 'none':
+        default:
+            return 'auth-none';
+    }
+}
+
+/**
+ * Get display text for auth chip
+ */
+getAuthChipText(authType) {
+    const type = (authType || 'none').toLowerCase();
+    switch (type) {
+        case 'bearer':
+        case 'bearertoken':
+            return 'Bearer';
+        case 'basic':
+            return 'Basic';
+        case 'apikey':
+        case 'api_key':
+            return 'API Key';
+        case 'custom':
+            return 'Custom';
+        case 'customscript':
+        case 'custom_script':
+            return 'Script';
+        case 'none':
+        default:
+            return 'None';
+    }
+}
+
+/**
+ * Apply dynamic text scaling based on actual rendered text width
+ */
+applyDynamicTextScaling() {
+    try {
+        const profileItems = document.querySelectorAll('.profile-item');
+        
+        profileItems.forEach(item => {
+            const nameElement = item.querySelector('.profile-item-name');
+            const urlElement = item.querySelector('.profile-item-url');
+            
+            if (nameElement) {
+                const nameContainer = nameElement.parentElement;
+                if (nameElement.scrollWidth > nameContainer.clientWidth * 0.9) {
+                    if (nameElement.scrollWidth > nameContainer.clientWidth * 1.3) {
+                        nameElement.setAttribute('data-very-long', 'true');
+                    } else {
+                        nameElement.setAttribute('data-long', 'true');
+                    }
+                }
+            }
+            
+            if (urlElement) {
+                const urlContainer = urlElement.parentElement;
+                if (urlElement.scrollWidth > urlContainer.clientWidth * 0.9) {
+                    if (urlElement.scrollWidth > urlContainer.clientWidth * 1.3) {
+                        urlElement.setAttribute('data-very-long', 'true');
+                    } else {
+                        urlElement.setAttribute('data-long', 'true');
+                    }
+                }
+            }
+        });
+        
+        console.log('✅ Dynamic text scaling applied');
+        
+    } catch (error) {
+        console.error('🚨 Error applying dynamic text scaling:', error);
+    }
+}
 
     /**
      * Select a profile with detailed debugging
@@ -491,13 +649,15 @@ $RequestContext.Headers["Accept"] = "application/json"`
                 showNotification(`Profile "${profileName}" not found`, 'error');
                 return;
             }
-            
-            console.log('📋 Found profile:', profile);
+              console.log('📋 Found profile:', profile);
             this.currentProfile = profile;
             this.renderProfileList(); // Update active state
             
             // Show basic profile details for now
             this.showBasicProfileDetails(profile);
+            
+            // Trigger shared profile management
+            this.handleSharedProfileChange(profileName, 'profiles');
             
         } catch (error) {
             console.error('🚨 Error selecting profile:', error);
@@ -854,87 +1014,87 @@ showCreateModal() {
         }, 100);
     }
 
-    /**
-     * Toggle authentication fields based on auth type - ENHANCED WITH COORDINATION
-     */
-    toggleAuthFields() {
-        const authType = document.getElementById('profile-authtype');
-        const authFields = document.getElementById('auth-fields');
-        
-        if (!authType || !authFields) {
-            console.warn('⚠️ Auth type select or auth fields container not found');
-            return;
-        }
-        
-        const authTypeValue = authType.value;
-        console.log('🔄 Toggling auth fields for type:', authTypeValue);
-        
-        let fieldsHtml = '';
-        
-        switch (authTypeValue) {
-            case 'Bearer':
-                fieldsHtml = `
-                    <div class="form-group">
-                        <div class="auth-help" style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px; margin-bottom: 1rem;">
-                            <p><strong>💡 Bearer Token Authentication</strong></p>
-                            <p>Add your bearer token in the <strong>Credentials</strong> section below using the key "token". The token will be sent as an Authorization header.</p>
-                        </div>
-                    </div>
-                `;
-                break;
-                
-            case 'Basic':
-                fieldsHtml = `
-                    <div class="form-group">
-                        <div class="auth-help" style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px; margin-bottom: 1rem;">
-                            <p><strong>💡 Basic Authentication</strong></p>
-                            <p>Add your credentials in the <strong>Credentials</strong> section below:</p>
-                            <ul style="margin: 0.5rem 0 0 1rem;">
-                                <li><strong>username</strong> - Your username</li>
-                                <li><strong>password</strong> - Your password</li>
-                            </ul>
-                            <p>They will be base64-encoded and sent as an Authorization header.</p>
-                        </div>
-                    </div>
-                `;
-                break;
-                
-            case 'ApiKey':
-                fieldsHtml = `
-                    <div class="form-group">
-                        <div class="auth-help" style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px; margin-bottom: 1rem;">
-                            <p><strong>💡 API Key Authentication</strong></p>
-                            <p>Add your API key details in the <strong>Credentials</strong> section below:</p>
-                            <ul style="margin: 0.5rem 0 0 1rem;">
-                                <li><strong>apiKey</strong> - Your API key value</li>
-                                <li><strong>headerName</strong> - Header name (default: X-API-Key)</li>
-                            </ul>
-                            <p>The key will be sent as a custom header.</p>
-                        </div>
-                    </div>
-                `;
-                break;
-                
-            case 'Custom':
-                fieldsHtml = `
-                    <div class="form-group">
-                        <label for="auth-script">Custom Authentication Script:</label>
-                        <textarea id="auth-script" class="form-control" rows="6" 
-                                  placeholder="# PowerShell script to generate auth headers&#10;# Example:&#10;param($RequestContext, $Profile)&#10;$RequestContext.Headers['Authorization'] = 'Bearer ' + $token"></textarea>
-                        <small class="form-help">PowerShell script that sets authentication headers. Access credentials from the Credentials section using $RequestContext.GetPlainTextSecret.Invoke('credentialName')</small>
-                    </div>
-                `;
-                break;
-                
-            case 'None':
-            default:
-                fieldsHtml = '<p class="form-help" style="font-style: italic; color: var(--text-muted);">No authentication required for this profile.</p>';
-                break;
-        }
-        
-        authFields.innerHTML = fieldsHtml;
-        console.log('✅ Auth fields HTML updated for type:', authTypeValue);
+/**
+ * Toggle authentication fields based on auth type - ENHANCED WITH COORDINATION
+ */
+toggleAuthFields() {
+    const authType = document.getElementById('profile-authtype');
+    const authFields = document.getElementById('auth-fields');
+    
+    if (!authType || !authFields) {
+        console.warn('⚠️ Auth type select or auth fields container not found');
+        return;
     }
+    
+    const authTypeValue = authType.value;
+    console.log('🔄 Toggling auth fields for type:', authTypeValue);
+    
+    let fieldsHtml = '';
+    
+    switch (authTypeValue) {
+        case 'Bearer':
+            fieldsHtml = `
+                <div class="form-group">
+                    <div class="auth-help" style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px; margin-bottom: 1rem;">
+                        <p><strong>💡 Bearer Token Authentication</strong></p>
+                        <p>Add your bearer token in the <strong>Credentials</strong> section below using the key "token". The token will be sent as an Authorization header.</p>
+                    </div>
+                </div>
+            `;
+            break;
+            
+        case 'Basic':
+            fieldsHtml = `
+                <div class="form-group">
+                    <div class="auth-help" style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px; margin-bottom: 1rem;">
+                        <p><strong>💡 Basic Authentication</strong></p>
+                        <p>Add your credentials in the <strong>Credentials</strong> section below:</p>
+                        <ul style="margin: 0.5rem 0 0 1rem;">
+                            <li><strong>username</strong> - Your username</li>
+                            <li><strong>password</strong> - Your password</li>
+                        </ul>
+                        <p>They will be base64-encoded and sent as an Authorization header.</p>
+                    </div>
+                </div>
+            `;
+            break;
+            
+        case 'ApiKey':
+            fieldsHtml = `
+                <div class="form-group">
+                    <div class="auth-help" style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px; margin-bottom: 1rem;">
+                        <p><strong>💡 API Key Authentication</strong></p>
+                        <p>Add your API key details in the <strong>Credentials</strong> section below:</p>
+                        <ul style="margin: 0.5rem 0 0 1rem;">
+                            <li><strong>apiKey</strong> - Your API key value</li>
+                            <li><strong>headerName</strong> - Header name (default: X-API-Key)</li>
+                        </ul>
+                        <p>The key will be sent as a custom header.</p>
+                    </div>
+                </div>
+            `;
+            break;
+            
+        case 'CustomScript':
+            fieldsHtml = `
+                <div class="form-group">
+                    <label for="auth-script">Custom Authentication Script:</label>
+                    <textarea id="auth-script" class="form-control" rows="6" 
+                              placeholder="# PowerShell script to generate auth headers&#10;# Example:&#10;param($RequestContext, $Profile)&#10;$RequestContext.Headers['Authorization'] = 'Bearer ' + $token"></textarea>
+                    <small class="form-help">PowerShell script that sets authentication headers. Access credentials from the Credentials section using $RequestContext.GetPlainTextSecret.Invoke('credentialName')</small>
+                </div>
+            `;
+            break;
+            
+        case 'None':
+        default:
+            fieldsHtml = '<p class="form-help" style="font-style: italic; color: var(--text-muted);">No authentication required for this profile.</p>';
+            break;
+    }
+    
+    authFields.innerHTML = fieldsHtml;
+    console.log('✅ Auth fields HTML updated for type:', authTypeValue);
+}
 
     /**
      * Edit existing profile
@@ -1008,6 +1168,24 @@ showCreateModal() {
                 }
                 console.log('✅ Modal and form elements confirmed in DOM');
                 this.populateAllEditFields(this.currentEditProfile);
+
+                // --- PATCH: Attach Add Credential button handler for edit modal ---
+                const addCredBtn = document.getElementById('add-credential-btn');
+                if (addCredBtn && !addCredBtn._handlerAttached) {
+                    addCredBtn.onclick = () => this.addCredentialRow();
+                    addCredBtn._handlerAttached = true;
+                    console.log('✅ Add credential button handler attached (edit modal)');
+                }
+                // --- END PATCH ---
+
+                // --- PATCH: Attach Add Custom Setting button handler for edit modal ---
+                const addSettingBtn = document.getElementById('add-customsetting-btn');
+                if (addSettingBtn && !addSettingBtn._handlerAttached) {
+                    addSettingBtn.onclick = () => this.addCustomSettingRow();
+                    addSettingBtn._handlerAttached = true;
+                    console.log('✅ Add custom setting button handler attached (edit modal)');
+                }
+                // --- END PATCH ---
             }, 300);
         } catch (error) {
             console.error('🚨 Error editing profile:', error);
@@ -1015,91 +1193,91 @@ showCreateModal() {
         }
     }
 
-/**
- * Toggle pagination details field visibility based on checkbox
- */
-togglePaginationDetailsField() {
-    const checkbox = document.getElementById('show-pagination-details');
-    const detailsGroup = document.getElementById('pagination-details-group');
-    
-    if (checkbox && detailsGroup) {
-        detailsGroup.style.display = checkbox.checked ? 'block' : 'none';
-        console.log('🔄 Pagination details field toggled:', checkbox.checked ? 'visible' : 'hidden');
-    }
-}
-
-/**
- * Update pagination visibility based on pagination type selection
- */
-updatePaginationVisibility() {
-    const paginationSelect = document.getElementById('profile-pagination');
-    const checkbox = document.getElementById('show-pagination-details');
-    const detailsGroup = document.getElementById('pagination-details-group');
-    
-    if (!paginationSelect || !checkbox || !detailsGroup) {
-        console.warn('⚠️ Pagination visibility elements not found');
-        return;
-    }
-    
-    const paginationType = paginationSelect.value;
-    console.log('🔄 Updating pagination visibility for type:', paginationType);
-    
-    // Determine if we should auto-show the details field
-    const shouldAutoShow = ['Custom', 'PageNumber'].includes(paginationType);
-    
-    if (shouldAutoShow) {
-        // For Custom and PageNumber, automatically show the details and check the checkbox
-        checkbox.checked = true;
-        detailsGroup.style.display = 'block';
-        console.log('✅ Auto-showing pagination details for', paginationType);
-    } else {
-        // For other types, respect the current checkbox state
-        // Don't auto-hide if user manually checked it
-        console.log('ℹ️ Pagination type', paginationType, 'uses defaults, checkbox state:', checkbox.checked);
-    }
-    
-    // Update the placeholder text based on pagination type
-    const textarea = document.getElementById('profile-pagination-details');
-    if (textarea) {
-        let placeholder = '';
-        switch (paginationType) {
-            case 'PageNumber':
-                placeholder = '{"PageParameter":"page","PageSizeParameter":"pageSize","DefaultPageSize":100}';
-                break;
-            case 'Cursor':
-                placeholder = '{"NextTokenField":"next_cursor","TokenParameter":"cursor","ItemsField":"items"}';
-                break;
-            case 'NextLink':
-                placeholder = '{"NextTokenField":"@odata.nextLink","ItemsField":"value"}';
-                break;
-            case 'LinkHeader':
-                placeholder = '{"LinkHeaderRel":"next","ItemsField":"items"}';
-                break;
-            case 'Custom':
-                placeholder = '{"PageParameter":"page","PageSizeParameter":"limit","NextTokenField":"nextToken"}';
-                break;
-            default:
-                placeholder = '{"PageParameter":"page","PageSizeParameter":"pageSize","DefaultPageSize":100}';
+    /**
+     * Toggle pagination details field visibility based on checkbox
+     */
+    togglePaginationDetailsField() {
+        const checkbox = document.getElementById('show-pagination-details');
+        const detailsGroup = document.getElementById('pagination-details-group');
+        
+        if (checkbox && detailsGroup) {
+            detailsGroup.style.display = checkbox.checked ? 'block' : 'none';
+            console.log('🔄 Pagination details field toggled:', checkbox.checked ? 'visible' : 'hidden');
         }
-        textarea.placeholder = placeholder;
     }
-}
 
-/**
- * Legacy method for backward compatibility - redirects to new method
- */
-togglePaginationFields() {
-    console.log('⚠️ togglePaginationFields() is deprecated, using updatePaginationVisibility()');
-    this.updatePaginationVisibility();
-}
+    /**
+     * Update pagination visibility based on pagination type selection
+     */
+    updatePaginationVisibility() {
+        const paginationSelect = document.getElementById('profile-pagination');
+        const checkbox = document.getElementById('show-pagination-details');
+        const detailsGroup = document.getElementById('pagination-details-group');
+        
+        if (!paginationSelect || !checkbox || !detailsGroup) {
+            console.warn('⚠️ Pagination visibility elements not found');
+            return;
+        }
+        
+        const paginationType = paginationSelect.value;
+        console.log('🔄 Updating pagination visibility for type:', paginationType);
+        
+        // Determine if we should auto-show the details field
+        const shouldAutoShow = ['Custom', 'PageNumber'].includes(paginationType);
+        
+        if (shouldAutoShow) {
+            // For Custom and PageNumber, automatically show the details and check the checkbox
+            checkbox.checked = true;
+            detailsGroup.style.display = 'block';
+            console.log('✅ Auto-showing pagination details for', paginationType);
+        } else {
+            // For other types, respect the current checkbox state
+            // Don't auto-hide if user manually checked it
+            console.log('ℹ️ Pagination type', paginationType, 'uses defaults, checkbox state:', checkbox.checked);
+        }
+        
+        // Update the placeholder text based on pagination type
+        const textarea = document.getElementById('profile-pagination-details');
+        if (textarea) {
+            let placeholder = '';
+            switch (paginationType) {
+                case 'PageNumber':
+                    placeholder = '{"PageParameter":"page","PageSizeParameter":"pageSize","DefaultPageSize":100}';
+                    break;
+                case 'Cursor':
+                    placeholder = '{"NextTokenField":"next_cursor","TokenParameter":"cursor","ItemsField":"items"}';
+                    break;
+                case 'NextLink':
+                    placeholder = '{"NextTokenField":"@odata.nextLink","ItemsField":"value"}';
+                    break;
+                case 'LinkHeader':
+                    placeholder = '{"LinkHeaderRel":"next","ItemsField":"items"}';
+                    break;
+                case 'Custom':
+                    placeholder = '{"PageParameter":"page","PageSizeParameter":"limit","NextTokenField":"nextToken"}';
+                    break;
+                default:
+                    placeholder = '{"PageParameter":"page","PageSizeParameter":"pageSize","DefaultPageSize":100}';
+            }
+            textarea.placeholder = placeholder;
+        }
+    }
 
-/**
- * Render edit profile form - COMPLETE VERSION with pagination checkbox
- */
-renderEditForm(profile) {
-    console.log('🎨 Rendering edit form for profile:', profile.name);
-    
-    const customSettingsSection = `
+    /**
+     * Legacy method for backward compatibility - redirects to new method
+     */
+    togglePaginationFields() {
+        console.log('⚠️ togglePaginationFields() is deprecated, using updatePaginationVisibility()');
+        this.updatePaginationVisibility();
+    }
+
+    /**
+     * Render edit profile form - COMPLETE VERSION with pagination checkbox
+     */
+    renderEditForm(profile) {
+        console.log('🎨 Rendering edit form for profile:', profile.name);
+        
+        const customSettingsSection = `
         <div class="form-section">
             <h4>⚙️ Custom Settings</h4>
             <div id="profile-customsettings-list"></div>
@@ -1195,16 +1373,16 @@ renderEditForm(profile) {
 
             <div class="form-section">
                 <h4>🔐 Authentication</h4>
-                <div class="form-group">
-                    <label for="profile-authtype">Authentication Type:</label>
-                    <select id="profile-authtype" class="form-control" onchange="profileManager.toggleAuthFields()">
-                        <option value="None">None</option>
-                        <option value="Bearer">Bearer Token</option>
-                        <option value="Basic">Basic Authentication</option>
-                        <option value="ApiKey">API Key</option>
-                        <option value="Custom">Custom Script</option>
-                    </select>
-                </div>
+<div class="form-group">
+    <label for="profile-authtype">Authentication Type:</label>
+    <select id="profile-authtype" class="form-control" onchange="profileManager.toggleAuthFields()">
+        <option value="None">None</option>
+        <option value="Bearer">Bearer Token</option>
+        <option value="Basic">Basic Authentication</option>
+        <option value="ApiKey">API Key</option>
+        <option value="CustomScript">Custom Script</option>
+    </select>
+</div>
                 
                 <div id="auth-fields">
                     <!-- Auth fields will be populated by toggleAuthFields -->
@@ -1257,7 +1435,7 @@ renderEditForm(profile) {
 populateAllEditFields(profile) {
     console.log('🔧 POPULATING ALL EDIT FIELDS');
     console.log('🔧 Profile name:', profile.name);
-    console.log('🔧 Profile pagination details:', JSON.stringify(profile.paginationDetails, null, 2));
+    console.log('🔧 Profile custom settings:', JSON.stringify(profile.customSettings, null, 2));
     
     try {
         const waitForElements = () => {
@@ -1270,17 +1448,6 @@ populateAllEditFields(profile) {
             const paginationField = document.getElementById('profile-pagination');
             const paginationDetailsField = document.getElementById('profile-pagination-details');
             const sessionOnlyField = document.getElementById('profile-session-only');
-
-            console.log('🔍 Form elements check:', {
-                nameField: !!nameField,
-                urlField: !!urlField,
-                descField: !!descField,
-                authTypeField: !!authTypeField,
-                headersField: !!headersField,
-                paginationField: !!paginationField,
-                paginationDetailsField: !!paginationDetailsField,
-                sessionOnlyField: !!sessionOnlyField
-            });
 
             // Wait for critical elements
             if (!nameField || !urlField || !authTypeField || !paginationDetailsField) {
@@ -1306,80 +1473,85 @@ populateAllEditFields(profile) {
                 console.log('✅ Headers field populated:', headersJson);
             }
 
-            // 3. PAGINATION DETAILS FIELD - THE MAIN FIX
+            // 3. PAGINATION DETAILS FIELD
             if (paginationDetailsField) {
                 console.log('🎯 SETTING PAGINATION DETAILS FIELD');
-                console.log('🎯 Field element:', paginationDetailsField);
-                console.log('🎯 Current field value before setting:', `"${paginationDetailsField.value}"`);
                 
                 if (profile.paginationDetails && typeof profile.paginationDetails === 'object' && Object.keys(profile.paginationDetails).length > 0) {
                     const paginationJson = JSON.stringify(profile.paginationDetails, null, 2);
-                    console.log('🎯 JSON to set:', paginationJson);
-                    
                     paginationDetailsField.value = paginationJson;
-                    
-                    console.log('🎯 Field value AFTER setting:', `"${paginationDetailsField.value}"`);
-                    console.log('🎯 Setting successful:', paginationDetailsField.value === paginationJson);
                     console.log('✅ PAGINATION DETAILS FIELD SET SUCCESSFULLY');
                 } else {
-                    console.log('⚠️ No valid pagination details found in profile');
                     paginationDetailsField.value = '';
                 }
-            } else {
-                console.error('❌ PAGINATION DETAILS FIELD NOT FOUND!');
             }
 
-            // 4. PAGINATION DETAILS HANDLING
+            // 4. AUTH TYPE HANDLING
+            let selectedPaginationType = 'Auto';
+            if (paginationField && profile.paginationType) {
+                const profilePaginationType = String(profile.paginationType).toLowerCase();
+                switch (profilePaginationType) {
+                    case 'pagebased':
+                    case 'pagenumber':
+                        selectedPaginationType = 'PageNumber';
+                        break;
+                    case 'linkheader':
+                        selectedPaginationType = 'LinkHeader';
+                        break;
+                    case 'nextlink':
+                        selectedPaginationType = 'NextLink';
+                        break;
+                    case 'cursor':
+                    case 'cursorbased':
+                        selectedPaginationType = 'Cursor';
+                        break;
+                    case 'none':
+                        selectedPaginationType = 'None';
+                        break;
+                    case 'custom':
+                        selectedPaginationType = 'Custom';
+                        break;
+                    default:
+                        selectedPaginationType = profile.paginationType;
+                }
+                paginationField.value = selectedPaginationType;
+            }
+
+            // 5. PAGINATION DETAILS HANDLING
             const showPaginationCheckbox = document.getElementById('show-pagination-details');
             const paginationDetailsGroup = document.getElementById('pagination-details-group');
             
-            if (paginationDetailsField && showPaginationCheckbox && paginationDetailsGroup) {
-                console.log('🎯 SETTING PAGINATION DETAILS AND VISIBILITY');
-                
-                // Determine if we have pagination details to show
+            if (showPaginationCheckbox && paginationDetailsGroup) {
                 const hasPaginationDetails = profile.paginationDetails && 
                     typeof profile.paginationDetails === 'object' && 
                     Object.keys(profile.paginationDetails).length > 0;
                 
                 if (hasPaginationDetails) {
-                    const paginationJson = JSON.stringify(profile.paginationDetails, null, 2);
-                    console.log('🎯 Setting pagination details JSON:', paginationJson);
-                    paginationDetailsField.value = paginationJson;
-                    
-                    // Check the checkbox and show the field
                     showPaginationCheckbox.checked = true;
                     paginationDetailsGroup.style.display = 'block';
-                    console.log('✅ PAGINATION DETAILS SET AND MADE VISIBLE');
                 } else {
-                    console.log('⚠️ No pagination details found in profile');
-                    paginationDetailsField.value = '';
-                    
-                    // Decide whether to show based on pagination type
                     const shouldAutoShow = ['Custom', 'PageNumber'].includes(selectedPaginationType);
                     showPaginationCheckbox.checked = shouldAutoShow;
                     paginationDetailsGroup.style.display = shouldAutoShow ? 'block' : 'none';
-                    console.log('🔧 Pagination visibility set based on type:', shouldAutoShow);
                 }
                 
-                // Update placeholder based on pagination type
                 this.updatePaginationVisibility();
-            } else {
-                console.error('❌ PAGINATION DETAILS ELEMENTS NOT FOUND!');
             }
-            
-            // 5. SESSION ONLY CHECKBOX
+
+            // 6. SESSION ONLY CHECKBOX
             if (sessionOnlyField) {
                 sessionOnlyField.checked = Boolean(profile.isSessionOnly);
                 console.log('✅ Session only checkbox set to:', sessionOnlyField.checked);
             }
 
-            // 6. AUTH TYPE AND FIELDS
+            // 7. AUTH TYPE AND FIELDS
             if (authTypeField) {
                 let authTypeValue = profile.authType || 'None';
                 
-                // Normalize auth type
+                // Normalize for selector
                 switch ((authTypeValue || '').toLowerCase()) {
                     case 'bearer':
+                    case 'bearertoken':
                         authTypeValue = 'Bearer';
                         break;
                     case 'basic':
@@ -1392,14 +1564,13 @@ populateAllEditFields(profile) {
                     case 'custom':
                     case 'customscript':
                     case 'custom_script':
-                        authTypeValue = 'Custom';
+                        authTypeValue = 'CustomScript';
                         break;
                     case 'none':
                     default:
                         authTypeValue = 'None';
                         break;
                 }
-                
                 authTypeField.value = authTypeValue;
                 console.log('✅ Auth type set to:', authTypeValue);
 
@@ -1413,76 +1584,156 @@ populateAllEditFields(profile) {
                         authType: authTypeValue
                     });
                     
-                    // Handle custom auth script
-                    if (authTypeValue === 'Custom' && profile.customAuthScript) {
-                        const scriptField = document.getElementById('auth-script');
-                        if (scriptField) {
-                            scriptField.value = profile.customAuthScript;
-                            console.log('✅ Custom auth script populated (length:', profile.customAuthScript.length, ')');
-                        } else {
-                            console.warn('⚠️ Auth script field not found');
-                        }
+                    // Handle custom auth script AFTER auth fields are set up
+                    if (authTypeValue === 'CustomScript' && profile.customAuthScript) {
+                        setTimeout(() => {
+                            const scriptField = document.getElementById('auth-script');
+                            if (scriptField) {
+                                scriptField.value = profile.customAuthScript;
+                                console.log('✅ Custom auth script populated (length:', profile.customAuthScript.length, ')');
+                            } else {
+                                console.error('❌ Script field not found!');
+                            }
+                        }, 100);
                     }
                 }, 200);
-            }
 
-            // 6. CREDENTIALS SECTION
-            const credentialsContainer = document.getElementById('profile-credentials-list');
-            if (credentialsContainer) {
-                credentialsContainer.innerHTML = '';
-                const creds = profile.credentials && typeof profile.credentials === 'object'
-                    ? profile.credentials
-                    : {};
-                
-                let credentialRowsAdded = false;
-                Object.entries(creds).forEach(([key, value]) => {
-                    this.addCredentialRow(credentialsContainer, key, value);
-                    credentialRowsAdded = true;
-                });
-                
-                if (!credentialRowsAdded) {
-                    this.addCredentialRow(credentialsContainer, '', '');
-                }
-                
-                console.log('✅ Credentials populated:', Object.keys(creds));
-            }
-
-            // Attach credential button handler
-            const addCredBtn = document.getElementById('add-credential-btn');
-            if (addCredBtn && !addCredBtn._handlerAttached) {
-                addCredBtn.onclick = () => this.addCredentialRow();
-                addCredBtn._handlerAttached = true;
-            }
-
-            // 7. CUSTOM SETTINGS SECTION
-            const customSettingsContainer = document.getElementById('profile-customsettings-list');
-            if (customSettingsContainer) {
-                customSettingsContainer.innerHTML = '';
-                const settings = (profile.customSettings && typeof profile.customSettings === 'object')
-                    ? profile.customSettings
-                    : {};
-                
-                let settingRowsAdded = false;
-                Object.entries(settings).forEach(([key, value]) => {
-                    this.addCustomSettingRow(customSettingsContainer, key, value);
-                    settingRowsAdded = true;
-                });
-                
-                if (!settingRowsAdded) {
+                // 8. CUSTOM SETTINGS SECTION - ✅ FIXED VERSION
+                const customSettingsContainer = document.getElementById('profile-customsettings-list');
+                if (customSettingsContainer) {
+                    console.log('🔧 Populating custom settings container');
+                    customSettingsContainer.innerHTML = '';
+                    
+                    // Add rows for existing custom settings
+                    if (profile.customSettings && typeof profile.customSettings === 'object' && Object.keys(profile.customSettings).length > 0) {
+                        console.log('📝 Adding custom settings rows:', Object.keys(profile.customSettings));
+                        Object.entries(profile.customSettings).forEach(([key, value]) => {
+                            this.addCustomSettingRow(customSettingsContainer, key, value);
+                        });
+                        console.log('✅ Custom settings populated:', Object.keys(profile.customSettings));
+                    } else {
+                        console.log('⚠️ No custom settings found in profile');
+                    }
+                    
+                    // Always add one empty row at the end
                     this.addCustomSettingRow(customSettingsContainer, '', '');
+                    console.log('✅ Empty custom setting row added');
                 }
+
+                // 9. CREDENTIALS SECTION - ✅ ENHANCED WITH COMPREHENSIVE MASKING SUPPORT
+    const credentialsContainer = document.getElementById('profile-credentials-list');
+    if (credentialsContainer) {
+        console.log('🔧 Populating credentials container');
+        credentialsContainer.innerHTML = '';
+        
+        // Get template info for proper field mapping
+        let template = null;
+        let authFieldMapping = {};
+        let templateDefaults = {};
+        if (profile.authType) {
+            template = Object.values(this.templates).find(t =>
+                t.name === profile.name ||
+                (t.authType && t.authType.toLowerCase() === profile.authType.toLowerCase())
+            );
+            if (template) {
+                authFieldMapping = template.authFieldMapping || {};
+                templateDefaults = template.templateDefaults || {};
+            }
+        }
+        
+        // Collect all keys that should be shown
+        let keysToShow = new Set([
+            ...Object.keys(authFieldMapping),
+            ...Object.keys(templateDefaults),
+            ...Object.keys(profile.credentials || {})
+        ]);
+        
+        // For custom auth, also add any keys from AuthenticationDetails
+        if ((profile.authType === 'Custom' || profile.authType === 'CustomScript') && profile.AuthenticationDetails) {
+            Object.keys(profile.AuthenticationDetails)
+                .filter(k => !['AuthType', 'AuthScriptBlock'].includes(k))
+                .forEach(k => keysToShow.add(k));
+        }
+        
+        // If no mapping, fallback to all keys in credentials
+        if (keysToShow.size === 0 && profile.credentials) {
+            Object.keys(profile.credentials).forEach(k => keysToShow.add(k));
+        }
+        
+        keysToShow.forEach(key => {
+            if (!key) return;
+            
+            const mapping = authFieldMapping[key] || {};
+            const label = mapping.label || key;
+            const inputType = mapping.type || (
+                /password|token|key/i.test(key) ? 'password' : 'text'
+            );
+            
+            // ✅ ENHANCED VALUE HANDLING WITH COMPREHENSIVE MASKING FOR EDIT
+            let value = '';
+            let placeholder = '';
+            
+            if (profile.credentials && profile.credentials[key] !== undefined) {
+                const credValue = profile.credentials[key];
                 
-                console.log('✅ Custom settings populated:', Object.keys(settings));
+                if (this.isSensitiveCredentialKey(key)) {
+                    // For sensitive keys, check for any masking pattern
+                    const isMaskedValue = credValue === '••••••••' ||
+                        credValue === '********' ||
+                        credValue === '***MASKED***' ||
+                        credValue === '***HIDDEN***' ||  // ← ADD THIS CHECK
+                        (credValue && credValue.match(/^[•*]{6,}$/));
+                    
+                    if (isMaskedValue || (credValue && credValue !== '')) {
+                        value = '••••••••'; // Show consistent masked value
+                        placeholder = 'Current value loaded (masked)';
+                        console.log(`🔒 Masked sensitive credential '${key}' (original: ${credValue})`);
+                    } else {
+                        value = '';
+                        placeholder = 'Enter new value';
+                    }
+                } else {
+                    // For non-sensitive keys, show actual value unless it's a masking pattern
+                    const isMaskedValue = credValue === '••••••••' ||
+                        credValue === '********' ||
+                        credValue === '***MASKED***' ||
+                        credValue === '***HIDDEN***';  // ← ADD THIS CHECK
+                    
+                    if (isMaskedValue) {
+                        value = '••••••••';
+                        placeholder = 'Current value loaded (masked)';
+                        console.log(`🔒 Masked non-sensitive credential '${key}' (original: ${credValue})`);
+                    } else {
+                        value = credValue || templateDefaults[key] || '';
+                        placeholder = label;
+                    }
+                }
+            } else {
+                // No existing value, use template defaults
+                value = templateDefaults[key] || '';
+                placeholder = label;
             }
-
-            // Attach custom settings button handler
-            const addSettingBtn = document.getElementById('add-customsetting-btn');
-            if (addSettingBtn && !addSettingBtn._handlerAttached) {
-                addSettingBtn.onclick = () => this.addCustomSettingRow();
-                addSettingBtn._handlerAttached = true;
+            
+            this.addCredentialRow(credentialsContainer, key, value, label, inputType);
+            
+            // Set the placeholder after adding the row
+            setTimeout(() => {
+                const rows = credentialsContainer.querySelectorAll('.credential-row');
+                const lastRow = rows[rows.length - 2]; // Get the row we just added (not the empty one)
+                if (lastRow) {
+                    const valueInput = lastRow.querySelector('.credential-value');
+                    if (valueInput && placeholder) {
+                        valueInput.placeholder = placeholder;
+                    }
+                }
+            }, 10);
+        });
+        
+        // Always add one empty row for new credentials
+        this.addCredentialRow(credentialsContainer, '', '');
+        console.log('✅ Credentials populated with comprehensive masking support');
+    }
             }
-
-            console.log('🎉 ALL FIELDS POPULATED SUCCESSFULLY!');
         };
         
         waitForElements();
@@ -1620,7 +1871,7 @@ populateAllEditFields(profile) {
         
         modal.innerHTML = `
             <div class="modal-dialog" style="width: ${options.width || '500px'}; max-width: 90vw; max-height: 90vh; overflow-y: auto; background: var(--bg-primary); border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
-                <div class="modal-header" style="padding: 1rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                <div class
                     <h3 style="margin: 0;">${this.safeEscape(title)}</h3>
                     <button class="modal-close" onclick="profileManager.closeModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; padding: 0.25rem;">&times;</button>
                 </div>
@@ -1744,16 +1995,16 @@ renderCreateForm() {
 
             <div class="form-section">
                 <h4>🔐 Authentication</h4>
-                <div class="form-group">
-                    <label for="profile-authtype">Authentication Type:</label>
-                    <select id="profile-authtype" class="form-control" onchange="profileManager.toggleAuthFields()">
-                        <option value="None">None</option>
-                        <option value="Bearer">Bearer Token</option>
-                        <option value="Basic">Basic Authentication</option>
-                        <option value="ApiKey">API Key</option>
-                        <option value="Custom">Custom Script</option>
-                    </select>
-                </div>
+<div class="form-group">
+    <label for="profile-authtype">Authentication Type:</label>
+    <select id="profile-authtype" class="form-control" onchange="profileManager.toggleAuthFields()">
+        <option value="None">None</option>
+        <option value="Bearer">Bearer Token</option>
+        <option value="Basic">Basic Authentication</option>
+        <option value="ApiKey">API Key</option>
+        <option value="CustomScript">Custom Script</option>
+    </select>
+</div>
                 
                 <div id="auth-fields"></div>
             </div>
@@ -1810,290 +2061,28 @@ renderCreateForm() {
 }
 
 /**
- * Apply template to form with coordinated auth and credentials - ENHANCED
+ * Helper to determine if a credential key is sensitive (should be stored in vault)
  */
-applyTemplate() {
-    const templateSelect = document.getElementById('profile-template');
-    const templateKey = templateSelect.value;
-    
-    if (!templateKey || !this.templates[templateKey]) return;
-    
-    const template = this.templates[templateKey];
-    
-    console.log('🎯 Applying template:', template.name);
-    console.log('🎯 Template auth type:', template.authType);
-    console.log('🎯 Template required secrets:', template.requiredSecrets);
-    console.log('🎯 Template auth field mapping:', template.authFieldMapping);
-    
-    // Fill basic form fields
-    document.getElementById('profile-name').value = template.name || '';
-    document.getElementById('profile-baseurl').value = template.baseUrl || '';
-    document.getElementById('profile-description').value = template.description || '';
-    document.getElementById('profile-authtype').value = template.authType || 'None';
-    document.getElementById('profile-pagination').value = template.paginationType || 'Auto';
-    
-    if (template.headers) {
-        document.getElementById('profile-headers').value = JSON.stringify(template.headers, null, 2);
-    }
-
-    // Handle pagination details if present
-    if (template.paginationDetails) {
-        const paginationDetailsField = document.getElementById('profile-pagination-details');
-        const showPaginationCheckbox = document.getElementById('show-pagination-details');
-        const paginationDetailsGroup = document.getElementById('pagination-details-group');
-        
-        if (paginationDetailsField && showPaginationCheckbox && paginationDetailsGroup) {
-            paginationDetailsField.value = JSON.stringify(template.paginationDetails, null, 2);
-            // Show the details when applying a template with pagination details
-            showPaginationCheckbox.checked = true;
-            paginationDetailsGroup.style.display = 'block';
-            console.log('✅ Template pagination details applied and made visible');
-        }
-    }
-    
-    // Update pagination visibility after setting type
-    setTimeout(() => {
-        this.updatePaginationVisibility();
-    }, 100);
-    
-    // Clear existing auth fields and trigger update
-    this.toggleAuthFields();
-    
-    // Handle custom settings from template
-    if (template.customSettings && typeof template.customSettings === 'object') {
-        const customSettingsContainer = document.getElementById('profile-customsettings-list');
-        if (customSettingsContainer) {
-            // Clear existing rows first
-            customSettingsContainer.innerHTML = '';
-            
-            // Add rows for each custom setting
-            Object.entries(template.customSettings).forEach(([key, value]) => {
-                this.addCustomSettingRow(customSettingsContainer, key, value);
-            });
-            
-            // Add one empty row at the end
-            this.addCustomSettingRow(customSettingsContainer, '', '');
-        }
-    }
-    
-    // Handle coordinated credentials from template - ENHANCED
-    this.applyTemplateCredentials(template);
-    
-    // Handle custom auth script from template
-    if (template.customAuthScript) {
-        // Wait for auth fields to be rendered
-        setTimeout(() => {
-            const scriptField = document.getElementById('auth-script');
-            if (scriptField) {
-                scriptField.value = template.customAuthScript;
-                console.log('✅ Custom auth script applied from template');
-            } else {
-                console.log('⚠️ Auth script field not found, will retry...');
-                // Retry after a longer delay
-                setTimeout(() => {
-                    const retryScriptField = document.getElementById('auth-script');
-                    if (retryScriptField) {
-                        retryScriptField.value = template.customAuthScript;
-                        console.log('✅ Custom auth script applied from template (retry)');
-                    }
-                }, 300);
-            }
-        }, 100);
-    }
-    
-    showNotification(`Applied ${template.name} template`, 'success');
-}
-
-setFormValue(elementId, value) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.value = value || '';
-        return true;
-    }
-    console.warn(`Form element '${elementId}' not found`);
-    return false;
-}
-
-validateTemplateApplication(template) {
-    const requiredFields = ['name', 'baseUrl', 'authType'];
-    const missingFields = requiredFields.filter(field => !template[field]);
-    
-    if (missingFields.length > 0) {
-        showNotification(`Template missing required fields: ${missingFields.join(', ')}`, 'error');
-        return false;
-    }
-    
-    // Validate auth field mapping
-    if (template.requiredSecrets && template.requiredSecrets.length > 0) {
-        if (!template.authFieldMapping) {
-            showNotification('Template requires secrets but no auth field mapping defined', 'warning');
-        }
-    }
-    
-    return true;
+isSensitiveCredentialKey(key) {
+    if (!key) return false;
+    // Lowercase for comparison
+    const k = key.toLowerCase();
+    // Add more as needed for your environment
+    return (
+        k.includes('privatekey') ||
+        k.includes('secret') ||
+        k.includes('password') ||
+        k.includes('token') ||
+        k.includes('apikey') ||
+        k === 'privatekey' ||
+        k === 'password' ||
+        k === 'token' ||
+        k === 'apikey'
+    );
 }
 
 /**
- * Apply template credentials in a coordinated way with auth types - NEW METHOD
- */
-applyTemplateCredentials(template) {
-    if (template.authFieldMapping && template.requiredSecrets) {
-        const credentialsContainer = document.getElementById('profile-credentials-list');
-        if (credentialsContainer) {
-            // Clear existing credentials
-            credentialsContainer.innerHTML = '';
-            
-            // Add credential rows based on template mapping
-            template.requiredSecrets.forEach(secretKey => {
-                if (template.authFieldMapping[secretKey]) {
-                    const mapping = template.authFieldMapping[secretKey];
-                    const inputType = mapping.type || 'password';
-                    
-                    this.addCredentialRow(
-                        credentialsContainer, 
-                        mapping.field || secretKey, 
-                        mapping.defaultValue || '',
-                        mapping.label || secretKey,
-                        inputType
-                    );
-                    
-                    // Set the label and make template fields readonly
-                    const lastRow = credentialsContainer.lastElementChild;
-                    if (lastRow && mapping.label) {
-                        const keyInput = lastRow.querySelector('.credential-key');
-                        if (keyInput) {
-                            keyInput.value = mapping.field || secretKey;
-                            keyInput.setAttribute('data-label', mapping.label);
-                            keyInput.title = mapping.label;
-                            if (mapping.defaultValue) {
-                                keyInput.style.backgroundColor = 'var(--bg-secondary)';
-                                keyInput.readOnly = true;
-                            }
-                        }
-                    }
-                }
-            });
-            
-            // Add one empty row for additional credentials
-            this.addCredentialRow(credentialsContainer, '', '');
-            console.log('✅ Template credentials applied successfully');
-        }
-    } else {
-        console.log('⚠️ No auth field mapping or required secrets found in template');
-    }
-}
 
-    /**
-     * Handle create profile form submission
-     */
-    async handleCreateProfile() {
-        try {
-            console.log('📤 Handling profile creation...');
-            
-            const form = document.getElementById('create-profile-form');
-            if (!form?.checkValidity()) {
-                form?.reportValidity();
-                return;
-            }
-
-            const profileData = this.collectFormData();
-            
-            // Validate required fields
-            if (!profileData.name) {
-                showNotification('Profile name is required', 'error');
-                return;
-            }
-            
-            if (!profileData.baseUrl) {
-                showNotification('Base URL is required', 'error');
-                return;
-            }
-
-            // Check for duplicate names
-            if (this.profiles.find(p => p && p.name === profileData.name)) {
-                showNotification('A profile with this name already exists', 'error');
-                return;
-            }
-
-            console.log('📤 Sending profile creation request:', profileData);
-            
-            const response = await apiClient.createProfile(profileData);
-            console.log('📨 Create profile response:', response);
-            
-            if (response.success) {
-                showNotification('Profile created successfully', 'success');
-                this.closeModal();
-                await this.loadProfiles();
-            } else {
-                showNotification(`Failed to create profile: ${response.error}`, 'error');
-            }
-            
-        } catch (error) {
-            console.error('🚨 Error creating profile:', error);
-            showNotification(`Error creating profile: ${error.message}`, 'error');
-        }
-    }
-
-    /**
-     * Handle edit profile form submission
-     */
-    async handleEditProfile() {
-        try {
-            console.log('📝 Handling profile update...');
-            
-            const form = document.getElementById('edit-profile-form');
-            if (!form?.checkValidity()) {
-                form?.reportValidity();
-                return;
-            }
-
-            const profileData = this.collectFormData();
-            const originalName = this.currentEditProfile.name;
-            
-            // Validate required fields
-            if (!profileData.name) {
-                showNotification('Profile name is required', 'error');
-                return;
-            }
-            
-            if (!profileData.baseUrl) {
-                showNotification('Base URL is required', 'error');
-                return;
-            }
-
-            // Check for duplicate names (excluding current profile)
-            if (profileData.name !== originalName && 
-                this.profiles.find(p => p && p.name === profileData.name)) {
-                showNotification('A profile with this name already exists', 'error');
-                return;
-            }
-
-            console.log('📝 Sending profile update request:', profileData);
-            
-            const response = await apiClient.updateProfile(originalName, profileData);
-            console.log('📨 Update profile response:', response);
-            
-            if (response.success) {
-                showNotification('Profile updated successfully', 'success');
-                this.closeModal();
-                await this.loadProfiles();
-                
-                // Update current selection if this was the selected profile
-                if (this.currentProfile?.name === originalName) {
-                    this.currentProfile = { ...profileData };
-                    this.selectProfile(profileData.name);
-                }
-            } else {
-                showNotification(`Failed to update profile: ${response.error}`, 'error');
-            }
-            
-        } catch (error) {
-            console.error('🚨 Error updating profile:', error);
-            showNotification(`Error updating profile: ${error.message}`, 'error');
-        }
-    }
-
-/**
  * Fixed collectFormData method for profile-manager.js
  * This replaces the existing collectFormData method
  */
@@ -2125,14 +2114,16 @@ collectFormData() {
     }
 
     // Parse pagination details JSON
-    try {
-        const paginationDetailsText = document.getElementById('profile-pagination-details')?.value?.trim();
-        if (paginationDetailsText) {
-            profileData.paginationDetails = JSON.parse(paginationDetailsText);
+    const showPaginationDetails = document.getElementById('show-pagination-details')?.checked;
+    if (showPaginationDetails) {
+        try {
+            const paginationDetailsText = document.getElementById('profile-pagination-details')?.value?.trim();
+            if (paginationDetailsText) {
+                profileData.paginationDetails = JSON.parse(paginationDetailsText);
+            }
+        } catch (error) {
+            console.warn('⚠️ Invalid JSON in pagination details, skipping');
         }
-    } catch (error) {
-        console.warn('⚠️ Invalid JSON in pagination details, using empty object');
-        profileData.paginationDetails = {};
     }
 
     // Collect custom settings
@@ -2149,59 +2140,66 @@ collectFormData() {
         profileData.customSettings = customSettings;
     }
 
-    // FIXED: Collect credentials with proper masking handling
+    // ✅ FIXED CREDENTIALS COLLECTION - SEND PRESERVE MARKERS INSTEAD OF EXCLUDING
     const credentials = {};
     const credRows = document.querySelectorAll('#profile-credentials-list .credential-row');
-    credRows.forEach(row => {
-        const key = row.querySelector('.credential-key')?.value?.trim();
+    
+    console.log('🔍 Found', credRows.length, 'credential rows');
+    
+    credRows.forEach((row, index) => {
+        const keyInput = row.querySelector('.credential-key');
         const valueInput = row.querySelector('.credential-value');
         
-        if (!key) return; // Skip rows without keys
+        const key = keyInput?.value?.trim();
+        const value = valueInput?.value?.trim();
         
-        let value = valueInput?.value?.trim();
+        console.log(`🔍 Row ${index}:`, {
+            key: key,
+            value: value ? `[${value.length} chars]` : 'empty',
+            keyElement: !!keyInput,
+            valueElement: !!valueInput
+        });
         
-        // FIXED: Handle masked credentials properly
-        if (valueInput && valueInput.type === 'password') {
-            // Check if this is a masked placeholder (various possible formats)
-            const isMasked = value === '********' || 
-                           value === '••••••••' || 
-                           value === '***MASKED***' ||
-                           value === '' ||
-                           (value && value.match(/^[•*]{6,}$/));
-            
-            if (isMasked && this.isEditing && this.currentEditProfile) {
-                // For editing: if field appears masked and user didn't change it, 
-                // don't include it in the update (backend will keep existing)
-                console.log(`🔒 Credential '${key}' appears masked, excluding from update`);
-                return; // Skip this credential - backend will keep existing value
-            }
-            
-            // If we reach here, it's either:
-            // 1. A new profile (create mode)
-            // 2. An edit where user actually entered a new value
-            if (value && !isMasked) {
-                credentials[key] = value;
-                console.log(`🔑 Including credential '${key}' with new value`);
-            } else if (!this.isEditing) {
-                // For new profiles, require non-empty values
-                console.log(`⚠️ New profile missing required credential '${key}'`);
-            }
+        if (!key) {
+            console.log(`⚠️ Row ${index}: Skipping row without key`);
+            return; // Skip rows without keys
+        }
+        
+        // ✅ COMPREHENSIVE MASKING DETECTION
+        const isMasked = 
+            value === '********' ||
+            value === '••••••••' ||
+            value === '***MASKED***' ||
+            value === '***HIDDEN***' ||
+            (value && value.match(/^[•*]{6,}$/)) ||
+            valueInput?.placeholder?.includes('masked') ||
+            valueInput?.placeholder?.includes('Current value loaded');
+
+        console.log(`🔍 Row ${index} - Key: '${key}', Masked: ${isMasked}, Value: '${value}'`);
+
+        // ✅ NEW LOGIC: ALWAYS INCLUDE THE FIELD - USE PRESERVE MARKER FOR MASKED
+        if (this.isEditing && isMasked) {
+            // Send preserve marker instead of excluding
+            credentials[key] = '***PRESERVE_EXISTING***';
+            console.log(`🔒 Row ${index}: Sending PRESERVE marker for masked credential '${key}'`);
+        } else if (value) {
+            // Send actual value for new/changed credentials
+            credentials[key] = value;
+            console.log(`🔑 Row ${index}: Including credential '${key}' with actual value`);
+        } else if (!this.isEditing && this.isSensitiveCredentialKey(key)) {
+            // For new profiles, warn about missing sensitive credentials but still include empty
+            credentials[key] = '';
+            console.log(`⚠️ Row ${index}: New profile - including empty sensitive credential '${key}'`);
         } else {
-            // Non-password fields (like headerName for API keys)
-            if (value) {
-                credentials[key] = value;
-                console.log(`🔧 Including non-secret credential field '${key}': ${value}`);
-            }
+            // Include empty non-sensitive fields
+            credentials[key] = '';
+            console.log(`📝 Row ${index}: Including empty credential '${key}'`);
         }
     });
     
-    // Only set credentials if we have any
-    if (Object.keys(credentials).length > 0) {
-        profileData.credentials = credentials;
-        console.log('🔑 Final credentials keys:', Object.keys(credentials));
-    } else {
-        console.log('🔑 No credentials to include in request');
-    }
+    // Always set credentials (may contain preserve markers)
+    profileData.credentials = credentials;
+    console.log('🔑 Final credentials to send:', credentials);
 
     // Handle custom auth script
     const authScript = document.getElementById('auth-script')?.value?.trim();
@@ -2425,6 +2423,174 @@ collectFormData() {
         }
 
         return errors;
+    }
+
+    /**
+     * Shared profile management - handle profile selection across tabs
+     */
+    handleSharedProfileChange(profileName, sourceTab) {
+        try {
+            console.log(`🔄 Shared profile change: ${profileName} from ${sourceTab}`);
+            
+            // Update current profile selection
+            this.currentSharedProfile = profileName;
+            
+            // Update EndpointTester if available
+            if (typeof endpointTester !== 'undefined') {
+                endpointTester.currentProfile = profileName;
+                if (endpointTester.updateProfileContext) {
+                    endpointTester.updateProfileContext();
+                }
+            }
+            
+            // Sync profile selection across tabs
+            this.syncProfileAcrossTabs(profileName, sourceTab);
+            
+            // Update history filter if we're on the history tab
+            if (sourceTab !== 'history') {
+                this.updateHistoryProfileFilter();
+            }
+            
+            console.log('✅ Shared profile change completed');
+            
+        } catch (error) {
+            console.error('🚨 Error handling shared profile change:', error);
+        }
+    }
+
+    /**
+     * Synchronize profile selection across all tabs
+     */
+    syncProfileAcrossTabs(profileName, sourceTab) {
+        try {
+            // Update test profile dropdown (API Tester tab)
+            if (sourceTab !== 'tester') {
+                const testSelect = document.getElementById('test-profile');
+                if (testSelect && testSelect.value !== profileName) {
+                    testSelect.value = profileName;
+                    // Add visual sync indicator
+                    testSelect.classList.add('profile-selector-synced');
+                    setTimeout(() => testSelect.classList.remove('profile-selector-synced'), 2000);
+                }
+            }
+            
+            // Update profiles tab selection
+            if (sourceTab !== 'profiles' && profileName) {
+                this.selectProfile(profileName);
+            }
+            
+            // Store the shared selection for persistence
+            if (profileName) {
+                localStorage.setItem('anyapi_shared_profile', profileName);
+            } else {
+                localStorage.removeItem('anyapi_shared_profile');
+            }
+            
+        } catch (error) {
+            console.error('🚨 Error syncing profile across tabs:', error);
+        }
+    }
+
+    /**
+     * Sync profile selection manually (sync button)
+     */
+    syncProfileSelection(targetTab) {
+        try {
+            const syncBtn = document.querySelector(`#${targetTab}-section .btn-sync`);
+            if (syncBtn) {
+                syncBtn.classList.add('syncing');
+                setTimeout(() => syncBtn.classList.remove('syncing'), 1000);
+            }
+            
+            // Get current profile from Profiles tab
+            const currentProfile = this.currentProfile?.name;
+            
+            if (currentProfile) {
+                // Sync to target tab
+                if (targetTab === 'tester') {
+                    const testSelect = document.getElementById('test-profile');
+                    if (testSelect) {
+                        testSelect.value = currentProfile;
+                        this.handleSharedProfileChange(currentProfile, 'sync');
+                        showNotification(`Profile "${currentProfile}" synced to API Tester`, 'success');
+                    }
+                }
+            } else {
+                showNotification('No profile selected to sync', 'warning');
+            }
+            
+        } catch (error) {
+            console.error('🚨 Error syncing profile selection:', error);
+            showNotification('Error syncing profile selection', 'error');
+        }
+    }
+
+    /**
+     * Update history profile filter dropdown
+     */
+    updateHistoryProfileFilter() {
+        try {
+            const filterSelect = document.getElementById('history-profile-filter');
+            if (!filterSelect) return;
+            
+            const currentValue = filterSelect.value;
+            filterSelect.innerHTML = '<option value="">All Profiles</option>';
+            
+            // Add all available profiles
+            this.profiles.forEach(profile => {
+                if (profile && profile.name) {
+                    const option = document.createElement('option');
+                    option.value = profile.name;
+                    option.textContent = profile.name;
+                    filterSelect.appendChild(option);
+                }
+            });
+            
+            // Restore selection if it still exists
+            if (currentValue && this.profiles.find(p => p && p.name === currentValue)) {
+                filterSelect.value = currentValue;
+            }
+            
+            console.log('✅ History profile filter updated');
+            
+        } catch (error) {
+            console.error('🚨 Error updating history profile filter:', error);
+        }
+    }
+
+    /**
+     * Initialize shared profile management
+     */
+    initializeSharedProfileManagement() {
+        try {
+            // Restore shared profile selection from localStorage
+            const savedProfile = localStorage.getItem('anyapi_shared_profile');
+            if (savedProfile && this.profiles.find(p => p && p.name === savedProfile)) {
+                this.currentSharedProfile = savedProfile;
+                
+                // Update test profile dropdown
+                const testSelect = document.getElementById('test-profile');
+                if (testSelect) {
+                    testSelect.value = savedProfile;
+                }
+                
+                // Update EndpointTester
+                if (typeof endpointTester !== 'undefined') {
+                    endpointTester.currentProfile = savedProfile;
+                    if (endpointTester.updateProfileContext) {
+                        endpointTester.updateProfileContext();
+                    }
+                }
+            }
+            
+            // Initialize history profile filter
+            this.updateHistoryProfileFilter();
+            
+            console.log('✅ Shared profile management initialized');
+            
+        } catch (error) {
+            console.error('🚨 Error initializing shared profile management:', error);
+        }
     }
 }
 

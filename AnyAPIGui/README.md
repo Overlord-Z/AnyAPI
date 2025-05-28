@@ -4,9 +4,11 @@
 
 A sophisticated, responsive web interface that provides visual management of REST API profiles, interactive endpoint testing, and secure credential storage - all powered by a PowerShell backend.
 
-![AnyAPI GUI](https://img.shields.io/badge/Status-Active%20Development-brightgreen)
-![Version](https://img.shields.io/badge/Version-2.0-blue)
+![AnyAPI GUI](https://img.shields.io/badge/Status-Development%20Preview-orange)
+![Version](https://img.shields.io/badge/Version-2.0--dev-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
+
+> **⚠️ Development Preview** - This project is currently in active development and not yet officially released. Features and APIs may change.
 
 ## 🚀 Features
 
@@ -35,27 +37,37 @@ A sophisticated, responsive web interface that provides visual management of RES
 ## 📋 Quick Start
 
 ### Prerequisites
-- **PowerShell 7.0+** (with AnyAPI module installed)
+- **PowerShell 7.0+** 
+- **AnyAPI PowerShell Module** (included in this repository)
 - **Modern Web Browser** (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)
 - **Network Access** to localhost:8080 (or configured port)
 
 ### Installation & Setup
 
-1. **Start the PowerShell Backend**
+1. **Clone the Repository**
    ```powershell
-   # Navigate to your AnyAPI directory
-   cd "d:\gitrepo\AnyAPI"
-   
+   git clone https://github.com/Overlord-Z/AnyAPI.git
+   cd AnyAPI
+   ```
+
+2. **Import the AnyAPI Module**
+   ```powershell
+   # Import the PowerShell module (if not already in PSModulePath)
+   Import-Module .\AnyAPI.psd1 -Force
+   ```
+
+3. **Start the PowerShell Backend**
+   ```powershell
    # Start the web server
    .\Start-AnyAPIGui.ps1 -Port 8080
    ```
 
-2. **Access the Web Interface**
+4. **Access the Web Interface**
    ```
    http://localhost:8080
    ```
 
-3. **Initial Setup**
+5. **Initial Setup**
    - The app will automatically detect your PowerShell backend
    - Configure SecretStore password (optional but recommended)
    - Create your first API profile or import existing ones
@@ -396,22 +408,51 @@ All issues above are tracked in the roadmap and will be addressed in the upcomin
 
 ## 📝 License
 
-MIT License - see LICENSE file for details.
+MIT License
+
+Copyright (c) 2025 James Zaenglein
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ## 🆘 Support
 
 ### **Getting Help**
 - **Issues:** Use GitHub Issues for bug reports and feature requests
-- **Documentation:** Check the `/docs` directory for detailed guides
-- **Examples:** See `/examples` for common usage patterns
+- **Documentation:** Check the `/docs` directory for detailed guides (coming soon)
+- **Examples:** See `/examples` for common usage patterns (coming soon)
+- **Discussions:** Use GitHub Discussions for questions and community support
 
 ### **Troubleshooting**
 - **Console Errors:** Check browser DevTools console for detailed error messages
 - **Performance Issues:** Use browser Performance tab to identify bottlenecks
 - **UI Problems:** Verify browser compatibility and disable browser extensions
+- **PowerShell Issues:** Ensure PowerShell 7.0+ is installed and AnyAPI module is properly imported
+
+### **Development Status**
+This project is in active development. Current status:
+- ✅ Core functionality working and stable
+- ✅ All major features implemented
+- 🔄 Code modernization and optimization in progress
+- 📋 Official release and PowerShell Gallery publication planned
 
 ---
 
-**Built with ❤️ for the PowerShell community**
+**Built with ❤️ by James Zaenglein for the PowerShell community**
 
-*Last Updated: December 2024 | Version 2.0*
+*Last Updated: January 2025 | Version 2.0-dev*

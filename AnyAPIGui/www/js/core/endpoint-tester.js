@@ -29,7 +29,41 @@ class EndpointTester {
      * Initialize endpoint tester
      */
     init() {
+        console.log('🚀 Initializing EndpointTester...');
+        
         this.loadRequestHistory();
+        
+        // Listen for profile changes from other components
+        window.addEventListener('profileChanged', (e) => {
+            if (e.detail.profileName !== this.currentProfile) {
+                this.onProfileChange(e.detail.profileName);
+                
+                // Update the profile selector if it exists
+                const profileSelect = document.getElementById('test-profile');
+                if (profileSelect && profileSelect.value !== e.detail.profileName) {
+                    profileSelect.value = e.detail.profileName || '';
+                }
+            }
+        });
+        
+        // Restore saved profile
+        const savedProfile = localStorage.getItem('anyapi_current_profile');
+        if (savedProfile) {
+            this.onProfileChange(savedProfile);
+        }
+        
+        // Initialize sections if the function exists
+        if (typeof this.initializeSections === 'function') {
+            this.initializeSections();
+        }
+        
+        // Initial validation
+        setTimeout(() => {
+            this.validateEndpoint();
+            this.initializeWithSavedProfile();
+        }, 100);
+        
+        console.log('✅ EndpointTester initialized');
     }
 
     /**
@@ -439,75 +473,114 @@ class EndpointTester {
      * Update profile context when profile changes
      */
     updateProfileContext() {
+        console.log('🔄 Updating profile context for:', this.currentProfile);
+        
         // Update base URL preview if element exists
         const baseUrlPreview = document.getElementById('base-url-preview');
-        if (baseUrlPreview && this.currentProfile) {
+        const compactPreview = document.querySelector('.base-url-preview-compact');
+        
+        if (this.currentProfile) {
             const profile = window.profileManager?.getProfile(this.currentProfile);
-            if (profile) {
-                baseUrlPreview.textContent = profile.baseUrl || 'No base URL';
+            if (profile && profile.baseUrl) {
+                const baseUrl = profile.baseUrl.replace(/\/$/, ''); // Remove trailing slash
+                
+                // Update both preview elements
+                if (baseUrlPreview) {
+                    baseUrlPreview.textContent = baseUrl;
+                    baseUrlPreview.style.display = 'block';
+                }
+                
+                if (compactPreview) {
+                    compactPreview.textContent = baseUrl;
+                    compactPreview.style.display = 'block';
+                }
+                
+                console.log('✅ Profile context updated with base URL:', baseUrl);
+            } else {
+                console.warn('⚠️ Profile not found or missing base URL:', this.currentProfile);
+                this.clearProfileContext();
             }
-        }
-    }
-
-/**
- * Add a new key-value pair to the specified container with improved styling
- */
-addKeyValuePair(containerId) {
-    const container = document.getElementById(containerId);
-    if (!container) {
-        console.warn(`Container not found: ${containerId}`);
-        return;
-    }
-
-    const keyValuePair = document.createElement('div');
-    keyValuePair.className = 'key-value-pair-compact';
-    
-    const placeholder = containerId.includes('headers') ? 'Header' : 'Key';
-    keyValuePair.innerHTML = `
-        <input class="kv-input-compact" placeholder="${placeholder}" type="text">
-        <input class="kv-input-compact" placeholder="Value" type="text">
-        <button type="button" class="kv-remove-btn" onclick="this.parentElement.remove()">
-            ×
-        </button>
-    `;
-    
-    container.appendChild(keyValuePair);
-    
-    // Focus on the first input
-    const firstInput = keyValuePair.querySelector('input');
-    if (firstInput) {
-        setTimeout(() => firstInput.focus(), 100);
-    }
-    
-    console.log(`Added key-value pair to: ${containerId}`);
-}
-
-
-/**
- * Initialize sections with proper state restoration
- */
-initializeSections() {
-    const sections = ['headers-section', 'params-section', 'body-section', 'options-section'];
-    
-    sections.forEach(sectionId => {
-        const section = document.getElementById(sectionId);
-        if (!section) return;
-        
-        const savedState = localStorage.getItem(`section_${sectionId}`);
-        const shouldExpand = savedState === 'expanded' || 
-                           (savedState === null && ['headers-section'].includes(sectionId));
-        
-        if (shouldExpand) {
-            section.classList.add('expanded');
         } else {
-            section.classList.remove('expanded');
+            this.clearProfileContext();
         }
-    });
-    
-    console.log('✅ Sections initialized with proper state');
-}
+    }
 
-    
+    /**
+     * Clear profile context displays
+     */
+    clearProfileContext() {
+        const baseUrlPreview = document.getElementById('base-url-preview');
+        const compactPreview = document.querySelector('.base-url-preview-compact');
+        
+        if (baseUrlPreview) {
+            baseUrlPreview.textContent = 'No profile selected';
+            baseUrlPreview.style.display = 'block';
+        }
+        
+        if (compactPreview) {
+            compactPreview.textContent = 'No profile selected';
+            compactPreview.style.display = 'block';
+        }
+    }
+
+    /**
+     * Handle profile selection change
+     */
+    onProfileChange(profileName) {
+        console.log('🔄 Profile changed to:', profileName);
+        
+        this.currentProfile = profileName;
+        this.updateProfileContext();
+        
+        // Save to localStorage for persistence
+        if (profileName) {
+            localStorage.setItem('anyapi_current_profile', profileName);
+        } else {
+            localStorage.removeItem('anyapi_current_profile');
+        }
+    }
+
+    /**
+     * Initialize with enhanced profile handling
+     */
+    init() {
+        console.log('🚀 Initializing EndpointTester...');
+        
+        this.loadRequestHistory();
+        
+        // Listen for profile changes from other components
+        window.addEventListener('profileChanged', (e) => {
+            if (e.detail.profileName !== this.currentProfile) {
+                this.onProfileChange(e.detail.profileName);
+                
+                // Update the profile selector if it exists
+                const profileSelect = document.getElementById('test-profile');
+                if (profileSelect && profileSelect.value !== e.detail.profileName) {
+                    profileSelect.value = e.detail.profileName || '';
+                }
+            }
+        });
+        
+        // Restore saved profile
+        const savedProfile = localStorage.getItem('anyapi_current_profile');
+        if (savedProfile) {
+            this.onProfileChange(savedProfile);
+        }
+        
+        // Initialize sections if the function exists
+        if (typeof this.initializeSections === 'function') {
+            this.initializeSections();
+        }
+        
+        // Initial validation
+        setTimeout(() => {
+            this.validateEndpoint();
+            this.initializeWithSavedProfile();
+        }, 100);
+        
+        console.log('✅ EndpointTester initialized');
+    }
+
     /**
      * Save current request to history without sending
      */

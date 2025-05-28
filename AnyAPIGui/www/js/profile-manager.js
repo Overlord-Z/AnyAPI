@@ -404,15 +404,19 @@ $RequestContext.Headers["Accept"] = "application/json"`
         };
 
         return `
-            <div class="profile-item ${isActive ? 'active' : ''}" 
+            <div class="profile-card ${isActive ? 'active' : ''}" 
                  onclick="profileManager.selectProfile('${profileData.jsName}')">
-                <div class="profile-item-header">
-                    <h4 class="profile-item-name">${profileData.name}</h4>
-                    ${profileData.authChip}
+                <div class="profile-card-header">
+                    <div class="profile-card-title">
+                        <h4 class="profile-name">${profileData.name}</h4>
+                        ${profileData.authChip}
+                    </div>
+                    ${profileData.actions}
                 </div>
-                <div class="profile-item-url">${profileData.url}</div>
-                ${profileData.description ? `<div class="profile-item-description">${profileData.description}</div>` : ''}
-                ${profileData.actions}
+                <div class="profile-card-body">
+                    <div class="profile-url" title="${profileData.url}">${profileData.url}</div>
+                    ${profileData.description ? `<div class="profile-description">${profileData.description}</div>` : ''}
+                </div>
             </div>
         `;
     }
@@ -420,15 +424,18 @@ $RequestContext.Headers["Accept"] = "application/json"`
     // Auth chip rendering with mapping
     renderAuthChip(authType) {
         const authConfig = {
-            [ProfileManager.AUTH_TYPES.BEARER]: { class: 'auth-bearer', text: 'Bearer' },
-            [ProfileManager.AUTH_TYPES.BASIC]: { class: 'auth-basic', text: 'Basic' },
-            [ProfileManager.AUTH_TYPES.API_KEY]: { class: 'auth-apikey', text: 'API Key' },
-            [ProfileManager.AUTH_TYPES.CUSTOM_SCRIPT]: { class: 'auth-customscript', text: 'Script' },
-            [ProfileManager.AUTH_TYPES.NONE]: { class: 'auth-none', text: 'None' }
+            [ProfileManager.AUTH_TYPES.BEARER]: { class: 'auth-bearer', text: 'Bearer', icon: '🔑' },
+            [ProfileManager.AUTH_TYPES.BASIC]: { class: 'auth-basic', text: 'Basic', icon: '👤' },
+            [ProfileManager.AUTH_TYPES.API_KEY]: { class: 'auth-apikey', text: 'API Key', icon: '🗝️' },
+            [ProfileManager.AUTH_TYPES.CUSTOM_SCRIPT]: { class: 'auth-customscript', text: 'Script', icon: '📜' },
+            [ProfileManager.AUTH_TYPES.NONE]: { class: 'auth-none', text: 'None', icon: '🔓' }
         };
 
         const config = authConfig[authType] || authConfig[ProfileManager.AUTH_TYPES.NONE];
-        return `<div class="profile-auth-chip ${config.class}">${config.text}</div>`;
+        return `<span class="auth-chip ${config.class}" title="${config.text} Authentication">
+                    <span class="auth-icon">${config.icon}</span>
+                    <span class="auth-text">${config.text}</span>
+                </span>`;
     }
 
     // Profile actions rendering
@@ -436,21 +443,23 @@ $RequestContext.Headers["Accept"] = "application/json"`
         const { safeJsEscape } = this.textUtils;
         const jsName = safeJsEscape(profileName);
         
-        const actions = [
-            { icon: '✏️', text: 'Edit', action: `editProfile('${jsName}')`, title: 'Edit Profile' },
-            { icon: '🧪', text: 'Test', action: `testProfile('${jsName}')`, title: 'Test Connection' },
-            { icon: '🗑️', text: '', action: `deleteProfile('${jsName}')`, title: 'Delete Profile', class: 'btn-danger' }
-        ];
-
-        const actionButtons = actions.map(({ icon, text, action, title, class: btnClass = 'btn-outline' }) =>
-            `<button class="btn ${btnClass} btn-sm" onclick="profileManager.${action}" title="${title}">
-                ${icon} ${text}
-            </button>`
-        ).join('');
-
         return `
-            <div class="profile-item-actions" onclick="event.stopPropagation();">
-                ${actionButtons}
+            <div class="profile-actions" onclick="event.stopPropagation();">
+                <button class="action-btn edit-btn" 
+                        onclick="profileManager.editProfile('${jsName}')" 
+                        title="Edit Profile">
+                    <span class="btn-icon">✏️</span>
+                </button>
+                <button class="action-btn test-btn" 
+                        onclick="profileManager.testProfile('${jsName}')" 
+                        title="Test Connection">
+                    <span class="btn-icon">🧪</span>
+                </button>
+                <button class="action-btn delete-btn" 
+                        onclick="profileManager.deleteProfile('${jsName}')" 
+                        title="Delete Profile">
+                    <span class="btn-icon">🗑️</span>
+                </button>
             </div>
         `;
     }
@@ -458,16 +467,23 @@ $RequestContext.Headers["Accept"] = "application/json"`
     // Empty state rendering
     renderEmptyState() {
         return `
-            <div class="empty-state" style="padding: 1rem;">
-                <p style="text-align: center; color: var(--text-muted);">No profiles configured</p>
-                <p style="text-align: center; color: var(--text-muted); font-size: 0.75rem;">
-                    Profiles loaded: ${this.profiles.length}
-                </p>
+            <div class="empty-state">
+                <div class="empty-state-icon">⚙️</div>
+                <div class="empty-state-content">
+                    <h3>No Profiles Found</h3>
+                    <p>Create your first API profile to get started</p>
+                    <button class="btn btn-primary" onclick="profileManager.showCreateModal()">
+                        ➕ Create Profile
+                    </button>
+                </div>
+                <div class="empty-state-meta">
+                    <small>Profiles loaded: ${this.profiles.length}</small>
+                </div>
             </div>
         `;
     }
 
-    // Enhanced profile selection with error handling
+    // Enhanced profile selection with event dispatch
     async selectProfile(profileName) {
         await this.handleAsync(async () => {
             if (!profileName) return;
@@ -480,7 +496,16 @@ $RequestContext.Headers["Accept"] = "application/json"`
             this.currentProfile = profile;
             this.renderProfileList();
             this.showBasicProfileDetails(profile);
-            this.handleSharedProfileChange(profileName, 'profiles');
+            
+            // Dispatch profile change event
+            window.dispatchEvent(new CustomEvent('profileChanged', {
+                detail: { 
+                    profileName, 
+                    profile,
+                    source: 'profileManager' 
+                }
+            }));
+            
         }, 'Error selecting profile');
     }
 
@@ -957,11 +982,11 @@ $RequestContext.Headers["Accept"] = "application/json"`
             let customSettingsHtml = '';
             if (profile.customSettings && typeof profile.customSettings === 'object' && Object.keys(profile.customSettings).length > 0) {
                 customSettingsHtml = `
-                    <div class="config-item" style="margin-top: 1rem;">
-                        <span class="config-label">Custom Settings:</span>
-                        <div class="config-value" style="font-family: monospace; font-size: 0.85rem; background: var(--bg-secondary); padding: 0.5rem; border-radius: 4px;">
+                    <div class="detail-section">
+                        <h5 class="detail-label">Custom Settings</h5>
+                        <div class="detail-content code-block">
                             ${Object.entries(profile.customSettings).map(([k, v]) =>
-                                `<div><strong>${safeEscape(k)}</strong>: ${safeEscape(v)}</div>`
+                                `<div class="setting-item"><strong>${safeEscape(k)}</strong>: ${safeEscape(v)}</div>`
                             ).join('')}
                         </div>
                     </div>
@@ -974,13 +999,13 @@ $RequestContext.Headers["Accept"] = "application/json"`
                 const pd = profile.paginationDetails;
                 const pdEntries = Object.entries(pd)
                     .filter(([k, v]) => k !== 'Type' && v !== undefined && v !== null && v !== '')
-                    .map(([k, v]) => `<div><strong>${safeEscape(k)}</strong>: ${safeEscape(v)}</div>`)
+                    .map(([k, v]) => `<div class="setting-item"><strong>${safeEscape(k)}</strong>: ${safeEscape(v)}</div>`)
                     .join('');
                 if (pdEntries) {
                     paginationDetailsHtml = `
-                        <div class="config-item" style="margin-top: 0.5rem;">
-                            <span class="config-label">Pagination Details:</span>
-                            <div class="config-value" style="font-family: monospace; font-size: 0.85rem; background: var(--bg-secondary); padding: 0.5rem; border-radius: 4px;">
+                        <div class="detail-section">
+                            <h5 class="detail-label">Pagination Details</h5>
+                            <div class="detail-content code-block">
                                 ${pdEntries}
                             </div>
                         </div>
@@ -989,63 +1014,77 @@ $RequestContext.Headers["Accept"] = "application/json"`
             }
 
             container.innerHTML = `
-                <div class="profile-config">
-                    <div class="config-section">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                            <h4>📋 ${profileData.name}</h4>
-                            <div class="profile-actions">
-                                <button class="btn btn-primary" onclick="profileManager.editProfile('${profileData.jsName}')" style="margin-right: 0.5rem;">
-                                    ✏️ Edit Profile
-                                </button>
-                                <button class="btn btn-outline" onclick="profileManager.testProfile('${profileData.jsName}')">
-                                    🧪 Test Connection
-                                </button>
+                <div class="profile-details-container">
+                    <div class="profile-details-header">
+                        <div class="profile-title-section">
+                            <h3 class="profile-title">📋 ${profileData.name}</h3>
+                            <div class="profile-meta">
+                                <span class="profile-status ${profile.isSessionOnly ? 'session-only' : 'persistent'}">
+                                    ${profile.isSessionOnly ? '🔄 Session Only' : '💾 Persistent'}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="profile-header-actions">
+                            <button class="btn btn-outline btn-sm" 
+                                    onclick="profileManager.editProfile('${profileData.jsName}')">
+                                <span class="btn-icon">✏️</span>
+                                <span class="btn-text">Edit</span>
+                            </button>
+                            <button class="btn btn-primary btn-sm" 
+                                    onclick="profileManager.testProfile('${profileData.jsName}')">
+                                <span class="btn-icon">🧪</span>
+                                <span class="btn-text">Test</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="profile-details-grid">
+                        <div class="detail-card">
+                            <h5 class="detail-label">Base URL</h5>
+                            <div class="detail-content url-content" title="${profileData.url}">
+                                ${profileData.url}
                             </div>
                         </div>
                         
-                        <div class="config-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
-                            <div class="config-item">
-                                <span class="config-label">Base URL:</span>
-                                <span class="config-value" style="word-break: break-all;">${profileData.url}</span>
-                            </div>
-                            <div class="config-item">
-                                <span class="config-label">Authentication:</span>
-                                <span class="config-value">${authDetails}</span>
-                            </div>
-                            <div class="config-item">
-                                <span class="config-label">Pagination:</span>
-                                <span class="config-value">${profileData.pagination}</span>
-                            </div>
-                            <div class="config-item">
-                                <span class="config-label">Session Only:</span>
-                                <span class="config-value">${profile.isSessionOnly ? 'Yes' : 'No'}</span>
+                        <div class="detail-card">
+                            <h5 class="detail-label">Authentication</h5>
+                            <div class="detail-content">
+                                ${this.renderAuthChip(profile.authType)}
+                                <span class="auth-details">${authDetails}</span>
                             </div>
                         </div>
-
+                        
+                        <div class="detail-card">
+                            <h5 class="detail-label">Pagination</h5>
+                            <div class="detail-content">${profileData.pagination}</div>
+                        </div>
+                        
                         ${profile.description ? `
-                        <div class="config-item" style="margin-bottom: 1rem;">
-                            <span class="config-label">Description:</span>
-                            <span class="config-value">${profileData.description}</span>
-                        </div>
-                        ` : ''}
-
-                        <div class="config-item">
-                            <span class="config-label">Default Headers:</span>
-                            <div class="config-value" style="font-family: monospace; font-size: 0.85rem; background: var(--bg-secondary); padding: 0.5rem; border-radius: 4px;">
-                                ${headersDisplay}
-                            </div>
-                        </div>
-                        ${paginationDetailsHtml}
-                        ${customSettingsHtml}
-                        ${profile.customAuthScript ? `
-                        <div class="config-item" style="margin-top: 1rem;">
-                            <span class="config-label">Custom Auth Script:</span>
-                            <div class="config-value" style="font-family: monospace; font-size: 0.75rem; background: var(--bg-secondary); padding: 0.5rem; border-radius: 4px; max-height: 100px; overflow-y: auto;">
-                                ${safeEscape(profile.customAuthScript)}
-                            </div>
+                        <div class="detail-card full-width">
+                            <h5 class="detail-label">Description</h5>
+                            <div class="detail-content">${profileData.description}</div>
                         </div>
                         ` : ''}
                     </div>
+
+                    <div class="detail-section">
+                        <h5 class="detail-label">Default Headers</h5>
+                        <div class="detail-content code-block">
+                            ${headersDisplay}
+                        </div>
+                    </div>
+                    
+                    ${paginationDetailsHtml}
+                    ${customSettingsHtml}
+                    
+                    ${profile.customAuthScript ? `
+                    <div class="detail-section">
+                        <h5 class="detail-label">Custom Auth Script</h5>
+                        <div class="detail-content code-block script-content">
+                            <pre><code>${safeEscape(profile.customAuthScript)}</code></pre>
+                        </div>
+                    </div>
+                    ` : ''}
                 </div>
             `;
             
@@ -1054,11 +1093,10 @@ $RequestContext.Headers["Accept"] = "application/json"`
         } catch (error) {
             console.error('🚨 Error showing profile details:', error);
             container.innerHTML = `
-                <div class="config-section">
-                    <h4>❌ Error Loading Profile</h4>
-                    <p style="color: var(--color-danger);">
-                        There was an error displaying this profile. Check the browser console for details.
-                    </p>
+                <div class="profile-details-container error-state">
+                    <div class="error-icon">❌</div>
+                    <h4>Error Loading Profile</h4>
+                    <p>There was an error displaying this profile. Check the browser console for details.</p>
                 </div>
             `;
         }

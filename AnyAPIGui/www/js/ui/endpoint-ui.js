@@ -116,9 +116,19 @@ function setupEventHandlers() {
     const profileSelect = document.getElementById('test-profile');
     if (profileSelect) {
         profileSelect.addEventListener('change', (e) => {
-            endpointTester.currentProfile = e.target.value;
-            endpointTester.updateProfileContext();
-            endpointTester.validateEndpoint();
+            const profileName = e.target.value;
+            console.log('🔄 Profile selector changed to:', profileName);
+            
+            // Update endpoint tester
+            endpointTester.onProfileChange(profileName);
+            
+            // Dispatch event for other components
+            window.dispatchEvent(new CustomEvent('profileChanged', {
+                detail: { 
+                    profileName, 
+                    source: 'endpointTester' 
+                }
+            }));
         });
     }
 

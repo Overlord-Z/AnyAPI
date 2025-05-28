@@ -63,6 +63,9 @@ class EndpointTester {
             this.initializeWithSavedProfile();
         }, 100);
         
+        // Setup body section visibility
+        this.setupBodySection();
+        
         console.log('✅ EndpointTester initialized');
     }
 
@@ -154,11 +157,11 @@ class EndpointTester {
     buildRequestData() {
         const endpointInput = document.getElementById('endpoint-url');
         const endpoint = endpointInput ? endpointInput.value.trim() : '';
-        
-        const data = {
+          const data = {
             profileName: document.getElementById('test-profile')?.value || this.currentProfile,
             method: this.currentMethod,
             endpoint: endpoint,
+            queryParameters: this.collectKeyValuePairs('query-params'),
             headers: this.collectKeyValuePairs('request-headers'),
             timestamp: new Date().toISOString()
         };
@@ -174,22 +177,26 @@ class EndpointTester {
         }
 
         return data;
-    }
-
-    /**
+    }    /**
      * Collect key-value pairs from a container
      */
     collectKeyValuePairs(containerId) {
         const container = document.getElementById(containerId);
         if (!container) return {};
         
-        const pairs = container.querySelectorAll('.key-value-pair');
+        // Support both .key-value-pair and .key-value-pair-compact
+        const pairs = container.querySelectorAll('.key-value-pair, .key-value-pair-compact');
         const result = {};
         
         pairs.forEach(pair => {
-            const key = pair.querySelector('.key-input')?.value?.trim();
-            const value = pair.querySelector('.value-input')?.value?.trim();
-            if (key) result[key] = value || '';
+            const inputs = pair.querySelectorAll('input');
+            if (inputs.length >= 2) {
+                const key = inputs[0].value.trim();
+                const value = inputs[1].value.trim();
+                if (key && value) {
+                    result[key] = value;
+                }
+            }
         });
         
         return result;
@@ -391,9 +398,7 @@ class EndpointTester {
             modal.style.display = 'block';
             modal.classList.add('show');
         }
-    }
-
-    /**
+    }    /**
      * Generate PowerShell code string
      */
     generatePowerShellCode(requestData) {
@@ -402,6 +407,16 @@ class EndpointTester {
         code += `    -Endpoint "${requestData.endpoint}" \\\n`;
         code += `    -Method "${requestData.method}"`;
 
+        // Add query parameters
+        if (requestData.queryParameters && Object.keys(requestData.queryParameters).length > 0) {
+            code += ' \\\n    -QueryParameters @{\n';
+            Object.entries(requestData.queryParameters).forEach(([key, value]) => {
+                code += `        "${key}" = "${value}"\n`;
+            });
+            code += '    }';
+        }
+
+        // Add headers
         if (requestData.headers && Object.keys(requestData.headers).length > 0) {
             code += ' \\\n    -Headers @{\n';
             Object.entries(requestData.headers).forEach(([key, value]) => {
@@ -410,6 +425,7 @@ class EndpointTester {
             code += '    }';
         }
 
+        // Add body
         if (requestData.body) {
             if (requestData.contentType === 'application/json') {
                 try {
@@ -578,6 +594,9 @@ class EndpointTester {
             this.initializeWithSavedProfile();
         }, 100);
         
+        // Setup body section visibility
+        this.setupBodySection();
+        
         console.log('✅ EndpointTester initialized');
     }
 
@@ -691,9 +710,117 @@ class EndpointTester {
                     showNotification('Failed to import history file', 'error');
                 }
             }
-        };
-        
+        };        
         input.click();
+    }
+
+    /**
+     * Auto-expand a collapsible section
+     */
+    autoExpandSection(sectionId) {
+        const section = document.getElementById(sectionId);
+        if (section && !section.classList.contains('expanded')) {
+            if (typeof toggleSection === 'function') {
+                toggleSection(sectionId);
+            } else {
+                // Fallback manual toggle
+                section.classList.add('expanded');
+                const content = section.querySelector('.collapsible-content');
+                const icon = section.querySelector('.collapse-icon');
+                if (content) {
+                    content.style.maxHeight = content.scrollHeight + 'px';
+                }
+                if (icon) {
+                    icon.style.transform = 'rotate(180deg)';
+                }
+            }
+        }
+    }
+
+    /**
+     * Add key-value pair to a container
+     */
+    addKeyValuePair(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) {
+            console.warn(`Container not found: ${containerId}`);
+            return;
+        }
+        
+        const pair = document.createElement('div');
+        pair.className = 'key-value-pair-compact';
+        
+        // Set appropriate placeholders based on container type
+        let keyPlaceholder = 'Name';
+        let valuePlaceholder = 'Value';
+        
+        if (containerId.includes('query-param')) {
+            keyPlaceholder = 'Parameter Name';
+            valuePlaceholder = 'Parameter Value';
+        } else if (containerId.includes('header')) {
+            keyPlaceholder = 'Header Name';
+            valuePlaceholder = 'Header Value';
+        }
+        
+        pair.innerHTML = `
+            <input type="text" class="kv-input-compact" placeholder="${keyPlaceholder}" autocomplete="off">
+            <input type="text" class="kv-input-compact" placeholder="${valuePlaceholder}" autocomplete="off">
+            <button class="kv-remove-btn" onclick="this.closest('.key-value-pair-compact').remove()" type="button" title="Remove this ${containerId.includes('header') ? 'header' : 'parameter'}">×</button>
+        `;
+        
+        container.appendChild(pair);
+        
+        // Auto-expand the section if it's not already expanded
+        const sectionId = container.closest('.collapsible-section')?.id;
+        if (sectionId) {
+            this.autoExpandSection(sectionId);
+        }
+        
+        // Focus on the first input
+        const firstInput = pair.querySelector('input');
+        if (firstInput) {
+            setTimeout(() => firstInput.focus(), 100);
+        }
+        
+        console.log(`Added key-value pair to: ${containerId}`);
+    }
+
+    /**
+     * Setup body section visibility based on HTTP method
+     */
+    setupBodySection() {
+        this.updateBodySectionVisibility();
+        
+        // Listen for method changes
+        window.addEventListener('methodChanged', () => {
+            this.updateBodySectionVisibility();
+        });
+    }
+
+    /**
+     * Update body section visibility based on current method
+     */
+    updateBodySectionVisibility() {
+        const bodySection = document.getElementById('body-section');
+        if (bodySection) {
+            if (['POST', 'PUT', 'PATCH'].includes(this.currentMethod)) {
+                bodySection.style.display = 'block';
+            } else {
+                bodySection.style.display = 'none';
+                // Collapse the section if it's currently expanded
+                if (bodySection.classList.contains('expanded')) {
+                    bodySection.classList.remove('expanded');
+                    const content = bodySection.querySelector('.collapsible-content');
+                    if (content) {
+                        content.style.maxHeight = '0px';
+                    }
+                    const icon = bodySection.querySelector('.collapse-icon');
+                    if (icon) {
+                        icon.style.transform = 'rotate(0deg)';
+                    }
+                }
+            }
+        }
     }
 }
 

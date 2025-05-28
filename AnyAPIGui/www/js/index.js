@@ -173,12 +173,12 @@ window.addEventListener('DOMContentLoaded', () => {
     if (savedDarkMode) {
         document.documentElement.setAttribute('data-theme', 'dark');
     }
-    
-    initializeApp();
+      initializeApp();
 });
 
-// Provide minimal global app object for legacy HTML handlers
-window.app = {
+// Provide minimal global app object for legacy HTML handlers (only if not already set)
+if (!window.app) {
+    window.app = {
         closeModal: (modalId) => {
             const modal = document.getElementById(modalId);
             if (modal) {
@@ -290,8 +290,7 @@ window.app = {
                 console.warn('Error extracting profile from history item:', error);
                 return '';
             }
-        },
-        clearHistory: () => {
+        },        clearHistory: () => {
             if (window.endpointTester && typeof window.endpointTester.clearHistory === 'function') {
                 if (confirm('Are you sure you want to clear all request history?')) {
                     window.endpointTester.clearHistory();
@@ -301,4 +300,5 @@ window.app = {
                 showNotification('History functionality not available', 'warning');
             }
         }
-};
+    };
+}

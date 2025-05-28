@@ -37,9 +37,11 @@ class AnyApiApp {
             
             // Set up global error handling
             this.setupErrorHandling();
-            
-            // Initialize dark mode
+              // Initialize dark mode
             this.initializeDarkMode();
+            
+            // Initialize sidebar state
+            this.initializeSidebar();
             
             // Set up event listeners
             this.setupEventListeners();
@@ -90,9 +92,7 @@ class AnyApiApp {
     initializeDarkMode() {
         this.applyDarkMode(this.isDarkMode);
         this.updateDarkModeToggle();
-    }
-
-    /**
+    }    /**
      * Toggle dark mode
      */
     toggleDarkMode() {
@@ -106,6 +106,55 @@ class AnyApiApp {
             'info',
             2000
         );
+    }    /**
+     * Toggle sidebar collapsed state
+     */
+    toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const toggleIcon = document.querySelector('.sidebar-toggle i');
+        
+        if (!sidebar) {
+            console.warn('Sidebar element not found');
+            return;
+        }
+        
+        sidebar.classList.toggle('collapsed');
+        
+        // Update toggle icon
+        if (toggleIcon) {
+            if (sidebar.classList.contains('collapsed')) {
+                toggleIcon.setAttribute('data-feather', 'chevron-right');
+            } else {
+                toggleIcon.setAttribute('data-feather', 'menu');
+            }
+            
+            // Re-render feather icons
+            if (window.feather) {
+                feather.replace();
+            }
+        }
+        
+        // Save state to localStorage
+        localStorage.setItem('anyapi_sidebar_collapsed', sidebar.classList.contains('collapsed'));
+    }/**
+     * Initialize sidebar state from localStorage
+     */
+    initializeSidebar() {
+        const isCollapsed = localStorage.getItem('anyapi_sidebar_collapsed') === 'true';
+        const sidebar = document.getElementById('sidebar');
+        
+        if (isCollapsed) {
+            sidebar.classList.add('collapsed');
+            const toggleIcon = document.querySelector('.sidebar-toggle i');
+            if (toggleIcon) {
+                toggleIcon.setAttribute('data-feather', 'chevron-right');
+            }
+        }
+        
+        // Re-render feather icons
+        if (window.feather) {
+            feather.replace();
+        }
     }
 
     /**
@@ -1210,4 +1259,53 @@ if (!window.location.hash) {
 // Export app instance for global access
 window.app = app;
 
+// Global wrapper function for sidebar toggle to handle timing issues
+window.toggleSidebarGlobal = function() {
+    if (window.app && typeof window.app.toggleSidebar === 'function') {
+        window.app.toggleSidebar();
+    } else {
+        console.warn('App not ready, using fallback sidebar toggle');
+        // Fallback to direct DOM manipulation
+        const sidebar = document.getElementById('sidebar');
+        const toggleIcon = document.querySelector('.sidebar-toggle i');
+        
+        if (sidebar) {
+            sidebar.classList.toggle('collapsed');
+            
+            // Update toggle icon if available
+            if (toggleIcon) {
+                if (sidebar.classList.contains('collapsed')) {
+                    toggleIcon.setAttribute('data-feather', 'chevron-right');
+                } else {
+                    toggleIcon.setAttribute('data-feather', 'menu');
+                }
+                
+                // Re-render feather icons if available
+                if (window.feather) {
+                    feather.replace();
+                }
+            }
+            
+            // Save state
+            localStorage.setItem('anyapi_sidebar_collapsed', sidebar.classList.contains('collapsed'));
+        }
+    }
+};
+
 console.log('✅ App.js loaded and configured');
+
+// Initialize the app when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('📋 DOM ready, initializing AnyApiApp...');
+        app.init().catch(error => {
+            console.error('Failed to initialize AnyApiApp:', error);
+        });
+    });
+} else {
+    // DOM is already ready
+    console.log('📋 DOM already ready, initializing AnyApiApp...');
+    app.init().catch(error => {
+        console.error('Failed to initialize AnyApiApp:', error);
+    });
+}

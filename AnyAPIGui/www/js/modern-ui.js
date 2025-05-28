@@ -115,16 +115,16 @@ function initializeSidebar() {
     console.log('✅ Sidebar initialized');
 }
 
-// Toggle sidebar visibility (for mobile/responsive)
-function toggleSidebar() {
-    const sidebar = document.querySelector('.sidebar');
-    const appBody = document.querySelector('.app-body');
-    
-    if (sidebar && appBody) {
-        sidebar.classList.toggle('collapsed');
-        appBody.classList.toggle('sidebar-collapsed');
-    }
-}
+// Toggle sidebar visibility (for mobile/responsive) - DEPRECATED: Now handled by app.js
+// function toggleSidebar() {
+//     const sidebar = document.querySelector('.sidebar');
+//     const appBody = document.querySelector('.app-body');
+//     
+//     if (sidebar && appBody) {
+//         sidebar.classList.toggle('collapsed');
+//         appBody.classList.toggle('sidebar-collapsed');
+//     }
+// }
 
 // Create notification container if it doesn't exist
 function createNotificationContainer() {
@@ -1566,15 +1566,16 @@ const navigationStyles = `
 }
 
 .sidebar-nav .nav-item:hover {
-    background: var(--bg-secondary, #f8f9fa);
-    color: var(--text-primary, #212529);
-    border-left-color: var(--color-primary, #007bff);
+    background: rgba(124, 58, 237, 0.25);
+    color: #f8fafc;
+    border-left-color: #7c3aed;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .sidebar-nav .nav-item.active {
-    background: var(--color-primary-light, #e3f2fd);
-    color: var(--color-primary, #007bff);
-    border-left-color: var(--color-primary, #007bff);
+    background: rgba(124, 58, 237, 0.08);
+    color: var(--text-primary, #212529);
+    border-left-color: #7c3aed;
     font-weight: 500;
 }
 `;
@@ -1668,7 +1669,7 @@ window.showModal = showModal;
 window.hideModal = hideModal;
 window.setButtonLoading = setButtonLoading;
 window.updateConnectionStatus = updateConnectionStatus;
-window.toggleSidebar = toggleSidebar;
+// window.toggleSidebar = toggleSidebar; // DEPRECATED: Now handled by app.js
 
 // Additional CSS for better container constraints and responsive design
 const improvedResponsiveStyles = `

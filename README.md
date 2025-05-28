@@ -1,159 +1,159 @@
-# AnyAPI Module v0.3.0 - PowerShell 7+ with Enhanced Secret Storage & Custom Authentication
+# 🚀 AnyAPI Module v0.8.0
 
-A high-performance PowerShell module for interacting with REST APIs with built-in authentication, pagination, retry logic, enhanced cross-platform secret storage, and fluent parameter builders.
+[![PowerShell Gallery](https://img.shields.io/powershellgallery/v/AnyAPI?style=flat-square&logo=powershell&logoColor=white&label=PowerShell%20Gallery)](https://www.powershellgallery.com/packages/AnyAPI)
+[![GitHub release](https://img.shields.io/github/v/release/Overlord-Z/AnyAPI?style=flat-square&logo=github)](https://github.com/Overlord-Z/AnyAPI/releases)
+[![License](https://img.shields.io/github/license/Overlord-Z/AnyAPI?style=flat-square)](https://github.com/Overlord-Z/AnyAPI/blob/main/LICENSE)
+[![PowerShell](https://img.shields.io/badge/PowerShell-7.2%2B-blue?style=flat-square&logo=powershell)](https://github.com/PowerShell/PowerShell)
+[![Cross Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey?style=flat-square)](https://github.com/Overlord-Z/AnyAPI)
 
-## Features
+> **A comprehensive PowerShell module for REST API integration with advanced authentication, intelligent pagination, cross-platform secret management, and fluent builder patterns.**
 
-### 🚀 Core Capabilities
-- **Universal REST API Support** - Works with any REST API
-- **Multiple Authentication Methods** - API Keys, Bearer Tokens, Custom Scripts
-- **Intelligent Pagination** - Auto-detects and handles 4 pagination types
-- **Enhanced Secret Storage** - Microsoft.PowerShell.SecretManagement integration with fallbacks
-- **Performance Optimized** - Caching, batching, and efficient memory management
-- **Robust Error Handling** - Exponential backoff, retry logic, rate limiting support
-- **Fluent Builder Pattern** - Chainable parameter builders for cleaner code
+## 🌟 Overview
 
-### 🔐 Authentication Types
-- **API Key** - Header or query parameter based
-- **Bearer Token** - OAuth2 and JWT tokens
-- **Custom Script** - Dynamic authentication via PowerShell scripts with full secret access
+AnyAPI transforms PowerShell into a powerful REST API client with enterprise-grade features for authentication, secret management, and data processing. Whether you're automating API workflows, building integrations, or managing multi-platform deployments, AnyAPI provides the tools you need.
 
-### 📄 Pagination Support
-- **Link Header** - RFC 5988 compliant (GitHub, GitLab style)
-- **Cursor-based** - Microsoft Graph, NextPageToken style
-- **Page-based** - Traditional page/pageSize parameters
-- **Offset/Limit** - Database-style pagination
+```mermaid
+graph TD
+    A[🎯 AnyAPI Module] --> B[🔐 Authentication Engine]
+    A --> C[📊 Data Processing]
+    A --> D[🔒 Secret Management]
+    A --> E[🔧 Builder Patterns]
+    
+    B --> B1[API Keys]
+    B --> B2[Bearer Tokens]
+    B --> B3[Custom Scripts]
+    B --> B4[OAuth2 Flows]
+    
+    C --> C1[Intelligent Pagination]
+    C --> C2[Streaming Support]
+    C --> C3[Batch Processing]
+    C --> C4[Error Handling]
+    
+    D --> D1[SecretManagement]
+    D --> D2[Cross-Platform Vaults]
+    D --> D3[Encrypted Storage]
+    D --> D4[Session Management]
+    
+    E --> E1[ApiRequestBuilder]
+    E --> E2[ProfileInitializationBuilder]
+    E --> E3[Fluent Interface]
+    E --> E4[Pipeline Support]
+    
+    style A fill:#e1f5fe
+    style B fill:#f3e5f5
+    style C fill:#e8f5e8
+    style D fill:#fce4ec
+    style E fill:#fff3e0
+```
 
-### 🔒 Enhanced Cross-Platform Security
-- **SecretManagement Integration** - Microsoft.PowerShell.SecretManagement and SecretStore (preferred)
-- **Windows** - DPAPI encryption fallback
-- **macOS** - Keychain integration fallback
-- **Linux** - Secret Service (GNOME/KDE) fallback
-- **Persistent Secrets** - Credentials automatically saved and retrieved between sessions
-- **Multiple Vault Support** - Organize secrets by environment or sensitivity
+## ✨ Key Features
 
-### 🔧 Builder Pattern Support
+### 🚀 **Universal API Integration**
+- **Any REST API** - Universal compatibility with all REST endpoints
+- **Smart Detection** - Automatic pagination and authentication discovery
+- **Fluent Builders** - Chainable method syntax for readable code
+- **High Performance** - Optimized for speed and memory efficiency
+
+### 🔐 **Advanced Authentication**
+- **Multiple Methods** - API Keys, Bearer Tokens, OAuth2, Custom Scripts
+- **Dynamic Authentication** - Runtime credential resolution and refresh
+- **Secure Storage** - Cross-platform encrypted credential management
+- **Token Management** - Automatic refresh and rotation support
+
+### 📄 **Intelligent Pagination**
+```mermaid
+flowchart LR
+    A[API Response] --> B{Pagination Type?}
+    B -->|Link Header| C[RFC 5988<br/>GitHub Style]
+    B -->|Cursor Based| D[NextToken<br/>Graph Style]
+    B -->|Page Based| E[Page/PageSize<br/>Traditional]
+    B -->|Offset/Limit| F[Database Style<br/>Skip/Take]
+    
+    C --> G[🔄 Auto Continue]
+    D --> G
+    E --> G
+    F --> G
+    
+    style A fill:#e3f2fd
+    style G fill:#c8e6c9
+```
+### 🔒 **Enterprise Security**
+- **SecretManagement Integration** - Microsoft.PowerShell.SecretManagement
+- **Cross-Platform Vaults** - Windows DPAPI, macOS Keychain, Linux Secret Service
+- **Persistent Sessions** - Secure credential caching between sessions
+- **Zero-Trust Architecture** - No plain-text credential storage
+
+### 🔧 **Builder Pattern Support** *(NEW in v0.8.0)*
 - **ApiRequestBuilder** - Fluent interface for building API requests
 - **ProfileInitializationBuilder** - Chainable profile configuration
+- **Pipeline Support** - PowerShell pipeline-friendly fluent methods
 - **Backward Compatibility** - All existing parameter-based syntax still works
 
-## Requirements
+## 🛠️ Installation
 
-- **PowerShell 7.2+** (Cross-platform support)
-- **Windows** - Windows 10/11 or Windows Server 2016+
-- **macOS** - macOS 10.14+ with Keychain access
-- **Linux** - Distribution with Secret Service support
-- **Optional** - Microsoft.PowerShell.SecretManagement and SecretStore modules (auto-installed when using Initialize-SecretStore)
+### Quick Install
+```powershell
+# Clone from GitHub and import
+git clone https://github.com/Overlord-Z/AnyAPI.git
+Import-Module .\AnyAPI\AnyAPI.psm1
 
-## Installation
+# Or download and import directly
+Import-Module .\path\to\AnyAPI.psm1
+```
 
+### Initial Setup
 ```powershell
 # Import the module
-Import-Module .\AnyAPI.psm1
+Import-Module AnyAPI
+
+# Initialize secure secret storage (one-time setup)
+Initialize-SecretStore
 
 # Verify installation
 Get-Command -Module AnyAPI
-
-# Optional: Set up enhanced secret storage (recommended)
-Initialize-SecretStore
-
-# Test secret storage capabilities
-Test-SecretStorage
-Get-SecretStorageInfo
-```
-
-## Quick Start
-
-### 1. Enhanced Secret Storage Setup (Recommended)
-
-```powershell
-# One-time setup for persistent, secure secret storage
-Initialize-SecretStore
-
-# Check what secret storage is being used
-Get-SecretStorageInfo
-
-# Test that everything is working
 Test-SecretStorage
 ```
 
-### 2. Initialize an API Profile (Traditional Syntax)
+## 🚀 Quick Start
 
+### 1. **Command-Line Profile Setup**
 ```powershell
-# GitHub API with personal access token
+# GitHub API with automatic secret storage
 Initialize-AnyApiProfile -ProfileName "GitHub" `
     -BaseUrl "https://api.github.com" `
     -AuthenticationDetails @{
         AuthType = "BearerToken"
-        TokenValue = "ghp_your_token_here"  # Automatically stored securely
+        TokenValue = "ghp_your_token_here"  # Automatically encrypted & stored
     } `
-    -PaginationDetails @{
-        Type = "LinkHeader"
-    }
+    -PaginationDetails @{ Type = "LinkHeader" }
 
-# REST API with API Key
-Initialize-AnyApiProfile -ProfileName "MyAPI" `
-    -BaseUrl "https://api.example.com" `
-    -AuthenticationDetails @{
-        AuthType = "ApiKey"
-        ApiKeyLocation = "Header"
-        ApiKeyName = "X-API-Key"
-        ApiKeyValue = "your-api-key-here"  # Automatically stored securely
-    } `
-    -DefaultHeaders @{
-        "Accept" = "application/json"
-        "User-Agent" = "PowerShell-AnyAPI/0.3.0"
-    }
+# Verify profile creation
+Get-AnyApiProfile -ProfileName "GitHub"
 ```
 
-### 2a. Initialize an API Profile (Builder Pattern - NEW!)
-
+### 2. **Fluent Builder Pattern** *(NEW Enhanced)*
 ```powershell
-# GitHub API using fluent builder pattern
-$profile = New-ProfileInitializationBuilder -ProfileName "GitHub" `
-    -BaseUrl "https://api.github.com" `
-    -AuthenticationDetails @{
-        AuthType = "BearerToken"
-        TokenValue = "ghp_your_token_here"  # Stored in SecretStore
-    } |
-    WithPagination @{ Type = "LinkHeader" } |
-    WithDefaultHeaders @{
-        "Accept" = "application/vnd.github.v3+json"
-        "User-Agent" = "PowerShell-AnyAPI/0.3.0"
-    } |
-    ForceOverwrite $true
+# Create complex requests with chainable methods
+$repos = New-ApiRequestBuilder -ProfileName "GitHub" -Endpoint "/user/repos" |
+    WithQueryParameters @{ sort = "updated"; per_page = 100 } |
+    WithPagination $true 100 1000 |
+    WithHeaders @{ "Accept" = "application/vnd.github.v3+json" } |
+    WithRetryPolicy 5 2000
+
+$repositories = Invoke-AnyApiEndpoint -RequestBuilder $repos
+
+# Profile initialization with builder pattern
+$profile = New-ProfileInitializationBuilder -ProfileName "ComplexAPI" `
+    -BaseUrl "https://api.example.com" `
+    -AuthenticationDetails @{ AuthType = "ApiKey"; ApiKeyName = "key"; ApiKeyValue = "secret" } |
+    WithPagination @{ Type = "PageBased"; DefaultPageSize = 50 } |
+    WithErrorHandling @{ MaxRetries = 5; ExponentialBackoff = $true } |
+    WithDefaultHeaders @{ "User-Agent" = "AnyAPI/0.8.0" }
 
 Initialize-AnyApiProfile -ProfileBuilder $profile
-
-# REST API with fluent configuration
-$apiProfile = New-ProfileInitializationBuilder -ProfileName "MyAPI" `
-    -BaseUrl "https://api.example.com" `
-    -AuthenticationDetails @{
-        AuthType = "ApiKey"
-        ApiKeyLocation = "Header"
-        ApiKeyName = "X-API-Key"
-        ApiKeyValue = "your-api-key-here"
-    } |
-    WithDefaultHeaders @{
-        "Accept" = "application/json"
-        "Content-Type" = "application/json"
-    } |
-    WithPagination @{
-        Type = "PageBased"
-        PageSizeParameter = "limit"
-        DefaultPageSize = 50
-    } |
-    WithErrorHandling @{
-        MaxRetries = 3
-        InitialBackoffMs = 1000
-    } |
-    SessionOnly $false
-
-Initialize-AnyApiProfile -ProfileBuilder $apiProfile
 ```
 
-### 3. Make API Calls (Traditional Syntax)
-
+### 3. **Simple API Calls**
 ```powershell
 # Simple GET request - secrets automatically retrieved
 $repos = Invoke-AnyApiEndpoint -ProfileName "GitHub" -Endpoint "/user/repos"
@@ -174,413 +174,237 @@ $newIssue = Invoke-AnyApiEndpoint -ProfileName "GitHub" `
     }
 ```
 
-### 3a. Make API Calls (Builder Pattern - NEW!)
+## 🖥️ Running the GUI
+
+A graphical interface for AnyAPI is available as a separate component.  
+To launch the GUI, simply run the provided start script from the GUI directory:
 
 ```powershell
-# Simple GET request using builder
-$request = New-ApiRequestBuilder -ProfileName "GitHub" -Endpoint "/user/repos"
-$repos = Invoke-AnyApiEndpoint -RequestBuilder $request
-
-# Complex request with fluent chaining
-$issues = New-ApiRequestBuilder -ProfileName "GitHub" -Endpoint "/repos/owner/repo/issues" |
-    WithMethod "GET" |
-    WithQueryParameters @{ state = "open"; per_page = 50 } |
-    WithHeaders @{ "Accept" = "application/vnd.github.v3+json" } |
-    WithRetryPolicy 5 2000 |
-    Invoke-AnyApiEndpoint -RequestBuilder $_
-
-# POST request with fluent configuration
-$newIssue = New-ApiRequestBuilder -ProfileName "GitHub" -Endpoint "/repos/owner/repo/issues" |
-    WithMethod "POST" |
-    WithBody @{
-        title = "New issue"
-        body = "Issue description"
-        labels = @("bug", "enhancement")
-    } |
-    WithContentType "application/json" |
-    WithRetryPolicy 3 1000 |
-    SuppressErrors $false
-
-$result = Invoke-AnyApiEndpoint -RequestBuilder $newIssue
-
-# Pagination with builder pattern
-$allRepos = New-ApiRequestBuilder -ProfileName "GitHub" -Endpoint "/user/repos" |
-    WithPagination $true 100 1000 |
-    WithQueryParameters @{ sort = "updated"; direction = "desc" }
-
-$repositories = Invoke-AnyApiEndpoint -RequestBuilder $allRepos
+# From the root of the repository or the GUI folder:
+pwsh ./start.ps1
 ```
 
-## Custom Authentication Scripts
+The GUI provides a visual way to manage profiles and explore APIs.  
+A full guide to the GUI will be published separately.
 
-### Enhanced Secret Access in Custom Scripts
+## 🎯 Architecture Overview
 
-Custom authentication scripts now have multiple ways to access secrets with full SecretStore integration:
+```mermaid
+architecture-beta
+    group api(cloud)[API Layer]
+    group auth(cloud)[Authentication]
+    group data(cloud)[Data Processing]
+    group builder(cloud)[Builder Patterns]
+    group storage(cloud)[Secret Storage]
 
+    service profiles(server)[Profile Manager] in api
+    service endpoints(server)[Endpoint Handler] in api
+    service pagination(server)[Pagination Engine] in api
+
+    service apikey(key)[API Keys] in auth
+    service bearer(key)[Bearer Tokens] in auth
+    service oauth(key)[OAuth2 Flow] in auth
+    service custom(key)[Custom Scripts] in auth
+
+    service streaming(disk)[Stream Processing] in data
+    service batching(disk)[Batch Operations] in data
+    service caching(disk)[Response Caching] in data
+
+    service request(internet)[ApiRequestBuilder] in builder
+    service profile(internet)[ProfileInitializationBuilder] in builder
+    service pipeline(internet)[Pipeline Support] in builder
+
+    service secretmgmt(database)[SecretManagement] in storage
+    service vaults(database)[Platform Vaults] in storage
+    service encryption(database)[Encryption Layer] in storage
+
+    request:R --> L:profiles
+    profile:R --> L:profiles
+    pipeline:R --> L:profiles
+    
+    profiles:R --> L:apikey
+    profiles:R --> L:bearer
+    profiles:R --> L:oauth
+    profiles:R --> L:custom
+    
+    endpoints:R --> L:streaming
+    endpoints:R --> L:batching
+    pagination:R --> L:caching
+    
+    apikey:R --> L:secretmgmt
+    bearer:R --> L:vaults
+    oauth:R --> L:encryption
+```
+
+## 🔐 Authentication Methods
+
+### API Key Authentication
 ```powershell
-$advancedAuthScript = {
-    param($RequestContext, $Profile)
-    
-    # Method 1: Helper functions (recommended)
-    $apiKey = $RequestContext.GetPlainTextSecret.Invoke('ApiKey')
-    $privateKey = $RequestContext.GetSecureSecret.Invoke('PrivateKey')  # SecureString
-    
-    # Method 2: PlainTextSecrets hashtable
-    $clientSecret = $Profile.PlainTextSecrets['ClientSecret']
-    
-    # Method 3: SecureSecrets hashtable (for SecureString operations)
-    $refreshTokenSecure = $Profile.SecureSecrets['RefreshToken']
-    
-    # Method 4: Traditional access (now returns proper SecureString)
-    $tokenSecure = $Profile.AuthenticationDetails.TokenValue
-    
-    # Use secrets for authentication logic
-    if ($apiKey) {
-        $RequestContext.Headers["Authorization"] = "Bearer $apiKey"
+# Header-based API key
+Initialize-AnyApiProfile -ProfileName "HeaderAPI" `
+    -BaseUrl "https://api.example.com" `
+    -AuthenticationDetails @{
+        AuthType = "ApiKey"
+        ApiKeyLocation = "Header"
+        ApiKeyName = "X-API-Key"
+        ApiKeyValue = "your-secret-key"  # Stored securely
     }
-}
+
+# Query parameter API key
+Initialize-AnyApiProfile -ProfileName "QueryAPI" `
+    -BaseUrl "https://api.example.com" `
+    -AuthenticationDetails @{
+        AuthType = "ApiKey"
+        ApiKeyLocation = "QueryParameter"
+        ApiKeyName = "api_key"
+        ApiKeyValue = "your-secret-key"  # Stored securely
+    }
 ```
 
-### OAuth2 Token Refresh Example
-
+### Bearer Token (OAuth2/JWT)
 ```powershell
-$oAuth2RefreshScript = {
+# Simple bearer token
+Initialize-AnyApiProfile -ProfileName "BearerAPI" `
+    -BaseUrl "https://api.example.com" `
+    -AuthenticationDetails @{
+        AuthType = "BearerToken"
+        TokenValue = "eyJhbGciOiJIUzI1NiIs..."  # JWT token stored securely
+    }
+```
+
+### Custom Authentication Scripts
+```powershell
+# Advanced OAuth2 with automatic token refresh
+$oAuth2Script = {
     param($RequestContext, $Profile)
     
-    # Access secrets using enhanced resolution
+    # Access secrets with enhanced helper methods
     $clientId = $RequestContext.GetPlainTextSecret.Invoke('ClientId')
     $clientSecret = $RequestContext.GetPlainTextSecret.Invoke('ClientSecret')
     $refreshToken = $RequestContext.GetPlainTextSecret.Invoke('RefreshToken')
     
-    # Check if token needs refresh
+    # Check token expiration
     $tokenExpiry = $Profile.CustomSettings.TokenExpiry
     if (-not $tokenExpiry -or (Get-Date) -gt [DateTime]$tokenExpiry) {
-        Write-Verbose "Token expired, refreshing..."
-        
-        # Make token refresh request
-        $tokenEndpoint = "$($Profile.BaseUrl)/oauth/token"
-        $refreshBody = @{
-            grant_type = "refresh_token"
-            refresh_token = $refreshToken
-            client_id = $clientId
-            client_secret = $clientSecret
-        }
-        
-        try {
-            $response = Invoke-RestMethod -Uri $tokenEndpoint -Method POST -Body $refreshBody -ContentType "application/x-www-form-urlencoded"
-            
-            # Update headers with new token
-            $RequestContext.Headers["Authorization"] = "Bearer $($response.access_token)"
-            
-            # Store new tokens back to SecretStore for future use
-            if ($response.refresh_token) {
-                $newRefreshSecure = ConvertTo-SecureString $response.refresh_token -AsPlainText -Force
-                Set-Secret -Name "AnyAPI.$($RequestContext.ProfileName).RefreshToken" -Secret $newRefreshSecure -Vault "AnyAPI-SecretStore"
+        # Refresh token logic
+        $tokenResponse = Invoke-RestMethod -Uri "$($Profile.BaseUrl)/oauth/token" `
+            -Method POST -Body @{
+                grant_type = "refresh_token"
+                refresh_token = $refreshToken
+                client_id = $clientId
+                client_secret = $clientSecret
             }
-            
-            $newAccessSecure = ConvertTo-SecureString $response.access_token -AsPlainText -Force
-            Set-Secret -Name "AnyAPI.$($RequestContext.ProfileName).TokenValue" -Secret $newAccessSecure -Vault "AnyAPI-SecretStore"
-            
-            Write-Verbose "OAuth2 token refreshed and stored successfully"
-        }
-        catch {
-            throw "Failed to refresh OAuth2 token: $($_.Exception.Message)"
-        }
+        
+        # Store new tokens securely
+        $newTokenSecure = ConvertTo-SecureString $tokenResponse.access_token -AsPlainText -Force
+        Set-Secret -Name "AnyAPI.$($RequestContext.ProfileName).TokenValue" -Secret $newTokenSecure
+        
+        $RequestContext.Headers["Authorization"] = "Bearer $($tokenResponse.access_token)"
     } else {
-        # Use existing token
         $currentToken = $RequestContext.GetPlainTextSecret.Invoke('TokenValue')
         $RequestContext.Headers["Authorization"] = "Bearer $currentToken"
     }
 }
 
-# Initialize OAuth2 profile
 Initialize-AnyApiProfile -ProfileName "OAuth2API" `
     -BaseUrl "https://api.oauth-example.com" `
     -AuthenticationDetails @{
         AuthType = "CustomScript"
-        AuthScriptBlock = $oAuth2RefreshScript
+        AuthScriptBlock = $oAuth2Script
         ClientId = "your-client-id"
-        ClientSecret = "your-client-secret"      # Stored securely
-        TokenValue = "initial-access-token"      # Stored securely
-        RefreshToken = "your-refresh-token"      # Stored securely
-    } `
-    -CustomSettings @{
-        TokenExpiry = (Get-Date).AddHours(1)
+        ClientSecret = "your-client-secret"
+        RefreshToken = "your-refresh-token"
     }
 ```
 
-### ConnectWise Manage API Example
+## 📊 Pagination Patterns
 
-```powershell
-$connectWiseScript = {
-    param($RequestContext, $Profile)
+```mermaid
+sequenceDiagram
+    participant Client as AnyAPI Client
+    participant API as REST API
+    participant Engine as Pagination Engine
     
-    Write-Verbose "ConnectWise authentication executing for profile '$($RequestContext.ProfileName)'"
+    Client->>Engine: Request with GetAllPages
+    Engine->>API: Initial Request
+    API-->>Engine: Response + Pagination Info
     
-    # Get ConnectWise credentials with multiple fallback methods
-    $company = $Profile.CustomSettings.Company ?? "your-company-id"
-    $publicKey = $RequestContext.GetPlainTextSecret.Invoke('PublicKey')
-    $privateKey = $RequestContext.GetPlainTextSecret.Invoke('PrivateKey')
-    $clientId = $RequestContext.GetPlainTextSecret.Invoke('ClientId')
+    loop Until No More Pages
+        Engine->>Engine: Detect Pagination Type
+        alt Link Header (GitHub)
+            Engine->>API: Follow Link: rel="next"
+        else Cursor Based (Graph)
+            Engine->>API: Use NextToken/Cursor
+        else Page Based (Traditional)
+            Engine->>API: Increment Page Number
+        else Offset/Limit (Database)
+            Engine->>API: Increase Offset
+        end
+        API-->>Engine: Next Page Response
+    end
     
-    if (-not $company -or -not $publicKey -or -not $privateKey -or -not $clientId) {
-        throw "Missing required ConnectWise credentials: Company, PublicKey, PrivateKey, and ClientId are all required"
-    }
-    
-    # Create ConnectWise authentication
-    # Format: "company+publickey:privatekey" -> Base64
-    $authString = "$company+$publicKey`:$privateKey"
-    $encodedAuth = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($authString))
-    
-    # Set ConnectWise headers
-    $RequestContext.Headers["Authorization"] = "Basic $encodedAuth"
-    $RequestContext.Headers["clientId"] = $clientId
-    $RequestContext.Headers["Accept"] = "application/json"
-    $RequestContext.Headers["Content-Type"] = "application/json"
-    
-    Write-Verbose "ConnectWise authentication headers set successfully"
-}
-
-# Initialize ConnectWise profile
-Initialize-AnyApiProfile -ProfileName "ConnectWise" `
-    -BaseUrl "https://your-cw-server.com/v4_6_release/apis/3.0" `
-    -AuthenticationDetails @{
-        AuthType = "CustomScript"
-        AuthScriptBlock = $connectWiseScript
-        PublicKey = "your-public-key"          # Stored securely
-        PrivateKey = "your-private-key"        # Stored securely  
-        ClientId = "your-client-uuid"          # Stored securely
-    } `
-    -CustomSettings @{
-        Company = "your-company-identifier"
-    } `
-    -Force
-
-# Test ConnectWise authentication
-Invoke-AnyApiEndpoint -ProfileName "ConnectWise" -Endpoint "/system/info" -Verbose
-
-# Get companies with pagination
-$companies = Invoke-AnyApiEndpoint -ProfileName "ConnectWise" -Endpoint "/company/companies" -GetAllPages
-
-# Search for tickets
-$tickets = Invoke-AnyApiEndpoint -ProfileName "ConnectWise" -Endpoint "/service/tickets" `
-    -QueryParameters @{ 
-        conditions = "status/name='New'"
-        pageSize = 25 
-    }
+    Engine-->>Client: Combined Results
 ```
 
-### Dynamic API Key Rotation Example
+### Supported Pagination Types
 
-```powershell
-$dynamicKeyScript = {
-    param($RequestContext, $Profile)
-    
-    # Access multiple API keys from SecretStore
-    $primaryKey = $RequestContext.GetPlainTextSecret.Invoke('PrimaryApiKey')
-    $secondaryKey = $RequestContext.GetPlainTextSecret.Invoke('SecondaryApiKey')
-    $backupKey = $RequestContext.GetPlainTextSecret.Invoke('BackupApiKey')
-    
-    # Intelligent key selection based on time of day
-    $currentHour = (Get-Date).Hour
-    $selectedKey = switch ($currentHour) {
-        { $_ -ge 0 -and $_ -lt 8 } { $backupKey }     # Midnight to 8 AM
-        { $_ -ge 8 -and $_ -lt 16 } { $primaryKey }   # 8 AM to 4 PM  
-        { $_ -ge 16 -and $_ -lt 24 } { $secondaryKey } # 4 PM to Midnight
-    }
-    
-    if (-not $selectedKey) {
-        throw "No API key available for current time slot"
-    }
-    
-    $keyType = if ($selectedKey -eq $primaryKey) { "Primary" } 
-               elseif ($selectedKey -eq $secondaryKey) { "Secondary" }
-               else { "Backup" }
-    
-    Write-Verbose "Using $keyType API key for hour $currentHour"
-    $RequestContext.Headers["X-API-Key"] = $selectedKey
-    $RequestContext.Headers["X-Key-Type"] = $keyType
-    $RequestContext.Headers["X-Key-Rotation-Hour"] = $currentHour
-}
+| Type | Example APIs | Detection Method | Parameters |
+|------|-------------|------------------|------------|
+| **Link Header** | GitHub, GitLab | `Link` header with `rel="next"` | Automatic |
+| **Cursor Based** | Microsoft Graph, Twitter | `nextToken`, `@odata.nextLink` | `NextTokenField` |
+| **Page Based** | Most REST APIs | `page`, `pageSize` parameters | `PageParameter`, `PageSizeParameter` |
+| **Offset/Limit** | Database APIs | `offset`, `limit` parameters | `OffsetParameter`, `LimitParameter` |
 
-# Initialize dynamic key profile
-Initialize-AnyApiProfile -ProfileName "RotatingAPI" `
-    -BaseUrl "https://api.enterprise.com" `
-    -AuthenticationDetails @{
-        AuthType = "CustomScript"
-        AuthScriptBlock = $dynamicKeyScript
-    } `
-    -CustomSettings @{
-        PrimaryApiKey = "primary-key-value"      # Stored securely
-        SecondaryApiKey = "secondary-key-value"  # Stored securely  
-        BackupApiKey = "backup-key-value"        # Stored securely
-    }
+## 🛡️ Security & Secret Management
+
+### SecretStore Integration
+```mermaid
+graph TB
+    A[AnyAPI Module] --> B[SecretManagement Layer]
+    B --> C{Platform Detection}
+    
+    C -->|Windows| D[SecretStore + DPAPI]
+    C -->|macOS| E[SecretStore + Keychain]
+    C -->|Linux| F[SecretStore + Secret Service]
+    
+    D --> G[Encrypted Vault]
+    E --> G
+    F --> G
+    
+    G --> H[Automatic Retrieval]
+    H --> I[Runtime Credential Resolution]
+    
+    style A fill:#e1f5fe
+    style G fill:#f3e5f5
+    style I fill:#e8f5e8
 ```
 
-## Secret Storage Management
-
-### SecretStore Functions
-
+### Secret Management Functions
 ```powershell
-# Initialize SecretStore (one-time setup)
+# Initialize secure storage (one-time setup)
 Initialize-SecretStore
 
-# Test secret storage capabilities  
+# Test storage capabilities
 Test-SecretStorage
 
-# Get detailed information about secret storage
+# Get storage information
 Get-SecretStorageInfo
 
-# Reset secret storage provider detection
+# Reset storage provider detection
 Reset-SecretStorage
 
-# Check what provider is being used
-Get-SecretStorageProvider
-```
-
-### Working with Secrets
-
-```powershell
-# Secrets are automatically managed, but you can work with them directly
+# Manual secret operations (usually automatic)
+$secureValue = ConvertTo-SecureString "secret" -AsPlainText -Force
+Set-Secret -Name "AnyAPI.MyProfile.ApiKey" -Secret $secureValue -Vault "AnyAPI-SecretStore"
 
 # List all AnyAPI secrets
 Get-SecretInfo -Vault "AnyAPI-SecretStore" | Where-Object Name -like "AnyAPI.*"
 
-# Get a specific secret (for debugging)
-Get-Secret -Name "AnyAPI.ProfileName.TokenValue" -Vault "AnyAPI-SecretStore" -AsPlainText
-
-# Manually store a secret (usually not needed)
-$secureValue = ConvertTo-SecureString "secret-value" -AsPlainText -Force
-Set-Secret -Name "AnyAPI.ProfileName.CustomSecret" -Secret $secureValue -Vault "AnyAPI-SecretStore"
-
-# Remove a specific secret
-Remove-Secret -Name "AnyAPI.ProfileName.TokenValue" -Vault "AnyAPI-SecretStore" -Confirm:$false
+# Debug secret storage issues
+Debug-AnyApiSecrets -ProfileName "MyProfile" -ShowValues
 ```
 
-## Advanced Configuration
-
-### Custom Authentication Script with Full Features
-
-```powershell
-$fullFeaturedAuthScript = {
-    param($RequestContext, $Profile)
-    
-    # Access profile name and request details
-    $profileName = $RequestContext.ProfileName
-    $method = $RequestContext.Method
-    $uri = $RequestContext.Uri
-    
-    Write-Verbose "Advanced auth executing for profile '$profileName' - $method $uri"
-    
-    # Multiple secret access methods
-    $apiKey = $RequestContext.GetPlainTextSecret.Invoke('ApiKey')
-    $signature = $RequestContext.GetPlainTextSecret.Invoke('SignatureKey')
-    
-    # Custom settings access
-    $region = $Profile.CustomSettings.Region ?? "us-east-1"
-    $service = $Profile.CustomSettings.Service ?? "api"
-    
-    # Time-based operations
-    $timestamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-    $nonce = [System.Guid]::NewGuid().ToString()
-    
-    # Create signature (example AWS-style)
-    $stringToSign = "$method|$([System.Uri]$uri).PathAndQuery|$timestamp|$nonce"
-    $hmac = [System.Security.Cryptography.HMACSHA256]::new([System.Text.Encoding]::UTF8.GetBytes($signature))
-    $signatureBytes = $hmac.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($stringToSign))
-    $computedSignature = [Convert]::ToBase64String($signatureBytes)
-    
-    # Set multiple headers
-    $RequestContext.Headers["Authorization"] = "API-Key $apiKey"
-    $RequestContext.Headers["X-Timestamp"] = $timestamp.ToString()
-    $RequestContext.Headers["X-Nonce"] = $nonce
-    $RequestContext.Headers["X-Signature"] = $computedSignature
-    $RequestContext.Headers["X-Region"] = $region
-    $RequestContext.Headers["X-Service"] = $service
-    
-    Write-Verbose "Advanced authentication completed with signature: $($computedSignature.Substring(0,10))..."
-}
-
-Initialize-AnyApiProfile -ProfileName "AdvancedAPI" `
-    -BaseUrl "https://api.advanced.com" `
-    -AuthenticationDetails @{
-        AuthType = "CustomScript"
-        AuthScriptBlock = $fullFeaturedAuthScript
-        ApiKey = "your-api-key"
-        SignatureKey = "your-signature-key"
-    } `
-    -CustomSettings @{
-        Region = "us-west-2"
-        Service = "myservice"
-    }
-```
-
-### Advanced Pagination Configuration
-
-```powershell
-# Custom pagination for non-standard APIs
-Initialize-AnyApiProfile -ProfileName "CustomAPI" `
-    -BaseUrl "https://api.custom.com" `
-    -AuthenticationDetails @{ AuthType = "ApiKey"; ApiKeyName = "key"; ApiKeyValue = "secret" } `
-    -PaginationDetails @{
-        Type = "PageBased"
-        PageParameter = "pageNum"           # Default: "page"
-        PageSizeParameter = "itemsPerPage"  # Default: "pageSize"
-        TotalPagesField = "totalPages"      # Field containing total pages
-        HasMoreField = "hasNextPage"        # Boolean field for more pages
-        ItemsField = "results"              # Field containing items array
-        DefaultPageSize = 25                # Default page size
-    }
-
-# Offset/Limit style pagination
-Initialize-AnyApiProfile -ProfileName "DatabaseAPI" `
-    -BaseUrl "https://api.database.com" `
-    -AuthenticationDetails @{ AuthType = "BearerToken"; TokenValue = "token" } `
-    -PaginationDetails @{
-        Type = "OffsetLimit"
-        OffsetParameter = "skip"      # Default: "offset"
-        LimitParameter = "take"       # Default: "limit"
-        TotalField = "totalCount"     # Field with total record count
-        ItemsField = "data"           # Field containing items
-    }
-
-# Cursor-based pagination (Microsoft Graph style)
-Initialize-AnyApiProfile -ProfileName "GraphAPI" `
-    -BaseUrl "https://graph.microsoft.com/v1.0" `
-    -AuthenticationDetails @{ AuthType = "BearerToken"; TokenValue = "token" } `
-    -PaginationDetails @{
-        Type = "Cursor"
-        NextTokenField = "@odata.nextLink"    # Field with next page URL
-        TokenParameter = "skiptoken"          # Query parameter for token
-        ItemsField = "value"                  # Field containing items
-    }
-```
-
-### Error Handling and Retry Logic
-
-```powershell
-# Configure retry behavior using builder pattern
-$profile = New-ProfileInitializationBuilder -ProfileName "ReliableAPI" `
-    -BaseUrl "https://api.sometimes-fails.com" `
-    -AuthenticationDetails @{ AuthType = "ApiKey"; ApiKeyName = "key"; ApiKeyValue = "secret" } |
-    WithErrorHandling @{
-        MaxRetries = 5
-        InitialBackoffMs = 2000
-        ExponentialBackoff = $true
-        RetryOn = @(429, 500, 502, 503, 504)  # HTTP status codes to retry
-    }
-
-Initialize-AnyApiProfile -ProfileBuilder $profile
-
-# Use in requests with builder pattern
-$request = New-ApiRequestBuilder -ProfileName "ReliableAPI" -Endpoint "/data" |
-    WithRetryPolicy 3 1000 |
-    SuppressErrors $true  # Don't throw on errors, return null instead
-
-$result = Invoke-AnyApiEndpoint -RequestBuilder $request
-```
-
-## Builder Pattern Guide
+## 🔧 Builder Pattern Guide
 
 ### ApiRequestBuilder Class
 
@@ -599,7 +423,6 @@ $request = $builder |
     WithHeaders @{ "Custom-Header" = "value" } |
     WithContentType "application/json" |
     WithRetryPolicy 5 2000 |
-    WithSecureValues @{ ApiKey = "secret-key" } |
     WithPagination $true 50 10 |
     WithStream { param($item) Write-Output $item.name } |
     SuppressErrors $true
@@ -619,14 +442,11 @@ $result = Invoke-AnyApiEndpoint -RequestBuilder $request
 | `WithHeaders` | `[hashtable]$Headers` | Add custom headers |
 | `WithContentType` | `[string]$ContentType` | Set Content-Type header |
 | `WithRetryPolicy` | `[int]$MaxRetries, [int]$InitialBackoffMs` | Configure retry behavior |
-| `WithSecureValues` | `[hashtable]$SecureValues` | Provide runtime secrets |
 | `WithPagination` | `[bool]$GetAllPages, [int]$PageSize, [int]$MaxPages` | Enable pagination |
 | `WithStream` | `[scriptblock]$Stream` | Enable streaming with callback |
 | `SuppressErrors` | `[bool]$SuppressErrors` | Control error handling |
 
 ### ProfileInitializationBuilder Class
-
-The `ProfileInitializationBuilder` provides a fluent interface for profile creation:
 
 ```powershell
 # Create a new profile builder
@@ -657,9 +477,6 @@ $profile = $builder |
         RateLimit = 1000
         Timeout = 30
     } |
-    WithSecureValues @{
-        RefreshToken = "refresh-token-value"
-    } |
     SessionOnly $false |
     ForceOverwrite $true
 
@@ -667,80 +484,9 @@ $profile = $builder |
 Initialize-AnyApiProfile -ProfileBuilder $profile
 ```
 
-#### Available Profile Builder Methods
+## 🚀 Advanced Examples
 
-| Method | Parameters | Description |
-|--------|------------|-------------|
-| `WithPagination` | `[hashtable]$PaginationDetails` | Configure pagination settings |
-| `WithErrorHandling` | `[hashtable]$ErrorHandlingDetails` | Set error handling and retry policies |
-| `WithDefaultHeaders` | `[hashtable]$DefaultHeaders` | Add default headers for all requests |
-| `WithCustomSettings` | `[hashtable]$CustomSettings` | Store custom configuration |
-| `WithSecureValues` | `[hashtable]$SecureValues` | Provide secure values for secrets |
-| `SessionOnly` | `[bool]$NoLocalFilePersistence` | Control profile persistence |
-| `ForceOverwrite` | `[bool]$Force` | Allow overwriting existing profiles |
-
-## Profile Management
-
-### View Profiles
-
-```powershell
-# List all profiles
-Get-AnyApiProfile
-
-# Get specific profile
-Get-AnyApiProfile -ProfileName "GitHub"
-
-# Get multiple profiles
-Get-AnyApiProfile -ProfileName @("GitHub", "MyAPI")
-```
-
-### Export/Import Profiles
-
-```powershell
-# Export profiles (secrets scrubbed by default)
-Export-AnyApiConfiguration -Path ".\api-profiles.json"
-
-# Export with secrets (USE WITH CAUTION)
-Export-AnyApiConfiguration -Path ".\api-profiles-with-secrets.json" -IncludeSecrets
-
-# Import profiles
-Import-AnyApiConfiguration -Path ".\api-profiles.json" -MergeStrategy "Overwrite"
-```
-
-### Remove Profiles
-
-```powershell
-# Remove a profile (with confirmation)
-Remove-AnyApiProfile -ProfileName "OldAPI"
-
-# Force removal without confirmation
-Remove-AnyApiProfile -ProfileName "OldAPI" -Confirm:$false
-```
-
-## Performance Optimizations
-
-### Built-in Caching
-- **Authentication Header Caching** - Reduces overhead for repeated calls
-- **Base URL Caching** - Environment variable caching for faster URI building
-- **Pagination Type Detection** - Cached after first detection
-- **Builder Object Reuse** - Builder objects can be reused and modified
-- **Secret Resolution Caching** - SecretStore integration with intelligent caching
-
-### Memory Efficiency
-- **Streaming Support** - Process large datasets without loading everything into memory
-- **Batch Processing** - Efficient collection handling for pagination
-- **Optimized JSON Serialization** - Compressed JSON for network efficiency
-- **Secure Memory Management** - Automatic cleanup of resolved secrets
-
-### Network Optimizations
-- **Connection Reuse** - Efficient HTTP client usage
-- **Retry Logic** - Exponential backoff with jitter
-- **Rate Limit Handling** - Respects Retry-After headers
-
-## Examples by API Type
-
-### GitHub API
-
+### GitHub API Integration
 ```powershell
 # Traditional approach - secrets now persist automatically
 Initialize-AnyApiProfile -ProfileName "GitHub" `
@@ -748,19 +494,8 @@ Initialize-AnyApiProfile -ProfileName "GitHub" `
     -AuthenticationDetails @{
         AuthType = "BearerToken"
         TokenValue = "ghp_your_token"  # Stored in SecretStore
-    }
-
-# Builder approach
-$github = New-ProfileInitializationBuilder -ProfileName "GitHub" `
-    -BaseUrl "https://api.github.com" `
-    -AuthenticationDetails @{
-        AuthType = "BearerToken"
-        TokenValue = "ghp_your_token"  # Stored in SecretStore
-    } |
-    WithPagination @{ Type = "LinkHeader" } |
-    WithDefaultHeaders @{ "Accept" = "application/vnd.github.v3+json" }
-
-Initialize-AnyApiProfile -ProfileBuilder $github
+    } `
+    -PaginationDetails @{ Type = "LinkHeader" }
 
 # Get all repositories with builder pattern
 $allRepos = New-ApiRequestBuilder -ProfileName "GitHub" -Endpoint "/user/repos" |
@@ -783,7 +518,6 @@ $topPowerShellRepos = Invoke-AnyApiEndpoint -RequestBuilder $searchRequest
 ```
 
 ### Microsoft Graph API
-
 ```powershell
 # Graph API with builder pattern
 $graph = New-ProfileInitializationBuilder -ProfileName "Graph" `
@@ -813,54 +547,54 @@ $userRequest = New-ApiRequestBuilder -ProfileName "Graph" -Endpoint "/users" |
     }
 
 Invoke-AnyApiEndpoint -RequestBuilder $userRequest
-
-# Complex query with builder
-$mailRequest = New-ApiRequestBuilder -ProfileName "Graph" -Endpoint "/me/messages" |
-    WithQueryParameters @{ 
-        '$top' = 50
-        '$select' = 'subject,from,receivedDateTime'
-        '$orderby' = 'receivedDateTime desc'
-        '$filter' = 'isRead eq false'
-    } |
-    WithRetryPolicy 3 1500
-
-$unreadEmails = Invoke-AnyApiEndpoint -RequestBuilder $mailRequest
 ```
 
 ### ConnectWise Manage API
-
 ```powershell
-# ConnectWise setup with custom authentication script
+# ConnectWise authentication script
+$connectWiseScript = {
+    param($RequestContext, $Profile)
+    
+    Write-Verbose "ConnectWise authentication executing for profile '$($RequestContext.ProfileName)'"
+    
+    # Get ConnectWise credentials
+    $company = $Profile.CustomSettings.Company ?? "your-company-id"
+    $publicKey = $RequestContext.GetPlainTextSecret.Invoke('PublicKey')
+    $privateKey = $RequestContext.GetPlainTextSecret.Invoke('PrivateKey')
+    $clientId = $RequestContext.GetPlainTextSecret.Invoke('ClientId')
+    
+    if (-not $company -or -not $publicKey -or -not $privateKey -or -not $clientId) {
+        throw "Missing required ConnectWise credentials"
+    }
+    
+    # Create ConnectWise authentication
+    $authString = "$company+$publicKey`:$privateKey"
+    $encodedAuth = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($authString))
+    
+    # Set ConnectWise headers
+    $RequestContext.Headers["Authorization"] = "Basic $encodedAuth"
+    $RequestContext.Headers["clientId"] = $clientId
+    $RequestContext.Headers["Accept"] = "application/json"
+    $RequestContext.Headers["Content-Type"] = "application/json"
+}
+
+# Initialize ConnectWise profile
 Initialize-AnyApiProfile -ProfileName "ConnectWise" `
-    -BaseUrl "https://cw.yourserver.com/v4_6_release/apis/3.0" `
+    -BaseUrl "https://your-cw-server.com/v4_6_release/apis/3.0" `
     -AuthenticationDetails @{
         AuthType = "CustomScript"
-        AuthScriptBlock = $connectWiseScript  # From custom script examples above
+        AuthScriptBlock = $connectWiseScript
         PublicKey = "your-public-key"
-        PrivateKey = "your-private-key"        # Stored securely
-        ClientId = "your-client-uuid"          # Stored securely
+        PrivateKey = "your-private-key"  
+        ClientId = "your-client-uuid"
     } `
     -CustomSettings @{
-        Company = "your-company-id"
+        Company = "your-company-identifier"
     } `
     -Force
 
-# ConnectWise operations
-# Get system information
-$systemInfo = Invoke-AnyApiEndpoint -ProfileName "ConnectWise" -Endpoint "/system/info"
-
 # Get companies with pagination
 $companies = Invoke-AnyApiEndpoint -ProfileName "ConnectWise" -Endpoint "/company/companies" -GetAllPages
-
-# Search for tickets with builder pattern
-$ticketSearch = New-ApiRequestBuilder -ProfileName "ConnectWise" -Endpoint "/service/tickets" |
-    WithQueryParameters @{ 
-        conditions = "board/name='IT Support' AND status/name in ('New','In Progress')"
-        pageSize = 100
-    } |
-    WithPagination $true 100 10
-
-$tickets = Invoke-AnyApiEndpoint -RequestBuilder $ticketSearch
 
 # Create a new ticket
 $newTicket = New-ApiRequestBuilder -ProfileName "ConnectWise" -Endpoint "/service/tickets" |
@@ -877,287 +611,223 @@ $newTicket = New-ApiRequestBuilder -ProfileName "ConnectWise" -Endpoint "/servic
 $createdTicket = Invoke-AnyApiEndpoint -RequestBuilder $newTicket
 ```
 
-### Custom REST API
-
+### Batch Data Processing
 ```powershell
-# Complex custom API setup with builder
-$customApi = New-ProfileInitializationBuilder -ProfileName "CustomAPI" `
-    -BaseUrl "https://api.yourcompany.com/v1" `
-    -AuthenticationDetails @{
-        AuthType = "ApiKey"
-        ApiKeyLocation = "Header"
-        ApiKeyName = "X-API-Key"
-        ApiKeyValue = "your-api-key"
+# Process large datasets with streaming
+$dataRequest = New-ApiRequestBuilder -ProfileName "DataAPI" -Endpoint "/analytics/events" |
+    WithQueryParameters @{ 
+        startDate = (Get-Date).AddDays(-30).ToString("yyyy-MM-dd")
+        endDate = (Get-Date).ToString("yyyy-MM-dd")
+        format = "detailed"
     } |
-    WithDefaultHeaders @{
-        "Accept" = "application/json"
-        "Content-Type" = "application/json"
-        "User-Agent" = "MyApp/1.0"
+    WithPagination $true 1000 100 |
+    WithStream {
+        param($event)
+        # Process each event individually to avoid memory issues
+        if ($event.severity -eq "critical") {
+            Send-Alert -Event $event
+        }
+        Export-EventToDatabase -Event $event
     } |
-    WithPagination @{
-        Type = "PageBased"
-        PageSizeParameter = "limit"
-        DefaultPageSize = 25
-        HasMoreField = "hasNext"
-    } |
-    WithErrorHandling @{
-        MaxRetries = 3
-        InitialBackoffMs = 1000
-    }
+    WithRetryPolicy 10 5000
 
-Initialize-AnyApiProfile -ProfileBuilder $customApi
-
-# CRUD operations with builder pattern
-# Read
-$items = New-ApiRequestBuilder -ProfileName "CustomAPI" -Endpoint "/items" |
-    WithQueryParameters @{ category = "active"; sort = "created_date" } |
-    WithPagination $true 50 5
-
-$allItems = Invoke-AnyApiEndpoint -RequestBuilder $items
-
-# Create
-$newItemRequest = New-ApiRequestBuilder -ProfileName "CustomAPI" -Endpoint "/items" |
-    WithMethod "POST" |
-    WithBody @{ 
-        name = "New Item"
-        description = "Item description"
-        category = "active"
-        tags = @("important", "new")
-    } |
-    WithRetryPolicy 5 2000
-
-$newItem = Invoke-AnyApiEndpoint -RequestBuilder $newItemRequest
-
-# Update
-$updateRequest = New-ApiRequestBuilder -ProfileName "CustomAPI" -Endpoint "/items/{id}" |
-    WithMethod "PUT" |
-    WithPathParameters @{ id = $newItem.id } |
-    WithBody @{ name = "Updated Item Name" }
-
-$updatedItem = Invoke-AnyApiEndpoint -RequestBuilder $updateRequest
-
-# Delete
-$deleteRequest = New-ApiRequestBuilder -ProfileName "CustomAPI" -Endpoint "/items/{id}" |
-    WithMethod "DELETE" |
-    WithPathParameters @{ id = $newItem.id } |
-    SuppressErrors $true
-
-Invoke-AnyApiEndpoint -RequestBuilder $deleteRequest
+# Execute with progress tracking
+$results = Invoke-AnyApiEndpoint -RequestBuilder $dataRequest
 ```
 
-## Troubleshooting
+## 📊 Performance & Monitoring
 
-### Common Issues
+### Built-in Performance Features
+- **Connection Pooling** - Reuse HTTP connections for efficiency
+- **Authentication Header Caching** - Reduces overhead for repeated calls
+- **Pagination Type Caching** - Cached after first detection
+- **Memory Streaming** - Process large datasets without memory bloat
+- **Retry Logic** - Exponential backoff with jitter for reliability
 
-1. **Secret Storage Issues**
-   ```powershell
-   # Check secret storage status
-   Get-SecretStorageInfo
-   
-   # Test secret storage
-   Test-SecretStorage
-   
-   # Reset secret storage provider
-   Reset-SecretStorage
-   
-   # Initialize SecretStore if needed
-   Initialize-SecretStore
-   ```
-
-2. **Authentication Failures**
-   ```powershell
-   # Check profile configuration
-   Get-AnyApiProfile -ProfileName "YourAPI"
-   
-   # Test with verbose output
-   Invoke-AnyApiEndpoint -ProfileName "YourAPI" -Endpoint "/test" -Verbose
-   
-   # Check what secrets are available
-   Get-SecretInfo -Vault "AnyAPI-SecretStore" | Where-Object Name -like "AnyAPI.YourAPI.*"
-   ```
-
-3. **Custom Script Debugging**
-   ```powershell
-   # Create a debug version of your custom script
-   $debugScript = {
-       param($RequestContext, $Profile)
-       
-       Write-Host "=== Custom Script Debug ===" -ForegroundColor Cyan
-       Write-Host "Profile: $($RequestContext.ProfileName)" -ForegroundColor Yellow
-       Write-Host "Available PlainTextSecrets:" -ForegroundColor Yellow
-       $Profile.PlainTextSecrets.Keys | ForEach-Object { 
-           Write-Host "  - $_" -ForegroundColor Gray 
-       }
-       
-       # Your authentication logic here
-       # Add plenty of Write-Verbose statements
-   }
-   ```
-
-4. **Pagination Not Working**
-   ```powershell
-   # Check pagination detection
-   $response = Invoke-AnyApiEndpoint -ProfileName "YourAPI" -Endpoint "/data" -Verbose
-   
-   # Configure manual pagination if auto-detection fails
-   Initialize-AnyApiProfile -ProfileName "YourAPI" -PaginationDetails @{
-       Type = "PageBased"  # or "LinkHeader", "Cursor", "OffsetLimit"
-   } -Force
-   ```
-
-5. **Performance Issues**
-   ```powershell
-   # Use streaming for large datasets
-   Invoke-AnyApiEndpoint -ProfileName "YourAPI" -Endpoint "/largdataset" -GetAllPages -Stream {
-       param($item)
-       # Process item immediately
-   }
-   
-   # Clear caches if needed
-   Clear-AuthHeaderCache -ProfileName "YourAPI"
-   ```
-
-### Debug Mode
-
+### Performance Management
 ```powershell
-# Enable verbose output for troubleshooting
+# Clear caches for troubleshooting
+Clear-AuthHeaderCache -ProfileName "MyAPI"
+Clear-PaginationTypeCache -ProfileName "MyAPI"
+Clear-AllProfileCaches -ProfileName "MyAPI"
+
+# Debug performance issues
 $VerbosePreference = "Continue"
-Invoke-AnyApiEndpoint -ProfileName "YourAPI" -Endpoint "/test" -Verbose
+Invoke-AnyApiEndpoint -ProfileName "MyAPI" -Endpoint "/data" -Verbose
 
 # Check last response headers
 $script:LastResponseHeaders
+```
 
-# Test specific secret resolution
+## 🔧 Profile Management
+
+### View Profiles
+```powershell
+# List all profiles
+Get-AnyApiProfile
+
+# Get specific profile
+Get-AnyApiProfile -ProfileName "GitHub"
+
+# Get multiple profiles
+Get-AnyApiProfile -ProfileName @("GitHub", "MyAPI")
+```
+
+### Export/Import Profiles
+```powershell
+# Export profiles (secrets scrubbed by default)
+Export-AnyApiConfiguration -Path ".\api-profiles.json"
+
+# Export with secrets (USE WITH CAUTION)
+Export-AnyApiConfiguration -Path ".\api-profiles-with-secrets.json" -IncludeSecrets
+
+# Import profiles
+Import-AnyApiConfiguration -Path ".\api-profiles.json" -MergeStrategy "Overwrite"
+```
+
+### Remove Profiles
+```powershell
+# Remove a profile (with confirmation)
+Remove-AnyApiProfile -ProfileName "OldAPI"
+
+# Force removal without confirmation
+Remove-AnyApiProfile -ProfileName "OldAPI" -Confirm:$false
+```
+
+## 🐛 Troubleshooting
+
+### Diagnostic Commands
+```powershell
+# Check module status
+Get-Module AnyAPI
+Get-Command -Module AnyAPI
+
+# Test secret storage
 Test-SecretStorage
+Get-SecretStorageInfo
+Reset-SecretStorage
+
+# Debug profile issues
+Get-AnyApiProfile -ProfileName "YourAPI"
+Debug-AnyApiSecrets -ProfileName "YourAPI"
+
+# Test connectivity with verbose output
+Invoke-AnyApiEndpoint -ProfileName "YourAPI" -Endpoint "/health" -Verbose
 ```
 
-## Best Practices
+### Common Issues & Solutions
 
-### 1. Profile Organization
-- Use descriptive profile names
-- Group related APIs logically
-- Use session-only profiles for temporary access
-- **NEW**: Use builder pattern for complex profile configurations
-- **NEW**: Leverage SecretStore for persistent, secure credential storage
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| **Secrets not persisting** | SecretStore not initialized | Run `Initialize-SecretStore` |
+| **Authentication failures** | Invalid credentials or format | Check with `Debug-AnyApiSecrets` |
+| **Pagination not working** | Auto-detection failed | Configure manually in profile |
+| **Performance issues** | No caching/streaming | Enable streaming for large datasets |
+| **Builder errors** | Invalid parameters | Check builder validation with `IsValid()` |
 
-### 2. Error Handling
-- Always handle potential null responses
-- Use -SuppressErrors for optional operations
-- Implement proper retry logic for critical operations
-- **NEW**: Chain error handling configuration with builders
-
-### 3. Performance
-- Use streaming for large datasets
-- Leverage pagination for better memory usage
-- Cache frequently accessed data locally
-- **NEW**: Reuse builder objects for similar requests
-
-### 4. Security
-- Never hardcode secrets in scripts
-- Use session-only profiles for sensitive environments
-- Regularly rotate API keys and tokens
-- **NEW**: Use SecretStore for automatic secret persistence and encryption
-- **NEW**: Use SecureValues parameter in builders for runtime secret injection
-
-### 5. Custom Script Best Practices
-- **Use helper functions**: `GetPlainTextSecret()` and `GetSecureSecret()` for easy access
-- **Multiple access methods**: Use different secret access patterns based on your needs
-- **Error handling**: Always validate that required secrets are available
-- **Verbose logging**: Add plenty of Write-Verbose statements for debugging
-- **Memory cleanup**: Let the framework handle secret cleanup automatically
-
-### 6. Builder Pattern Best Practices
-- **Reuse Builders**: Create base builders and extend them for variations
-- **Method Chaining**: Use fluent interface for readable configuration
-- **Validation**: Always validate builder state before execution
-- **Templates**: Create reusable builder templates for common patterns
-
-## Migration Guide
-
-### From Parameter-Based to Builder Pattern
-
-The builder pattern is completely optional - all existing code continues to work unchanged. However, here's how to migrate for improved readability:
-
-#### Before (Parameter-Based)
+### Debug Mode
 ```powershell
-# Old way - still works
-Invoke-AnyApiEndpoint -ProfileName "GitHub" `
-    -Endpoint "/repos/owner/repo/issues" `
-    -Method "POST" `
-    -QueryParameters @{ assignee = "user" } `
-    -Body @{ title = "Issue"; body = "Description" } `
-    -Headers @{ "Accept" = "application/json" } `
-    -MaxRetries 3 `
-    -InitialBackoffMs 1000 `
-    -GetAllPages `
-    -PageSize 50
+# Enable comprehensive debugging
+$VerbosePreference = "Continue"
+$DebugPreference = "Continue"
+
+# Test with full verbosity
+Invoke-AnyApiEndpoint -ProfileName "TestAPI" -Endpoint "/debug" -Verbose -Debug
+
+# Check cached values
+$script:AuthHeaderCache
+$script:PaginationTypeCache
 ```
 
-#### After (Builder Pattern)
-```powershell
-# New way - more readable and flexible
-$request = New-ApiRequestBuilder -ProfileName "GitHub" -Endpoint "/repos/owner/repo/issues" |
-    WithMethod "POST" |
-    WithQueryParameters @{ assignee = "user" } |
-    WithBody @{ title = "Issue"; body = "Description" } |
-    WithHeaders @{ "Accept" = "application/json" } |
-    WithRetryPolicy 3 1000 |
-    WithPagination $true 50 1000
+## 🤝 Contributing
 
-Invoke-AnyApiEndpoint -RequestBuilder $request
+We welcome contributions! Please see our [Contributing Guide](https://github.com/Overlord-Z/AnyAPI/blob/main/CONTRIBUTING.md) for details.
+
+### Development Setup
+```bash
+# Clone the repository
+git clone https://github.com/Overlord-Z/AnyAPI.git
+cd AnyAPI
+
+# Install development dependencies
+pwsh -c "Install-Module Pester, PSScriptAnalyzer -Scope CurrentUser"
+
+# Run tests
+pwsh -c "Invoke-Pester"
+
+# Check code quality
+pwsh -c "Invoke-ScriptAnalyzer -Path . -Recurse"
 ```
 
-### From Legacy Secret Storage to SecretStore
+## 📈 Roadmap to v1.0
 
-```powershell
-# Before: Secrets had to be re-entered each session
-Initialize-AnyApiProfile -ProfileName "API" -AuthenticationDetails @{
-    AuthType = "ApiKey"
-    ApiKeyValue = "key-here"  # Would be lost
-}
-
-# After: Automatic SecretStore integration
-Initialize-SecretStore  # One-time setup
-Initialize-AnyApiProfile -ProfileName "API" -AuthenticationDetails @{
-    AuthType = "ApiKey" 
-    ApiKeyValue = "key-here"  # Automatically stored and retrieved
-}
-
-# Later sessions - no re-authentication needed!
-$data = Invoke-AnyApiEndpoint -ProfileName "API" -Endpoint "/data"
+```mermaid
+timeline
+    title AnyAPI Development Roadmap
+    
+    section v0.8.0 (Current)
+        : Enhanced Builder Patterns
+        : Advanced Secret Management
+        : Performance Optimizations
+        : Cross-Platform Support
+    
+    section v0.9.0 (Planned)
+        : GraphQL Support
+        : Plugin Architecture
+        : Advanced Monitoring
+        : Cloud Integration
+    
+    section v1.0.0 (Target)
+        : Production Ready
+        : Comprehensive Testing
+        : Full Documentation
+        : PowerShell Gallery
 ```
 
-## Version History
+## 📄 Version History
 
-### v0.3.0 (Current)
-- ✅ PowerShell 7+ cross-platform support
-- ✅ Intelligent pagination with 4 types
-- ✅ **NEW**: Enhanced secret storage with Microsoft.PowerShell.SecretManagement integration
-- ✅ **NEW**: Persistent secrets across sessions with automatic encryption
-- ✅ **NEW**: Enhanced custom script support with multiple secret access methods
-- ✅ **NEW**: ConnectWise Manage API support with robust authentication
-- ✅ **NEW**: Initialize-SecretStore, Test-SecretStorage, Get-SecretStorageInfo functions
-- ✅ Performance optimizations and caching
-- ✅ Enhanced error handling and retry logic
-- ✅ Streaming support for large datasets
-- ✅ Fluent builder pattern with ApiRequestBuilder and ProfileInitializationBuilder
-- ✅ Chainable method configuration for improved readability
-- ✅ Backward compatibility with all existing parameter-based syntax
+### v0.8.0 (Current) - *"Enhanced Builder Patterns & Performance"*
+- ✅ **NEW**: Enhanced `ApiRequestBuilder` with fluent interface and pipeline support
+- ✅ **NEW**: `ProfileInitializationBuilder` for complex profile configuration
+- ✅ **NEW**: Pipeline-friendly builder methods (`WithMethod`, `WithHeaders`, etc.)
+- ✅ **NEW**: Advanced authentication caching with custom script support
+- ✅ **NEW**: `Debug-AnyApiSecrets` function for troubleshooting credential issues
+- ✅ **ENHANCED**: Cross-platform secret management with SecretStore integration
+- ✅ **ENHANCED**: Performance optimizations with intelligent caching
+- ✅ **ENHANCED**: Custom authentication scripts with enhanced secret access
+- ✅ **ENHANCED**: Comprehensive pagination support with auto-detection
 
-### v0.2.0
-- ✅ Basic pagination support
-- ✅ Improved authentication handling
+### v0.3.0 - *"Secret Storage & Custom Auth"*
+- ✅ Enhanced secret storage with SecretManagement integration
+- ✅ Custom authentication script support
+- ✅ Fluent builder pattern introduction
+- ✅ Performance optimizations
+
+### v0.2.0 - *"Pagination & Profiles"*
+- ✅ Intelligent pagination support
 - ✅ Profile persistence
+- ✅ Enhanced authentication handling
 
-### v0.1.0
-- ✅ Initial release
-- ✅ Basic REST API support
-- ✅ Multiple authentication methods
+### v0.1.0 - *"Foundation"*
+- ✅ Initial REST API support
+- ✅ Basic authentication methods
+- ✅ Core functionality
 
-## Contributing
+## 🙏 Acknowledgments
 
-This module is part of the MediPowershell toolkit. For issues or contributions, please follow the project guidelines.
+- Microsoft PowerShell Team for the excellent SecretManagement module
+- The PowerShell Community for invaluable feedback and contributions
+- All API providers who maintain excellent documentation and standards
 
-## License
+---
 
-See the main MediPowershell project for licensing information.
+<div align="center">
+
+**[🏠 Home](https://github.com/Overlord-Z/AnyAPI)** • 
+**[📚 Documentation](https://github.com/Overlord-Z/AnyAPI/wiki)** • 
+**[💬 Discussions](https://github.com/Overlord-Z/AnyAPI/discussions)** • 
+**[🐛 Issues](https://github.com/Overlord-Z/AnyAPI/issues)**
+
+Made with ❤️ by the AnyAPI team
+
+</div>

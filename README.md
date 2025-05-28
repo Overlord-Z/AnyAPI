@@ -1,12 +1,14 @@
 # 🚀 AnyAPI Module v0.8.0
 
-[![PowerShell Gallery](https://img.shields.io/powershellgallery/v/AnyAPI?style=flat-square&logo=powershell&logoColor=white&label=PowerShell%20Gallery)](https://www.powershellgallery.com/packages/AnyAPI)
 [![GitHub release](https://img.shields.io/github/v/release/Overlord-Z/AnyAPI?style=flat-square&logo=github)](https://github.com/Overlord-Z/AnyAPI/releases)
 [![License](https://img.shields.io/github/license/Overlord-Z/AnyAPI?style=flat-square)](https://github.com/Overlord-Z/AnyAPI/blob/main/LICENSE)
 [![PowerShell](https://img.shields.io/badge/PowerShell-7.2%2B-blue?style=flat-square&logo=powershell)](https://github.com/PowerShell/PowerShell)
 [![Cross Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey?style=flat-square)](https://github.com/Overlord-Z/AnyAPI)
+[![Development](https://img.shields.io/badge/Status-Development%20Preview-orange?style=flat-square)](https://github.com/Overlord-Z/AnyAPI)
 
 > **A comprehensive PowerShell module for REST API integration with advanced authentication, intelligent pagination, cross-platform secret management, and fluent builder patterns.**
+
+> **⚠️ Development Preview** - This project is currently in active development and not yet officially released. Features and APIs may change.
 
 ## 🌟 Overview
 
@@ -815,6 +817,7 @@ timeline
 
 ## 🙏 Acknowledgments
 
+- **James Zaenglein** - Creator and primary maintainer of AnyAPI
 - Microsoft PowerShell Team for the excellent SecretManagement module
 - The PowerShell Community for invaluable feedback and contributions
 - All API providers who maintain excellent documentation and standards
@@ -828,6 +831,6 @@ timeline
 **[💬 Discussions](https://github.com/Overlord-Z/AnyAPI/discussions)** • 
 **[🐛 Issues](https://github.com/Overlord-Z/AnyAPI/issues)**
 
-Made with ❤️ by the AnyAPI team
+Created with ❤️ by James Zaenglein for the PowerShell community
 
 </div>

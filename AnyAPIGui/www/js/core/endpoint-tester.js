@@ -236,10 +236,8 @@ class EndpointTester {
         if (responseMeta) {
             responseMeta.innerHTML = '<span class="text-muted">Sending request...</span>';
         }
-    }
-
-    /**
-     * Display API response
+    }    /**
+     * Display API response using enhanced response viewer
      */
     displayResponse(response, duration, requestData) {
         const responseMeta = document.getElementById('response-meta');
@@ -250,26 +248,40 @@ class EndpointTester {
                 <span class="${statusClass}">Status: ${status}</span>
                 <span class="text-muted"> • Duration: ${formatDuration(duration)}</span>
             `;
-        }
-
-        const responseViewer = document.getElementById('response-viewer');
-        if (responseViewer) {
-            if (response.success && response.result) {
-                responseViewer.innerHTML = `<pre>${formatJson(response.result)}</pre>`;
-            } else if (response.error) {
-                responseViewer.innerHTML = `
-                    <div class="error-response">
-                        <h4>Error Response</h4>
-                        <pre>${escapeHtml(response.error)}</pre>
-                    </div>
-                `;
+        }        // Use enhanced response viewer if available
+        if (window.responseViewer && response.success && response.result) {
+            // Use the enhanced UI function that handles tabs and metadata
+            if (window.displayResponseData) {
+                window.displayResponseData(response.result, {
+                    url: requestData?.url,
+                    method: requestData?.method,
+                    timestamp: new Date().toISOString()
+                });
             } else {
-                responseViewer.innerHTML = `
-                    <div class="empty-response">
-                        <div class="empty-icon">📡</div>
-                        <p>No response data</p>
-                    </div>
-                `;
+                // Fallback to direct viewer call
+                window.responseViewer.displayResponse(response.result);
+            }
+        } else {
+            // Fallback to simple display
+            const responseViewer = document.getElementById('response-viewer');
+            if (responseViewer) {
+                if (response.success && response.result) {
+                    responseViewer.innerHTML = `<pre>${formatJson(response.result)}</pre>`;
+                } else if (response.error) {
+                    responseViewer.innerHTML = `
+                        <div class="error-response">
+                            <h4>Error Response</h4>
+                            <pre>${escapeHtml(response.error)}</pre>
+                        </div>
+                    `;
+                } else {
+                    responseViewer.innerHTML = `
+                        <div class="empty-response">
+                            <div class="empty-icon">📡</div>
+                            <p>No response data</p>
+                        </div>
+                    `;
+                }
             }
         }
     }

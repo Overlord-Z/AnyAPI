@@ -16,7 +16,6 @@
     
     <!-- Styles -->
     <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="css/modern-components.css">
 </head>
 <body>
     <!-- Loading Screen -->
@@ -278,15 +277,32 @@
                                     <i data-feather="clock"></i>
                                 </button>
                             </div>
-                        </div>
-
-                        <!-- Enhanced Response Viewer -->
+                        </div>                        <!-- Enhanced Response Viewer -->
                         <div class="response-viewer-optimized">
                             <div class="response-header-enhanced">
                                 <div class="response-title">Response Explorer</div>
                                 <div class="response-meta-compact" id="response-meta">
                                     <!-- Status will be populated here -->
                                 </div>
+                            </div>
+                            
+                            <!-- Search Input -->
+                            <div class="response-search-container" id="response-search-container" style="display: none;">
+                                <div class="search-input-wrapper">
+                                    <i data-feather="search" class="search-icon"></i>
+                                    <input type="text" id="response-search-input" class="response-search-input" 
+                                           placeholder="Search in response data..." 
+                                           onkeydown="if(event.key==='Escape') responseViewer.hideSearch()">
+                                    <button class="search-close-btn" onclick="responseViewer.hideSearch()">
+                                        <i data-feather="x"></i>
+                                    </button>
+                                </div>
+                                <div class="search-stats" id="search-stats"></div>
+                            </div>
+                            
+                            <!-- Response Tabs -->
+                            <div class="response-tabs" id="response-tabs">
+                                <!-- Tabs will be dynamically created here -->
                             </div>
                             
                             <div class="response-content-enhanced">
@@ -297,6 +313,24 @@
                                         </div>
                                         <h3>Ready to Test</h3>
                                         <p>Send a request to see enhanced response visualization</p>
+                                        <div class="empty-features">
+                                            <div class="feature-item">
+                                                <i data-feather="table"></i>
+                                                <span>Table View</span>
+                                            </div>
+                                            <div class="feature-item">
+                                                <i data-feather="git-branch"></i>
+                                                <span>Tree Explorer</span>
+                                            </div>
+                                            <div class="feature-item">
+                                                <i data-feather="bar-chart-2"></i>
+                                                <span>Data Statistics</span>
+                                            </div>
+                                            <div class="feature-item">
+                                                <i data-feather="file-text"></i>
+                                                <span>Schema Analysis</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

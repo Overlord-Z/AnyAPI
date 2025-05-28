@@ -437,33 +437,65 @@ class EndpointTester {
         }
     }
 
-    /**
-     * Add a new key-value pair to the specified container
-     */
-    addKeyValuePair(containerId) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-
-        const keyValuePair = document.createElement('div');
-        keyValuePair.className = 'key-value-pair';
-        
-        const placeholder = containerId.includes('headers') ? 'Header' : 'Key';
-        keyValuePair.innerHTML = `
-            <input class="key-input" placeholder="${placeholder}" type="text">
-            <input class="value-input" placeholder="Value" type="text">
-            <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.parentElement.remove()">
-                <i data-feather="x"></i>
-            </button>
-        `;
-        
-        container.appendChild(keyValuePair);
-        
-        // Refresh feather icons if available
-        if (typeof feather !== 'undefined') {
-            feather.replace();
-        }
+/**
+ * Add a new key-value pair to the specified container with improved styling
+ */
+addKeyValuePair(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) {
+        console.warn(`Container not found: ${containerId}`);
+        return;
     }
 
+    const keyValuePair = document.createElement('div');
+    keyValuePair.className = 'key-value-pair-compact';
+    
+    const placeholder = containerId.includes('headers') ? 'Header' : 'Key';
+    keyValuePair.innerHTML = `
+        <input class="kv-input-compact" placeholder="${placeholder}" type="text">
+        <input class="kv-input-compact" placeholder="Value" type="text">
+        <button type="button" class="kv-remove-btn" onclick="this.parentElement.remove()">
+            ×
+        </button>
+    `;
+    
+    container.appendChild(keyValuePair);
+    
+    // Focus on the first input
+    const firstInput = keyValuePair.querySelector('input');
+    if (firstInput) {
+        setTimeout(() => firstInput.focus(), 100);
+    }
+    
+    console.log(`Added key-value pair to: ${containerId}`);
+}
+
+
+/**
+ * Initialize sections with proper state restoration
+ */
+initializeSections() {
+    const sections = ['headers-section', 'params-section', 'body-section', 'options-section'];
+    
+    sections.forEach(sectionId => {
+        const section = document.getElementById(sectionId);
+        if (!section) return;
+        
+        const savedState = localStorage.getItem(`section_${sectionId}`);
+        const shouldExpand = savedState === 'expanded' || 
+                           (savedState === null && ['headers-section'].includes(sectionId));
+        
+        if (shouldExpand) {
+            section.classList.add('expanded');
+        } else {
+            section.classList.remove('expanded');
+        }
+    });
+    
+    console.log('✅ Sections initialized with proper state');
+}
+
+    
     /**
      * Save current request to history without sending
      */

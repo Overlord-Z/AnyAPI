@@ -100,19 +100,26 @@ function Send-File {
         $Response,
         [string]$FilePath
     )
-    
-    if (Test-Path $FilePath) {
-        $content = Get-Content -Path $FilePath -Raw
-        $mimeType = Get-MimeType -FilePath $FilePath
-        
-        $Response.ContentType = $mimeType
-        $buffer = [System.Text.Encoding]::UTF8.GetBytes($content)
-        $Response.ContentLength64 = $buffer.Length
-        $Response.OutputStream.Write($buffer, 0, $buffer.Length)
-        $Response.Close()
-    }
-    else {
-        Send-JsonResponse -Response $Response -Data @{ error = "File not found" } -StatusCode 404
+
+    try {
+        if (Test-Path $FilePath) {
+            $mimeType = Get-MimeType -FilePath $FilePath
+            $Response.ContentType = $mimeType
+
+            $fileStream = [System.IO.File]::OpenRead($FilePath)
+            $Response.ContentLength64 = $fileStream.Length
+            $buffer = New-Object byte[] 8192
+            while (($read = $fileStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+                $Response.OutputStream.Write($buffer, 0, $read)
+            }
+            $fileStream.Close()
+            $Response.OutputStream.Close()
+        } else {
+            Send-JsonResponse -Response $Response -Data @{ error = "File not found" } -StatusCode 404
+        }
+    } catch {
+        Write-Host "❌ Error sending file $FilePath`: $_" -ForegroundColor Red
+        Send-JsonResponse -Response $Response -Data @{ error = "Failed to serve file: $FilePath. $_" } -StatusCode 500
     }
 }
 

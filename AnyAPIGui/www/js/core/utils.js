@@ -1,11 +1,11 @@
 // Utility functions (formatJson, escapeHtml, isValidJson, formatDuration, etc.)
-// Export all utility functions here
+// All utility functions defined globally
 
-export function formatJson(data) {
+function formatJson(data) {
     return JSON.stringify(data, null, 2);
 }
 
-export function escapeHtml(str) {
+function escapeHtml(str) {
     if (typeof str !== 'string') return str;
     return str.replace(/[&<>'"]/g, function (tag) {
         const charsToReplace = {
@@ -19,7 +19,7 @@ export function escapeHtml(str) {
     });
 }
 
-export function isValidJson(str) {
+function isValidJson(str) {
     try {
         JSON.parse(str);
         return true;
@@ -28,7 +28,7 @@ export function isValidJson(str) {
     }
 }
 
-export function formatDuration(ms) {
+function formatDuration(ms) {
     if (ms < 1000) return ms + ' ms';
     return (ms / 1000).toFixed(2) + ' s';
 }
@@ -42,7 +42,7 @@ export function formatDuration(ms) {
  * @param {HTMLElement} element - The element to animate
  * @param {Object} options - Animation options
  */
-export function enableBreathingAnimation(element, options = {}) {
+function enableBreathingAnimation(element, options = {}) {
     if (!element) return;
     
     const defaults = {
@@ -89,7 +89,7 @@ export function enableBreathingAnimation(element, options = {}) {
  * Disable breathing animation on an element
  * @param {HTMLElement} element - The element to stop animating
  */
-export function disableBreathingAnimation(element) {
+function disableBreathingAnimation(element) {
     if (!element) return;
     element.style.animation = '';
 }
@@ -100,7 +100,7 @@ export function disableBreathingAnimation(element) {
  * @param {string} color - The pulse color
  * @param {number} duration - Pulse duration in ms
  */
-export function createPulseEffect(element, color = 'var(--color-secondary)', duration = 600) {
+function createPulseEffect(element, color = 'var(--color-secondary)', duration = 600) {
     if (!element) return;
     
     const originalBoxShadow = element.style.boxShadow;
@@ -123,7 +123,7 @@ export function createPulseEffect(element, color = 'var(--color-secondary)', dur
  * @param {HTMLElement} element - The element to animate
  * @param {Object} options - Animation options
  */
-export function animateAppearance(element, options = {}) {
+function animateAppearance(element, options = {}) {
     if (!element) return;
     
     const defaults = {
@@ -163,7 +163,7 @@ export function animateAppearance(element, options = {}) {
  * Create a shimmer loading effect
  * @param {HTMLElement} element - The element to add shimmer to
  */
-export function addShimmerEffect(element) {
+function addShimmerEffect(element) {
     if (!element) return;
     
     element.classList.add('shimmer-loading');
@@ -195,7 +195,7 @@ export function addShimmerEffect(element) {
  * Remove shimmer loading effect
  * @param {HTMLElement} element - The element to remove shimmer from
  */
-export function removeShimmerEffect(element) {
+function removeShimmerEffect(element) {
     if (!element) return;
     element.classList.remove('shimmer-loading');
 }

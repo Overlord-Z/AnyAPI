@@ -1,7 +1,7 @@
 // Request history management module
-// Exported as ES6 module
+// Available globally
 
-export class HistoryManager {
+class HistoryManager {
     constructor(maxItems = 50) {
         this.maxItems = maxItems;
         this.history = this.load();
@@ -46,7 +46,9 @@ export class HistoryManager {
             this.history = [...data.history, ...this.history].slice(0, this.maxItems);
             this.save();
             return true;
-        }
-        return false;
+        }        return false;
     }
 }
+
+// Make HistoryManager globally available
+window.HistoryManager = HistoryManager;

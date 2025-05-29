@@ -35,10 +35,10 @@
                 <button class="modal-close" onclick="secretManager.closePasswordModal()">
                     <i data-feather="x"></i>
                 </button>
-            </div>
-            <div class="modal-body">
-                <p>Enter your SecretStore password to unlock secure credential storage:</p>
-                <input type="password" id="secret-store-password" class="form-control" placeholder="SecretStore Password">
+            </div>            <div class="modal-body">
+                <p>Enter your SecretStore password to unlock secure credential storage:</p>                <form id="secret-store-form" onsubmit="event.preventDefault(); secretManager.unlockSecretStore();">
+                    <input type="password" id="secret-store-password" class="form-control" placeholder="SecretStore Password" autocomplete="new-password">
+                </form>
                 <div class="form-note">
                     <i data-feather="info"></i>
                     Your credentials will be encrypted and stored securely
@@ -492,6 +492,8 @@
     <script src="js/profile-manager.js"></script>
     <script src="js/template-manager.js"></script>
     <script src="js/core/utils.js"></script>
+    <script src="js/core/history-manager.js"></script>
+    <script src="js/core/endpoint-tester.js"></script>
     <script src="js/app.js"></script>
     <script type="module" src="js/index.js"></script>
 

@@ -365,13 +365,13 @@ class AnyApiApp {
         } else {
             console.warn('⚠️ TemplateManager not available');
         }
-        
-        // Initialize EndpointTester
-        if (typeof endpointTester !== 'undefined') {
+          // Initialize EndpointTester
+        if (typeof window.initializeEndpointTester === 'function') {
             console.log('🧪 Initializing EndpointTester...');
             initPromises.push(
                 Promise.resolve().then(() => {
-                    if (endpointTester.updateHistoryDisplay) {
+                    const endpointTester = window.initializeEndpointTester();
+                    if (endpointTester && endpointTester.updateHistoryDisplay) {
                         endpointTester.updateHistoryDisplay();
                     }
                     console.log('✅ EndpointTester initialized');
@@ -380,7 +380,7 @@ class AnyApiApp {
                 })
             );
         } else {
-            console.warn('⚠️ EndpointTester not available');
+            console.warn('⚠️ EndpointTester initialization function not available');
         }
         
         // Wait for all managers to initialize
@@ -607,12 +607,17 @@ class AnyApiApp {
                         console.warn('Failed to load templates on section show:', error);
                     });
                 }
-                break;
-                  case 'history':
+                break;            case 'history':
                 console.log('📚 Activating History section');
                 // Update history display
-                if (typeof endpointTester !== 'undefined' && endpointTester.updateHistoryDisplay) {
-                    endpointTester.updateHistoryDisplay();
+                if (typeof window.endpointTester !== 'undefined' && window.endpointTester.updateHistoryDisplay) {
+                    window.endpointTester.updateHistoryDisplay();
+                } else if (typeof window.initializeEndpointTester === 'function') {
+                    // Initialize if not already done
+                    const endpointTester = window.initializeEndpointTester();
+                    if (endpointTester && endpointTester.updateHistoryDisplay) {
+                        endpointTester.updateHistoryDisplay();
+                    }
                 }
                 // Update profile filter dropdown
                 if (typeof profileManager !== 'undefined' && profileManager.updateHistoryProfileFilter) {

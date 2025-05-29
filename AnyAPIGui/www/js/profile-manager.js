@@ -346,7 +346,43 @@ $RequestContext.Headers["Accept"] = "application/json"`
                 this.updateTestProfileDropdown();
                 this.initializeSharedProfileManagement();
             });
-        }, 'Failed to load profiles');
+        }, 'Failed to load profiles');    }
+
+    // Initialize shared profile management across components
+    initializeSharedProfileManagement() {
+        try {
+            // Make profileManager globally available
+            window.profileManager = this;
+            
+            // Emit profile loaded event
+            window.dispatchEvent(new CustomEvent('profilesLoaded', {
+                detail: { 
+                    profiles: this.profiles,
+                    count: this.profiles.length 
+                }
+            }));
+            
+            // Set up cross-component synchronization
+            this.setupProfileSynchronization();
+            
+            console.log('✅ Shared profile management initialized');
+        } catch (error) {
+            console.error('❌ Error initializing shared profile management:', error);
+        }
+    }
+
+    // Set up profile synchronization across components
+    setupProfileSynchronization() {
+        // Listen for profile changes from other components
+        window.addEventListener('profileSelected', (e) => {
+            const profileName = e.detail.profileName;
+            this.setCurrentProfile(profileName);
+        });
+
+        // Listen for profile updates
+        window.addEventListener('profileUpdated', (e) => {
+            this.loadProfiles();
+        });
     }
 
     // Batch DOM updates for better performance
@@ -522,6 +558,73 @@ $RequestContext.Headers["Accept"] = "application/json"`
     // Utility method for finding profiles
     findProfile(profileName) {
         return this.profiles.find(p => p?.name === profileName);
+    }
+
+    // Alias for compatibility with code expecting getProfile
+    getProfile(profileName) {
+        return this.findProfile(profileName);
+    }
+
+    /**
+     * Update test profile dropdown
+     */
+    updateTestProfileDropdown() {
+        try {
+            const select = document.getElementById('test-profile');
+            if (!select) {
+                console.log('ℹ️ Test profile dropdown not found (may not be on this page)');
+                return;
+            }
+
+            const currentValue = select.value;
+            select.innerHTML = '<option value="">Select a profile...</option>';
+            
+            this.profiles.forEach(profile => {
+                if (profile && profile.name) {
+                    const option = document.createElement('option');
+                    option.value = profile.name;
+                    option.textContent = profile.name;
+                    select.appendChild(option);
+                }
+            });
+
+            // Restore selection if it still exists
+            if (currentValue && this.profiles.find(p => p && p.name === currentValue)) {
+                select.value = currentValue;
+            }
+            
+            console.log('✅ Test profile dropdown updated with', this.profiles.length, 'profiles');
+            
+        } catch (error) {
+            console.error('🚨 Error updating test profile dropdown:', error);
+        }
+    }
+
+    /**
+     * Apply dynamic text scaling for profile list items
+     */
+    applyDynamicTextScaling() {
+        try {
+            const profileItems = document.querySelectorAll('.profile-card, .profile-item');
+            profileItems.forEach(item => {
+                const nameElement = item.querySelector('.profile-name');
+                const urlElement = item.querySelector('.profile-url');
+                
+                if (nameElement && nameElement.textContent.length > 20) {
+                    nameElement.style.fontSize = '0.9em';
+                }
+                
+                if (urlElement && urlElement.textContent.length > 40) {
+                    urlElement.style.fontSize = '0.85em';
+                    urlElement.title = urlElement.textContent; // Add tooltip for long URLs
+                }
+            });
+            
+            console.log('✅ Dynamic text scaling applied to', profileItems.length, 'profile items');
+            
+        } catch (error) {
+            console.error('🚨 Error applying dynamic text scaling:', error);
+        }
     }
 
     // Form creation with better abstraction
@@ -827,9 +930,7 @@ $RequestContext.Headers["Accept"] = "application/json"`
                 </div>
             `;
         }
-    }
-
-    // Apply template to form fields
+    }    // Apply template to form fields - ENHANCED WITH COORDINATED CREDENTIAL SYSTEM
     applyTemplate() {
         const templateSelect = this.domUtils.getElement('profile-template');
         if (!templateSelect) return;
@@ -839,6 +940,7 @@ $RequestContext.Headers["Accept"] = "application/json"`
 
         const template = this.templates[templateKey];
         console.log('🎨 Applying template:', templateKey, template);
+        console.log('🔧 Template auth field mapping:', template.authFieldMapping);
 
         // Apply basic fields
         const fieldMappings = [
@@ -877,23 +979,46 @@ $RequestContext.Headers["Accept"] = "application/json"`
             }
         }
 
-        // Apply template defaults to credentials
-        if (template.templateDefaults) {
-            setTimeout(() => {
-                Object.entries(template.templateDefaults).forEach(([key, value]) => {
-                    this.addCredentialRow(null, key, value);
+        // ENHANCED: Apply custom settings if present
+        if (template.customSettings && typeof template.customSettings === 'object') {
+            const customSettingsContainer = this.domUtils.getElement('profile-customsettings-list');
+            if (customSettingsContainer) {
+                // Clear existing custom settings
+                customSettingsContainer.innerHTML = '';
+                
+                // Add template custom settings
+                Object.entries(template.customSettings).forEach(([key, value]) => {
+                    this.addCustomSettingRow(customSettingsContainer, key, value);
                 });
-            }, 100);
+                
+                // Add empty row for manual additions
+                this.addCustomSettingRow(customSettingsContainer, '', '');
+            }
         }
 
-        // Trigger auth fields update
+        // PHASE 1 ENHANCEMENT: Trigger auth fields update first to generate dynamic credential fields
         this.toggleAuthFields();
-        this.updatePaginationVisibility();
 
-        showNotification(`Template "${template.name}" applied`, 'success');
+        // PHASE 1 ENHANCEMENT: Apply template credentials in coordination with auth type
+        setTimeout(() => {
+            this.applyTemplateCredentials(template);
+        }, 150); // Allow time for dynamic fields to render
+
+        // Handle custom auth script if present
+        if (template.customAuthScript) {
+            setTimeout(() => {
+                const scriptField = this.domUtils.getElement('auth-script');
+                if (scriptField) {
+                    scriptField.value = template.customAuthScript;
+                    console.log('✅ Custom auth script applied from template');
+                }
+            }, 200);
+        }
+
+        this.updatePaginationVisibility();        showNotification(`Template "${template.name}" applied with coordinated credentials`, 'success');
     }
 
-    // Toggle authentication fields based on auth type
+    // Toggle authentication fields based on auth type with dynamic credential generation - ENHANCED
     toggleAuthFields() {
         const authType = this.domUtils.getElement('profile-authtype');
         const authFields = this.domUtils.getElement('auth-fields');
@@ -906,529 +1031,376 @@ $RequestContext.Headers["Accept"] = "application/json"`
         const authTypeValue = authType.value;
         console.log('🔄 Toggling auth fields for type:', authTypeValue);
         
-        const authFieldsConfig = {
+        // Update auth help section
+        this.updateAuthHelpSection(authTypeValue, authFields);
+        
+        // Generate dynamic credential fields
+        this.generateAuthSpecificCredentials(authTypeValue);
+    }
+
+    /**
+     * Update authentication help section
+     */
+    updateAuthHelpSection(authType, authFields) {
+        const authHelpConfig = {
             'Bearer': `
-                <div class="form-group">
-                    <div class="auth-help" style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px; margin-bottom: 1rem;">
-                        <p><strong>💡 Bearer Token Authentication</strong></p>
-                        <p>Add your bearer token in the <strong>Credentials</strong> section below using the key "token".</p>
-                    </div>
+                <div class="auth-help" style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px; margin-bottom: 1rem;">
+                    <p><strong>💡 Bearer Token Authentication</strong></p>
+                    <p>Your bearer token will be automatically added to the Authorization header.</p>
+                    <p style="margin: 0.5rem 0; color: var(--text-muted); font-size: 0.875rem;">
+                        Required credential fields have been added below.
+                    </p>
                 </div>
             `,
             'Basic': `
-                <div class="form-group">
-                    <div class="auth-help" style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px; margin-bottom: 1rem;">
-                        <p><strong>💡 Basic Authentication</strong></p>
-                        <p>Add your credentials in the <strong>Credentials</strong> section below:</p>
-                        <ul style="margin: 0.5rem 0 0 1rem;">
-                            <li><strong>username</strong> - Your username</li>
-                            <li><strong>password</strong> - Your password</li>
-                        </ul>
-                    </div>
+                <div class="auth-help" style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px; margin-bottom: 1rem;">
+                    <p><strong>💡 Basic Authentication</strong></p>
+                    <p>Your credentials will be base64-encoded and sent as an Authorization header.</p>
+                    <p style="margin: 0.5rem 0; color: var(--text-muted); font-size: 0.875rem;">
+                        Required credential fields have been added below.
+                    </p>
                 </div>
             `,
             'ApiKey': `
-                <div class="form-group">
-                    <div class="auth-help" style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px; margin-bottom: 1rem;">
-                        <p><strong>💡 API Key Authentication</strong></p>
-                        <p>Add your API key details in the <strong>Credentials</strong> section below:</p>
-                        <ul style="margin: 0.5rem 0 0 1rem;">
-                            <li><strong>apiKey</strong> - Your API key value</li>
-                            <li><strong>headerName</strong> - Header name (default: X-API-Key)</li>
-                        </ul>
-                    </div>
+                <div class="auth-help" style="padding: 0.75rem; background: var(--bg-secondary); border-radius: 4px; margin-bottom: 1rem;">
+                    <p><strong>💡 API Key Authentication</strong></p>
+                    <p>Your API key will be sent as a custom header (default: X-API-Key).</p>
+                    <p style="margin: 0.5rem 0; color: var(--text-muted); font-size: 0.875rem;">
+                        Required credential fields have been added below.
+                    </p>
                 </div>
             `,
             'CustomScript': `
                 <div class="form-group">
-                    <label for="auth-script">Custom Authentication Script:</label>
-                    <textarea id="auth-script" class="form-control" rows="6" 
-                              placeholder="# PowerShell script to generate auth headers&#10;# Example:&#10;param($RequestContext, $Profile)&#10;$RequestContext.Headers['Authorization'] = 'Bearer ' + $token"></textarea>
-                    <small class="form-help">PowerShell script that sets authentication headers. Access credentials from the Credentials section using $RequestContext.GetPlainTextSecret.Invoke('credentialName')</small>
+                    <label for="auth-script" class="form-label">Custom Authentication Script:</label>
+                    <textarea id="auth-script" class="form-control code-input" rows="8" 
+                              placeholder="# PowerShell script to generate auth headers&#10;# Example:&#10;param($RequestContext, $Profile)&#10;$token = $RequestContext.GetPlainTextSecret.Invoke('token')&#10;$RequestContext.Headers['Authorization'] = 'Bearer ' + $token"></textarea>
+                    <small class="form-help">
+                        PowerShell script that sets authentication headers. Use $RequestContext.GetPlainTextSecret.Invoke('credentialName') to access credential values.
+                    </small>
                 </div>
+            `,
+            'None': `
+                <p class="form-help" style="font-style: italic; color: var(--text-muted);">
+                    No authentication required for this profile.
+                </p>
             `
         };
-        
-        authFields.innerHTML = authFieldsConfig[authTypeValue] || 
-            '<p class="form-help" style="font-style: italic; color: var(--text-muted);">No authentication required for this profile.</p>';
-        
-        console.log('✅ Auth fields HTML updated for type:', authTypeValue);
+
+        authFields.innerHTML = authHelpConfig[authType] || authHelpConfig['None'];
     }
 
-    // Toggle pagination details field visibility
-    togglePaginationDetailsField() {
-        const checkbox = this.domUtils.getElement('show-pagination-details');
-        const detailsGroup = this.domUtils.getElement('pagination-details-group');
-        
-        if (checkbox && detailsGroup) {
-            detailsGroup.style.display = checkbox.checked ? 'block' : 'none';
-            console.log('🔄 Pagination details field toggled:', checkbox.checked ? 'visible' : 'hidden');
+    /**
+     * Generate authentication-specific credential fields dynamically
+     */
+    generateAuthSpecificCredentials(authType) {
+        const credentialsContainer = document.getElementById('profile-credentials-list');
+        if (!credentialsContainer) {
+            console.warn('⚠️ Credentials container not found');
+            return;
         }
-    }
 
-    // Update pagination visibility based on pagination type selection
-    updatePaginationVisibility() {
-        const paginationSelect = this.domUtils.getElement('profile-pagination');
-        const checkbox = this.domUtils.getElement('show-pagination-details');
-        const detailsGroup = this.domUtils.getElement('pagination-details-group');
-        
-        if (!paginationSelect || !checkbox || !detailsGroup) return;
-        
-        const paginationType = paginationSelect.value;
-        const shouldAutoShow = ['Custom', 'PageNumber'].includes(paginationType);
-        
-        if (shouldAutoShow) {
-            checkbox.checked = true;
-            detailsGroup.style.display = 'block';
-        }
-        
-        // Update placeholder text
-        const textarea = this.domUtils.getElement('profile-pagination-details');
-        if (textarea) {
-            const placeholders = {
-                'PageNumber': '{"PageParameter":"page","PageSizeParameter":"pageSize","DefaultPageSize":100}',
-                'Cursor': '{"NextTokenField":"next_cursor","TokenParameter":"cursor","ItemsField":"items"}',
-                'NextLink': '{"NextTokenField":"@odata.nextLink","ItemsField":"value"}',
-                'LinkHeader': '{"LinkHeaderRel":"next","ItemsField":"items"}',
-                'Custom': '{"PageParameter":"page","PageSizeParameter":"limit","NextTokenField":"nextToken"}'
-            };
-            textarea.placeholder = placeholders[paginationType] || placeholders['PageNumber'];
-        }
-    }
+        // Clear any existing auth-generated fields but preserve manually added ones
+        const authGeneratedFields = credentialsContainer.querySelectorAll('.auth-generated-field');
+        authGeneratedFields.forEach(field => field.remove());
 
-    // Import profiles from JSON file
-    async importProfiles() {
-        try {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.json';
-            input.onchange = async (event) => {
-                const file = event.target.files[0];
-                if (!file) return;
+        // Define auth-specific credential requirements
+        const authCredentialMapping = {
+            'Bearer': [
+                { key: 'token', label: 'Bearer Token', type: 'password', required: true }
+            ],
+            'Basic': [
+                { key: 'username', label: 'Username', type: 'text', required: true },
+                { key: 'password', label: 'Password', type: 'password', required: true }
+            ],
+            'ApiKey': [
+                { key: 'apiKey', label: 'API Key', type: 'password', required: true },
+                { key: 'headerName', label: 'Header Name', type: 'text', required: false, defaultValue: 'X-API-Key' }
+            ]
+        };
 
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    try {
-                        const profilesData = JSON.parse(e.target.result);
-                        
-                        if (!Array.isArray(profilesData)) {
-                            throw new Error('Invalid file format - expected array of profiles');
-                        }
-
-                        const response = await apiClient.importProfiles(profilesData);
-                        if (response.success) {
-                            showNotification(`Successfully imported ${response.count} profiles`, 'success');
-                            await this.loadProfiles();
-                        } else {
-                            throw new Error(response.error || 'Import failed');
-                        }
-                        
-                    } catch (error) {
-                        console.error('🚨 Error parsing import file:', error);
-                        showNotification('Invalid JSON file', 'error');
-                    }
-                };
-                reader.readAsText(file);
-            };
-            input.click();
+        const requiredFields = authCredentialMapping[authType];
+        if (requiredFields) {
+            console.log(`🔧 Generating ${requiredFields.length} credential fields for ${authType} auth`);
             
-        } catch (error) {
-            console.error('🚨 Error importing profiles:', error);
-            showNotification('Import failed', 'error');
+            requiredFields.forEach(field => {
+                this.addDynamicCredentialField(
+                    field.key, 
+                    field.label, 
+                    field.type, 
+                    field.required, 
+                    field.defaultValue || ''
+                );
+            });
         }
     }
 
-    // Export all profiles to JSON file
-    async exportProfiles() {
-        await this.handleAsync(async () => {
-            if (this.profiles.length === 0) {
-                showNotification('No profiles to export', 'warning');
+    /**
+     * Add a dynamic credential field that's tied to authentication type
+     */
+    addDynamicCredentialField(key, label, type, required, defaultValue = '') {
+        const container = document.getElementById('profile-credentials-list');
+        if (!container) return;
+
+        const row = document.createElement('div');
+        row.className = 'credential-row auth-generated-field';
+        row.style.display = 'flex';
+        row.style.gap = '0.5em';
+        row.style.marginBottom = '0.5em';
+
+        // Create a more distinctive styling for auth-generated fields
+        row.innerHTML = `
+            <input type="text" class="form-control credential-key" 
+                   value="${this.textUtils.safeEscape(key)}" 
+                   readonly
+                   style="flex:1; background: var(--bg-secondary); border-color: var(--primary); font-weight: 500;"
+                   title="Authentication field: ${this.textUtils.safeEscape(label)}">
+            <input type="${type}" class="form-control credential-value" 
+                   placeholder="${this.textUtils.safeEscape(label)}${required ? ' (required)' : ''}" 
+                   value="${this.textUtils.safeEscape(defaultValue)}" 
+                   ${required ? 'required' : ''}
+                   style="flex:2;"
+                   title="${this.textUtils.safeEscape(label)}">
+            <button type="button" class="btn btn-outline btn-sm credential-toggle" 
+                    title="${type === 'password' ? 'Show/Hide' : 'Field info'}" 
+                    style="flex:0;">
+                <span class="credential-eye" style="pointer-events:none;">
+                    ${type === 'password' ? '👁️' : 'ℹ️'}
+                </span>
+            </button>
+            <button type="button" class="btn btn-outline btn-sm" 
+                    title="Remove" 
+                    style="flex:0;" 
+                    onclick="this.parentElement.remove()">🗑️</button>
+        `;
+
+        // Add authentication field indicator
+        const indicator = document.createElement('div');
+        indicator.className = 'auth-field-indicator';
+        indicator.style.cssText = `
+            position: absolute;
+            left: -8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 4px;
+            height: 20px;
+            background: var(--primary);
+            border-radius: 2px;
+            z-index: 1;
+        `;
+        row.style.position = 'relative';
+        row.appendChild(indicator);
+
+        container.appendChild(row);
+
+        // Add functionality for password fields
+        const valueInput = row.querySelector('.credential-value');
+        const toggleBtn = row.querySelector('.credential-toggle');
+          if (type === 'password' && toggleBtn && valueInput) {
+            toggleBtn.onclick = function () {
+                if (valueInput.type === 'password') {
+                    valueInput.type = 'text';
+                    toggleBtn.title = 'Hide';
+                    toggleBtn.querySelector('.credential-eye').textContent = '🙈';
+                } else {
+                    valueInput.type = 'password';
+                    toggleBtn.title = 'Show';
+                    toggleBtn.querySelector('.credential-eye').textContent = '👁️';
+                }            };
+        }
+        
+        console.log(`✅ Added dynamic credential field: ${key} (${label})`);
+    }
+
+    /**
+     * Apply template credentials in coordination with auth type - PHASE 1 ENHANCEMENT
+     * This method works with the dynamic credential system to populate template credentials
+     */
+    applyTemplateCredentials(template) {
+        console.log('🔑 Applying template credentials with coordination...');
+        
+        const credentialsContainer = this.domUtils.getElement('profile-credentials-list');
+        if (!credentialsContainer) {
+            console.warn('⚠️ Credentials container not found');
+            return;
+        }
+
+        // Get existing auth-generated fields (from dynamic system)
+        const authGeneratedFields = credentialsContainer.querySelectorAll('.auth-generated-field');
+        const existingCredentials = new Set();
+        
+        authGeneratedFields.forEach(field => {
+            const keyInput = field.querySelector('.credential-key');
+            if (keyInput && keyInput.value) {
+                existingCredentials.add(keyInput.value);
+            }
+        });
+
+        console.log('🔧 Found existing auth-generated credentials:', Array.from(existingCredentials));
+
+        // Apply template field mapping to enhance existing auth-generated fields
+        if (template.authFieldMapping) {
+            Object.entries(template.authFieldMapping).forEach(([credKey, mapping]) => {
+                if (existingCredentials.has(credKey)) {
+                    // Find the existing field and enhance it with template defaults
+                    const existingField = Array.from(authGeneratedFields).find(field => {
+                        const keyInput = field.querySelector('.credential-key');
+                        return keyInput && keyInput.value === credKey;
+                    });
+                    
+                    if (existingField && mapping.defaultValue) {
+                        const valueInput = existingField.querySelector('.credential-value');
+                        if (valueInput && !valueInput.value) {
+                            valueInput.value = mapping.defaultValue;
+                            valueInput.placeholder = `${mapping.label} (from template)`;
+                            console.log(`✅ Applied template default for ${credKey}: ${mapping.defaultValue}`);
+                        }
+                    }
+                } else if (template.requiredSecrets && template.requiredSecrets.includes(credKey)) {
+                    // Add missing required credential from template
+                    console.log(`🔑 Adding missing required credential: ${credKey}`);
+                    this.addCredentialRow(
+                        credentialsContainer, 
+                        credKey, 
+                        mapping.defaultValue || '', 
+                        mapping.label, 
+                        mapping.type
+                    );
+                }
+            });
+        }
+
+        // Add any additional required secrets not covered by auth field mapping
+        if (template.requiredSecrets) {
+            template.requiredSecrets.forEach(secretKey => {
+                if (!existingCredentials.has(secretKey)) {
+                    const mapping = template.authFieldMapping?.[secretKey];
+                    const label = mapping?.label || secretKey;
+                    const type = mapping?.type || 'password';
+                    
+                    console.log(`🔑 Adding template required secret: ${secretKey} (${label})`);
+                    this.addCredentialRow(credentialsContainer, secretKey, '', label, type);
+                }
+            });
+        }
+
+        // Apply legacy template defaults for backward compatibility
+        if (template.templateDefaults) {
+            Object.entries(template.templateDefaults).forEach(([key, value]) => {
+                if (!existingCredentials.has(key)) {
+                    console.log(`🔧 Adding template default: ${key}`);
+                    this.addCredentialRow(credentialsContainer, key, value);
+                }
+            });
+        }        console.log('✅ Template credentials applied with coordination');
+    }
+
+    /**
+     * Handle shared profile changes from dropdowns across different components
+     * @param {string} profileName - The name of the selected profile
+     * @param {string} source - The source component ('tester', 'main', etc.)
+     */
+    handleSharedProfileChange(profileName, source = 'unknown') {
+        console.log(`🔄 Handling shared profile change: "${profileName}" from ${source}`);
+        
+        if (!profileName || profileName === '') {
+            console.log('⚠️ No profile selected, clearing current profile');
+            this.currentSharedProfile = null;
+            return;
+        }
+
+        try {
+            // Find the profile by name
+            const profile = this.getProfile(profileName);
+            if (!profile) {
+                console.error(`❌ Profile "${profileName}" not found`);
+                if (typeof showNotification === 'function') {
+                    showNotification(`Profile "${profileName}" not found`, 'error');
+                }
                 return;
             }
 
-            const response = await apiClient.exportProfiles();
-            if (!response.success || !response.data) {
-                throw new Error(response.error || 'Export failed');
-            }
-
-            const blob = new Blob([JSON.stringify(response.data, null, 2)], { 
-                type: 'application/json' 
-            });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `anyapi-profiles-${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            // Update the current shared profile
+            this.currentSharedProfile = profile;
             
-            showNotification(`Exported ${this.profiles.length} profiles`, 'success');
-        }, 'Export failed');
+            // Select the profile using existing method
+            this.selectProfile(profileName);
+            
+            // Notify other components if they have handlers
+            this.notifyProfileChange(profile, source);
+            
+            console.log(`✅ Shared profile "${profileName}" selected from ${source}`);
+            
+            if (typeof showNotification === 'function') {
+                showNotification(`Profile "${profileName}" selected`, 'success');
+            }
+            
+        } catch (error) {
+            console.error('❌ Error handling shared profile change:', error);
+            if (typeof showNotification === 'function') {
+                showNotification(`Error selecting profile: ${error.message}`, 'error');
+            }
+        }
     }
 
-    // Get profile by name (utility method)
-    getProfile(profileName) {
-        return this.findProfile(profileName);
-    }
-
-    // Refresh profiles from server
-    async refreshProfiles() {
-        console.log('🔄 Refreshing profiles...');
-        showNotification('Refreshing profiles...', 'info');
-        await this.loadProfiles();
-        showNotification('Profiles refreshed', 'success');
-    }
-
-    // Populate auth fields with existing profile data
-    populateAuthFields(profile) {
-        console.log('🔧 Populating auth fields for profile:', profile.name, 'Auth type:', profile.authType);
-        
-        // First ensure auth fields are rendered
-        this.toggleAuthFields();
-        
-        // Then populate with existing data
-        setTimeout(() => {
+    /**
+     * Notify other components about profile changes
+     * @param {Object} profile - The selected profile
+     * @param {string} source - The source component that triggered the change
+     */
+    notifyProfileChange(profile, source) {
+        // Notify EndpointTester if it exists and has the method
+        if (window.endpointTester && typeof window.endpointTester.onProfileChanged === 'function') {
             try {
-                if (!profile.credentials) {
-                    console.log('⚠️ No credentials found in profile');
-                    return;
-                }
-                
-                switch (profile.authType) {
-                    case ProfileManager.AUTH_TYPES.BEARER:
-                        const tokenField = this.domUtils.getElement('auth-token');
-                        if (tokenField && profile.credentials.token) {
-                            tokenField.value = profile.credentials.token;
-                            tokenField.placeholder = 'Current token loaded';
-                        }
-                        break;
-                        
-                    case ProfileManager.AUTH_TYPES.BASIC:
-                        const usernameField = this.domUtils.getElement('auth-username');
-                        const passwordField = this.domUtils.getElement('auth-password');
-                        
-                        if (usernameField && profile.credentials.username) {
-                            usernameField.value = profile.credentials.username;
-                        }
-                        if (passwordField && profile.credentials.password) {
-                            passwordField.value = profile.credentials.password;
-                            passwordField.placeholder = 'Current password loaded';
-                        }
-                        break;
-                        
-                    case ProfileManager.AUTH_TYPES.API_KEY:
-                        const apiKeyField = this.domUtils.getElement('auth-apikey');
-                        const headerNameField = this.domUtils.getElement('auth-apikey-header');
-                        
-                        if (apiKeyField && profile.credentials.apiKey) {
-                            apiKeyField.value = profile.credentials.apiKey;
-                            apiKeyField.placeholder = 'Current API key loaded';
-                        }
-                        if (headerNameField) {
-                            headerNameField.value = profile.credentials.headerName || 'X-API-Key';
-                        }
-                        break;
-                }
-                
-                // Handle custom auth script
-                if (profile.authType === ProfileManager.AUTH_TYPES.CUSTOM_SCRIPT && profile.customAuthScript) {
-                    const scriptField = this.domUtils.getElement('auth-script');
-                    if (scriptField) {
-                        scriptField.value = profile.customAuthScript;
-                    }
-                }
-                
+                window.endpointTester.onProfileChanged(profile, source);
+                console.log('📡 Notified EndpointTester of profile change');
             } catch (error) {
-                console.error('🚨 Error populating auth fields:', error);
+                console.warn('⚠️ Error notifying EndpointTester:', error);
             }
-        }, 100);
-    }
-
-    // Sync profile selection manually (sync button)
-    syncProfileSelection(targetTab) {
-        try {
-            const syncBtn = document.querySelector(`#${targetTab}-section .btn-sync`);
-            if (syncBtn) {
-                syncBtn.classList.add('syncing');
-                setTimeout(() => syncBtn.classList.remove('syncing'), 1000);
-            }
-            
-            const currentProfile = this.currentProfile?.name;
-            
-            if (currentProfile) {
-                if (targetTab === 'tester') {
-                    const testSelect = this.domUtils.getElement('test-profile');
-                    if (testSelect) {
-                        testSelect.value = currentProfile;
-                        this.handleSharedProfileChange(currentProfile, 'sync');
-                        showNotification(`Profile "${currentProfile}" synced to API Tester`, 'success');
-                    }
-                }
-            } else {
-                showNotification('No profile selected to sync', 'warning');
-            }
-            
-        } catch (error) {
-            console.error('🚨 Error syncing profile selection:', error);
-            showNotification('Error syncing profile selection', 'error');
         }
-    }
 
-    applyDynamicTextScaling() {
-        // Implementation for dynamic text scaling
-        const profileItems = this.domUtils.getElements('.profile-item');
-        profileItems.forEach(item => {
-            const nameElement = item.querySelector('.profile-item-name');
-            const urlElement = item.querySelector('.profile-item-url');
-            
-            [nameElement, urlElement].forEach(element => {
-                if (element && element.scrollWidth > element.clientWidth * 0.9) {
-                    const ratio = element.scrollWidth / element.clientWidth;
-                    element.setAttribute(ratio > 1.3 ? 'data-very-long' : 'data-long', 'true');
-                }
-            });
-        });
-    }
-
-    // Shared profile management methods remain similar but with enhanced error handling
-    handleSharedProfileChange(profileName, sourceTab) {
-        try {
-            console.log(`🔄 Shared profile change: ${profileName} from ${sourceTab}`);
-            this.currentSharedProfile = profileName;
-            this.syncProfileAcrossTabs(profileName, sourceTab);
-            this.updateHistoryProfileFilter();
-        } catch (error) {
-            console.error('🚨 Error handling shared profile change:', error);
+        // Notify API Client if it exists and has the method
+        if (window.apiClient && typeof window.apiClient.onProfileChanged === 'function') {
+            try {
+                window.apiClient.onProfileChanged(profile, source);
+                console.log('📡 Notified ApiClient of profile change');
+            } catch (error) {
+                console.warn('⚠️ Error notifying ApiClient:', error);
+            }
         }
+
+        // Update other profile dropdowns that might exist
+        this.updateOtherProfileDropdowns(profile.name, source);
     }
 
-    syncProfileAcrossTabs(profileName, sourceTab) {
-        const syncTargets = [
-            { condition: sourceTab !== 'tester', id: 'test-profile' },
-            // Add more sync targets as needed
-        ];
-
-        syncTargets.forEach(({ condition, id }) => {
-            if (condition) {
-                const element = this.domUtils.getElement(id);
-                if (element && element.value !== profileName) {
-                    element.value = profileName;
-                    element.classList.add('profile-selector-synced');
-                    setTimeout(() => element.classList.remove('profile-selector-synced'), 2000);
-                }
+    /**
+     * Update other profile dropdowns to stay in sync
+     * @param {string} profileName - The selected profile name
+     * @param {string} excludeSource - The source to exclude from updates
+     */
+    updateOtherProfileDropdowns(profileName, excludeSource) {
+        // List of known profile dropdown IDs
+        const dropdownIds = ['test-profile', 'profile-selector', 'main-profile'];
+        
+        dropdownIds.forEach(dropdownId => {
+            const dropdown = document.getElementById(dropdownId);
+            if (dropdown && dropdown.value !== profileName) {
+                dropdown.value = profileName;
+                console.log(`🔄 Updated ${dropdownId} dropdown to "${profileName}"`);
             }
         });
-
-        if (profileName) {
-            localStorage.setItem('anyapi_shared_profile', profileName);
-        } else {
-            localStorage.removeItem('anyapi_shared_profile');
-        }
-    }
-
-    // Initialize shared profile management
-    initializeSharedProfileManagement() {
-        try {
-            const savedProfile = localStorage.getItem('anyapi_shared_profile');
-            if (savedProfile && this.findProfile(savedProfile)) {
-                this.currentSharedProfile = savedProfile;
-                
-                const testSelect = this.domUtils.getElement('test-profile');
-                if (testSelect) testSelect.value = savedProfile;
-                
-                if (typeof endpointTester !== 'undefined') {
-                    endpointTester.currentProfile = savedProfile;
-                    endpointTester.updateProfileContext?.();
-                }
-            }
-            
-            this.updateHistoryProfileFilter();
-        } catch (error) {
-            console.error('🚨 Error initializing shared profile management:', error);
-        }
-    }
-
-    updateHistoryProfileFilter() {
-        const filterSelect = this.domUtils.getElement('history-profile-filter');
-        if (!filterSelect) return;
-
-        const currentValue = filterSelect.value;
-        filterSelect.innerHTML = '<option value="">All Profiles</option>';
-        
-        this.profiles.forEach(profile => {
-            if (profile?.name) {
-                const option = this.domUtils.createElement('option', {
-                    value: profile.name,
-                    textContent: profile.name
-                });
-                filterSelect.appendChild(option);
-            }
-        });
-
-        if (currentValue && this.findProfile(currentValue)) {
-            filterSelect.value = currentValue;
-        }
-    }
-
-    // Enhanced form data collection
-    collectFormData() {
-        console.log('📊 Collecting form data...');
-        
-        const formFields = [
-            { id: 'profile-name', key: 'name', required: true },
-            { id: 'profile-baseurl', key: 'baseUrl', required: true },
-            { id: 'profile-description', key: 'description' },
-            { id: 'profile-authtype', key: 'authType', default: 'None' },
-            { id: 'profile-pagination', key: 'paginationType', default: 'Auto' },
-            { id: 'profile-session-only', key: 'isSessionOnly', type: 'checkbox' }
-        ];
-
-        const profileData = formFields.reduce((data, field) => {
-            const element = this.domUtils.getElement(field.id);
-            if (element) {
-                const value = field.type === 'checkbox' 
-                    ? element.checked 
-                    : (element.value?.trim() || field.default || '');
-                data[field.key] = value;
-            }
-            return data;
-        }, {});
-
-        // Parse JSON fields
-        profileData.headers = this.parseJSONField('profile-headers', {});
-        
-        if (this.domUtils.getElement('show-pagination-details')?.checked) {
-            profileData.paginationDetails = this.parseJSONField('profile-pagination-details');
-        }
-
-        // Collect dynamic sections
-        profileData.customSettings = this.collectCustomSettings();
-        profileData.credentials = this.collectCredentials();
-
-        // Handle custom auth script
-        const authScript = this.domUtils.getElement('auth-script')?.value?.trim();
-        if (authScript) {
-            profileData.customAuthScript = authScript;
-        }
-
-        console.log('✅ Form data collected:', profileData);
-        return profileData;
-    }
-
-    // JSON field parsing utility
-    parseJSONField(fieldId, defaultValue = null) {
-        try {
-            const text = this.domUtils.getElement(fieldId)?.value?.trim();
-            return text ? JSON.parse(text) : defaultValue;
-        } catch (error) {
-            console.warn(`⚠️ Invalid JSON in ${fieldId}, using default`);
-            return defaultValue;
-        }
-    }
-
-    // Custom settings collection
-    collectCustomSettings() {
-        const settings = {};
-        const rows = this.domUtils.getElements('#profile-customsettings-list .customsetting-row');
-        
-        rows.forEach(row => {
-            const key = row.querySelector('.customsetting-key')?.value?.trim();
-            const value = row.querySelector('.customsetting-value')?.value?.trim();
-            if (key) settings[key] = value;
-        });
-
-        return settings;
-    }
-
-    // Simplified credentials collection - no masking logic
-    collectCredentials() {
-        const credentials = {};
-        const rows = this.domUtils.getElements('#profile-credentials-list .credential-row');
-        
-        rows.forEach(row => {
-            const keyInput = row.querySelector('.credential-key');
-            const valueInput = row.querySelector('.credential-value');
-            
-            const key = keyInput?.value?.trim();
-            const value = valueInput?.value?.trim();
-            
-            if (key) {
-                // Store the actual value - no special handling for masked values
-                credentials[key] = value || '';
-            }
-        });
-
-        console.log('🔐 Collected credentials:', Object.keys(credentials).reduce((acc, key) => {
-            acc[key] = credentials[key] ? '[VALUE SET]' : '[EMPTY]';
-            return acc;
-        }, {}));
-
-        return credentials;
-    }
-
-    // Test profile connection
-    async testProfile(profileName) {
-        await this.handleAsync(async () => {
-            const profile = this.findProfile(profileName);
-            if (!profile) {
-                throw new Error(`Profile "${profileName}" not found`);
-            }
-
-            showNotification('Testing connection...', 'info');
-            
-            const response = await apiClient.testProfile(profileName);
-            if (response.success) {
-                showNotification('✅ Connection successful', 'success');
-            } else {
-                throw new Error(response.error?.message || 'Connection test failed');
-            }
-        }, 'Test failed');
-    }
-
-    // Update test profile dropdown
-    updateTestProfileDropdown() {
-        const testSelect = this.domUtils.getElement('test-profile');
-        if (!testSelect) return;
-
-        const currentValue = testSelect.value;
-        testSelect.innerHTML = '<option value="">Select Profile...</option>';
-        
-        this.profiles.forEach(profile => {
-            if (profile?.name) {
-                const option = this.domUtils.createElement('option', {
-                    value: profile.name,
-                    textContent: profile.name
-                });
-                testSelect.appendChild(option);
-            }
-        });
-
-        // Restore previous selection if still valid
-        if (currentValue && this.findProfile(currentValue)) {
-            testSelect.value = currentValue;
-        }
-    }
-
-    // Render empty profile details
-    renderEmptyProfileDetails() {
-        const container = this.domUtils.getElement('profile-details');
-        if (container) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">⚙️</div>
-                    <h3>Select a Profile</h3>
-                    <p>Choose a profile from the sidebar to view its configuration</p>
-                </div>
-            `;
-        }
     }
 }
 
-// Initialize and export
-console.log('🚀 Initializing Optimized ProfileManager...');
+// Create global profile manager instance
 const profileManager = new ProfileManager();
+window.profileManager = profileManager;
+// Ensure all key methods are bound to the instance for HTML event compatibility
+['getProfile', 'selectProfile', 'loadProfiles', 'handleSharedProfileChange'].forEach(fn => {
+    window.profileManager[fn] = profileManager[fn].bind(profileManager);
+});
 
-if (typeof window !== 'undefined') {
-    window.profileManager = profileManager;
+// Export the ProfileManager class
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = ProfileManager;
 }

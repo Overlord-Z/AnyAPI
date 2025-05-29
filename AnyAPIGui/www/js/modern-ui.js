@@ -115,10 +115,22 @@ function initializeSidebar() {
     console.log('✅ Sidebar initialized');
 }
 
-// Toggle sidebar visibility (for mobile/responsive) - DEPRECATED: Now handled by app.js
-// function toggleSidebar() {
-//     const sidebar = document.querySelector('.sidebar');
-//     const appBody = document.querySelector('.app-body');
+// Toggle sidebar visibility (for mobile/responsive)
+function toggleSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    const appBody = document.querySelector('.app-body');
+    
+    if (sidebar) {
+        sidebar.classList.toggle('collapsed');
+    }
+    
+    if (appBody) {
+        appBody.classList.toggle('sidebar-collapsed');
+    }
+}
+
+// Make toggleSidebar globally available
+window.toggleSidebar = toggleSidebar;
 //     
 //     if (sidebar && appBody) {
 //         sidebar.classList.toggle('collapsed');

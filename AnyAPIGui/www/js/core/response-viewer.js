@@ -1,6 +1,5 @@
 // Core EnhancedResponseViewer class (logic only, no direct DOM manipulation)
-// Exported as ES6 module
-import { formatJson, escapeHtml } from './utils.js';
+// Using global functions from utils.js (loaded via script tag)
 
 class EnhancedResponseViewer {
     constructor() {

@@ -1,9 +1,8 @@
 /**
  * Core EndpointTester class - Business logic only, no DOM manipulation
- * Exported as ES6 module for use by UI components
+ * Available globally for use by UI components
  */
-import { formatJson, escapeHtml, isValidJson, formatDuration } from './utils.js';
-import { HistoryManager } from './history-manager.js';
+// Functions from utils.js are now available globally
 
 class EndpointTester {
     constructor() {
@@ -124,6 +123,187 @@ class EndpointTester {
             exported: new Date().toISOString(),
             history: this.requestHistory
         };
+    }    /**
+     * Validate endpoint and provide feedback
+     */
+    validateEndpoint() {
+        const endpointInput = document.getElementById('endpoint-url');
+        const feedbackElement = document.getElementById('endpoint-validation-feedback');
+        const profileSelect = document.getElementById('test-profile');
+        
+        if (!endpointInput || !feedbackElement) return;
+        
+        const endpoint = endpointInput.value.trim();
+        const profileName = profileSelect?.value;
+        
+        if (!endpoint) {
+            feedbackElement.style.display = 'none';
+            return;
+        }
+        
+        // Check if this looks like a GitHub API profile
+        const profile = window.profileManager?.getProfile(profileName);
+        const isGitHubAPI = profile && 
+            (profile.baseUrl?.includes('api.github.com') || 
+             profile.baseUrl?.includes('github.com/api'));
+        
+        if (isGitHubAPI) {
+            const validation = this.validateGitHubEndpoint(endpoint);
+            this.showValidationFeedback(feedbackElement, validation);
+        } else {
+            feedbackElement.style.display = 'none';
+        }
+    }
+
+    /**
+     * Validate GitHub-specific endpoint patterns
+     */
+    validateGitHubEndpoint(endpoint) {
+        const validation = {
+            isValid: false,
+            level: 'error',
+            message: '',
+            suggestions: []
+        };
+        
+        // Remove leading slash for consistency
+        const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : '/' + endpoint;
+        
+        // Check for common GitHub patterns
+        if (this.githubPatterns.repos.test(normalizedEndpoint)) {
+            const repoMatch = normalizedEndpoint.match(/^\/repos\/([^\/]+)\/([^\/]+)(?:\/(.*))?/);
+            if (repoMatch) {
+                const [, owner, repo, path] = repoMatch;
+                
+                if (owner && repo) {
+                    validation.isValid = true;
+                    validation.level = 'success';
+                    validation.message = `✅ Valid GitHub repository endpoint: ${owner}/${repo}`;
+                    
+                    if (path) {
+                        validation.message += ` (accessing: ${path})`;
+                    }
+                } else {
+                    validation.message = '❌ Repository endpoint needs both owner and repository name';
+                    validation.suggestions.push('Format: /repos/owner/repository-name');
+                    validation.suggestions.push('Example: /repos/microsoft/vscode');
+                }
+            }
+        } else if (this.githubPatterns.search.test(normalizedEndpoint)) {
+            validation.isValid = true;
+            validation.level = 'success';
+            validation.message = '✅ Valid GitHub search endpoint';
+        } else if (this.githubPatterns.user.test(normalizedEndpoint)) {
+            validation.isValid = true;
+            validation.level = 'success';
+            validation.message = '✅ Valid GitHub user endpoint (authenticated user)';
+        } else if (this.githubPatterns.users.test(normalizedEndpoint)) {
+            const userMatch = normalizedEndpoint.match(/^\/users\/([^\/]+)/);
+            if (userMatch) {
+                validation.isValid = true;
+                validation.level = 'success';
+                validation.message = `✅ Valid GitHub user endpoint: ${userMatch[1]}`;
+            }
+        } else if (this.githubPatterns.orgs.test(normalizedEndpoint)) {
+            const orgMatch = normalizedEndpoint.match(/^\/orgs\/([^\/]+)/);
+            if (orgMatch) {
+                validation.isValid = true;
+                validation.level = 'success';
+                validation.message = `✅ Valid GitHub organization endpoint: ${orgMatch[1]}`;
+            }
+        } else {
+            // Provide helpful suggestions for common mistakes
+            validation.level = 'warning';
+            validation.message = '⚠️ Endpoint format may not be correct for GitHub API';
+            
+            // Common mistake patterns
+            if (normalizedEndpoint.includes('/api/v3/')) {
+                validation.suggestions.push('Remove "/api/v3" - your base URL should handle the API version');
+                validation.suggestions.push('Use: /repos/owner/repo instead of /api/v3/repos/owner/repo');
+            }
+            
+            if (normalizedEndpoint.includes('github.com/') && !normalizedEndpoint.includes('/api/')) {
+                validation.suggestions.push('This looks like a web URL, not an API endpoint');
+                validation.suggestions.push('For repo info, use: /repos/owner/repo');
+            }
+            
+            // Provide common GitHub endpoint examples
+            validation.suggestions.push('Common patterns:');
+            validation.suggestions.push('• /repos/owner/repo - Get repository info');
+            validation.suggestions.push('• /repos/owner/repo/issues - Get repository issues');
+            validation.suggestions.push('• /search/repositories?q=javascript - Search repositories');
+            validation.suggestions.push('• /user - Get authenticated user info');
+            validation.suggestions.push('• /users/username - Get specific user info');
+        }
+        
+        return validation;
+    }
+
+    /**
+     * Show validation feedback to user
+     */
+    showValidationFeedback(feedbackElement, validation) {
+        if (!feedbackElement) return;
+        
+        // Add CSS if not already present
+        if (!document.getElementById('endpoint-feedback-styles')) {
+            const style = document.createElement('style');
+            style.id = 'endpoint-feedback-styles';
+            style.textContent = `
+                .endpoint-feedback-success {
+                    background-color: var(--color-success-bg, rgba(40, 167, 69, 0.1));
+                    border-color: var(--color-success-border, rgba(40, 167, 69, 0.3));
+                    color: var(--color-success-text, #28a745);
+                }
+                .endpoint-feedback-warning {
+                    background-color: var(--color-warning-bg, rgba(255, 193, 7, 0.1));
+                    border-color: var(--color-warning-border, rgba(255, 193, 7, 0.3));
+                    color: var(--color-warning-text, #ffc107);
+                }
+                .endpoint-feedback-error {
+                    background-color: var(--color-danger-bg, rgba(220, 53, 69, 0.1));
+                    border-color: var(--color-danger-border, rgba(220, 53, 69, 0.3));
+                    color: var(--color-danger-text, #dc3545);
+                }
+                .endpoint-feedback-suggestions {
+                    margin-top: 0.5rem;
+                    font-size: 0.8rem;
+                    opacity: 0.9;
+                }
+                .endpoint-feedback-suggestions ul {
+                    margin: 0.25rem 0 0 1rem;
+                    padding: 0;
+                }
+                .endpoint-feedback-suggestions li {
+                    margin-bottom: 0.125rem;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // Clear previous classes
+        feedbackElement.className = `endpoint-feedback-${validation.level}`;
+        feedbackElement.style.cssText = `
+            margin-top: 0.5rem;
+            padding: 0.75rem;
+            border: 1px solid;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            display: block;
+        `;
+
+        let content = `<div>${validation.message}</div>`;
+        
+        if (validation.suggestions && validation.suggestions.length > 0) {
+            content += '<div class="endpoint-feedback-suggestions">';
+            content += '<ul>';
+            validation.suggestions.forEach(suggestion => {
+                content += `<li>${escapeHtml(suggestion)}</li>`;
+            });
+            content += '</ul></div>';
+        }
+        
+        feedbackElement.innerHTML = content;
     }
 
     /**
@@ -817,11 +997,39 @@ class EndpointTester {
                     const icon = bodySection.querySelector('.collapse-icon');
                     if (icon) {
                         icon.style.transform = 'rotate(0deg)';
-                    }
+                    }                }
+            }
+        }
+    }
+
+    /**
+     * Initialize with saved profile from local storage
+     */
+    initializeWithSavedProfile() {
+        try {
+            const savedProfile = localStorage.getItem('selectedProfile');
+            if (savedProfile) {
+                const profileSelect = document.getElementById('test-profile');
+                if (profileSelect) {
+                    profileSelect.value = savedProfile;
+                    this.onProfileChange();
                 }
             }
+        } catch (error) {
+            console.warn('⚠️ Could not load saved profile:', error.message);
         }
     }
 }
 
-export default EndpointTester;
+// Make EndpointTester globally available
+window.EndpointTester = EndpointTester;
+
+// Create global instance - will be initialized by app.js
+window.initializeEndpointTester = function() {
+    if (!window.endpointTester) {
+        const endpointTester = new EndpointTester();
+        window.endpointTester = endpointTester;
+        console.log('✅ EndpointTester initialized globally');
+    }
+    return window.endpointTester;
+};

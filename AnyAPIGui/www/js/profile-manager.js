@@ -862,9 +862,7 @@ $RequestContext.Headers["Accept"] = "application/json"`
                         </div>
                     `;
                 }
-            }
-
-            container.innerHTML = `
+            }            container.innerHTML = `
                 <div class="profile-details-container">
                     <div class="profile-details-header">
                         <div class="profile-title-section">
@@ -889,53 +887,57 @@ $RequestContext.Headers["Accept"] = "application/json"`
                         </div>
                     </div>
                     
-                    <div class="profile-details-grid">
-                        <div class="detail-card">
-                            <h5 class="detail-label">Base URL</h5>
-                            <div class="detail-content url-content" title="${profileData.url}">
-                                ${profileData.url}
+                    <div class="profile-details-content modern-scrollbar">
+                        <div class="profile-details-grid">
+                            <div class="detail-card">
+                                <h5 class="detail-label">Base URL</h5>
+                                <div class="detail-content url-content" title="${profileData.url}">
+                                    ${profileData.url}
+                                </div>
                             </div>
+                            
+                            <div class="detail-card">
+                                <h5 class="detail-label">Authentication</h5>
+                                <div class="detail-content">
+                                    ${this.renderAuthChip(profile.authType)}
+                                    <span class="auth-details">${authDetails}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="detail-card">
+                                <h5 class="detail-label">Pagination</h5>
+                                <div class="detail-content">${profileData.pagination}</div>
+                            </div>
+                            
+                            ${profile.description ? `
+                            <div class="detail-card full-width">
+                                <h5 class="detail-label">Description</h5>
+                                <div class="detail-content">${profileData.description}</div>
+                            </div>
+                            ` : ''}
                         </div>
-                        
-                        <div class="detail-card">
-                            <h5 class="detail-label">Authentication</h5>
+
+                        <div class="detail-section">
+                            <h5 class="detail-label">Default Headers</h5>
                             <div class="detail-content">
-                                ${this.renderAuthChip(profile.authType)}
-                                <span class="auth-details">${authDetails}</span>
+                                <div class="code-block">${headersDisplay}</div>
                             </div>
                         </div>
                         
-                        <div class="detail-card">
-                            <h5 class="detail-label">Pagination</h5>
-                            <div class="detail-content">${profileData.pagination}</div>
-                        </div>
+                        ${paginationDetailsHtml}
+                        ${customSettingsHtml}
                         
-                        ${profile.description ? `
-                        <div class="detail-card full-width">
-                            <h5 class="detail-label">Description</h5>
-                            <div class="detail-content">${profileData.description}</div>
+                        ${profile.customAuthScript ? `
+                        <div class="detail-section">
+                            <h5 class="detail-label">Custom Auth Script</h5>
+                            <div class="detail-content">
+                                <div class="code-block script-content">
+                                    <pre><code>${safeEscape(profile.customAuthScript)}</code></pre>
+                                </div>
+                            </div>
                         </div>
                         ` : ''}
                     </div>
-
-                    <div class="detail-section">
-                        <h5 class="detail-label">Default Headers</h5>
-                        <div class="detail-content code-block">
-                            ${headersDisplay}
-                        </div>
-                    </div>
-                    
-                    ${paginationDetailsHtml}
-                    ${customSettingsHtml}
-                    
-                    ${profile.customAuthScript ? `
-                    <div class="detail-section">
-                        <h5 class="detail-label">Custom Auth Script</h5>
-                        <div class="detail-content code-block script-content">
-                            <pre><code>${safeEscape(profile.customAuthScript)}</code></pre>
-                        </div>
-                    </div>
-                    ` : ''}
                 </div>
             `;
             

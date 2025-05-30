@@ -5,7 +5,11 @@
 
 class ApiClient {
     constructor() {
-        this.baseUrl = '';
+        this.baseUrl = ''; // Set baseUrl for same-origin or cross-origin as needed
+        // Use '' if frontend and backend are same origin/port
+        // If frontend is served from a different port, use:
+        // this.baseUrl = 'http://localhost:8080';
+
         this.isConnected = false;
         this.secretStorePassword = null;
         this.connectionCheckInterval = null;
@@ -195,7 +199,25 @@ async testSecretAccess() {
                 }
 
                 if (!response.ok) {
-                    const error = new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
+                    // --- Add detailed logging for debugging 500 errors ---
+                    console.error(`API fetch error: ${url}`, {
+                        status: response.status,
+                        statusText: response.statusText,
+                        request: fetchOptions,
+                        response: data
+                    });
+                    // --- Ensure error message is always a string ---
+                    let errorMsg = '';
+                    if (typeof data === 'object' && data !== null) {
+                        if (data.error) {
+                            errorMsg = typeof data.error === 'string' ? data.error : JSON.stringify(data.error);
+                        } else {
+                            errorMsg = JSON.stringify(data);
+                        }
+                    } else {
+                        errorMsg = String(data);
+                    }
+                    const error = new Error(errorMsg || `HTTP ${response.status}: ${response.statusText}`);
                     error.status = response.status;
                     error.response = data;
                     throw error;
@@ -205,7 +227,9 @@ async testSecretAccess() {
 
             } catch (error) {
                 lastError = error;
-                
+                // --- Add error logging for debugging ---
+                console.error(`Fetch attempt failed for ${url}:`, error && error.message ? error.message : error);
+
                 // Don't retry for certain errors
                 if (error.name === 'AbortError') {
                     throw new Error('Request timeout');
@@ -222,6 +246,8 @@ async testSecretAccess() {
             }
         }
 
+        // --- Final error log before throwing ---
+        console.error(`All fetch attempts failed for ${url}:`, lastError && lastError.message ? lastError.message : lastError);
         throw lastError;
     }
 
@@ -590,4 +616,4 @@ function isValidJson(string) {
 
 
 // Initialize global API client
-const apiClient = new ApiClient();
+window.apiClient = new ApiClient();

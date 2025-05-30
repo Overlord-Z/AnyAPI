@@ -1392,69 +1392,51 @@ function Get-ResponseItems {
         [hashtable]$PaginationDetails
     )
 
-    $pd = $PaginationDetails ?? @{}
+    $pd = $PaginationDetails
     $items = $null
     $itemsFound = $false
 
-    Write-Verbose "Extracting items from response..."
-
-    # Priority 1: Configured items field
-    if ($pd.ItemsField -and ![string]::IsNullOrEmpty($pd.ItemsField)) {
-        try {
-            $fieldValue = $Response.($pd.ItemsField)
-            if ($fieldValue -is [array]) {
-                $items = @($fieldValue)
-                $itemsFound = $items.Count -gt 0
-                Write-Verbose "Found $($items.Count) items using configured field '$($pd.ItemsField)'"
-                return @{ Items = $items; ItemsFound = $itemsFound; Count = $items.Count }
-            }
-            else {
-                Write-Verbose "Configured items field '$($pd.ItemsField)' is not an array"
-            }
-        }
-        catch {
-            Write-Verbose "Failed to access configured items field '$($pd.ItemsField)': $($_.Exception.Message)"
+    # Fast path: Check if we already know the structure
+    if ($pd -and $pd.ItemsField) {
+        $fieldValue = $Response.($pd.ItemsField)
+        if ($fieldValue -is [array]) {
+            $items = @($fieldValue)
+            $itemsFound = $items.Count -gt 0
+            return @{ Items = $items; ItemsFound = $itemsFound; Count = $items.Count }
         }
     }
 
-    # Priority 2: Response is already an array
+    # Response is already an array
     if ($Response -is [array]) {
         $items = @($Response)
         $itemsFound = $items.Count -gt 0
-        Write-Verbose "Response is direct array with $($items.Count) items"
     }
-    # Priority 3: Common API patterns (ordered by frequency)
-    elseif ($Response -is [PSCustomObject]) {
-        $commonFields = @('data', 'value', 'items', 'results', 'records', 'list', 'content', 'entities')
-        
-        foreach ($field in $commonFields) {
-            if ($Response.PSObject.Properties.Name -contains $field) {
-                $fieldValue = $Response.$field
-                if ($fieldValue -is [array]) {
-                    $items = @($fieldValue)
-                    $itemsFound = $items.Count -gt 0
-                    Write-Verbose "Found $($items.Count) items in '$field' field"
-                    break
-                }
-            }
-        }
-        
-        # If no array field found, treat whole response as single item
-        if ($null -eq $items) {
-            $items = @($Response)
-            $itemsFound = $true
-            Write-Verbose "No array field found, treating response as single item"
-        }
+    # Common API patterns (ordered by frequency)
+    elseif ($Response.data -is [array]) {
+        $items = @($Response.data)
+        $itemsFound = $items.Count -gt 0
+    }
+    elseif ($Response.value -is [array]) {
+        # Microsoft Graph, OData style
+        $items = @($Response.value)
+        $itemsFound = $items.Count -gt 0
+    }
+    elseif ($Response.items -is [array]) {
+        $items = @($Response.items)
+        $itemsFound = $items.Count -gt 0
+    }
+    elseif ($Response.results -is [array]) {
+        $items = @($Response.results)
+        $itemsFound = $items.Count -gt 0
     }
     else {
-        # Fallback: treat response as single item
+        # Assume the whole response is the item(s)
         $items = @($Response)
-        $itemsFound = $true
-        Write-Verbose "Response is not an object or array, treating as single item"
+        $itemsFound = $true  # Can't determine emptiness for non-array responses
     }
 
     return @{
-        Items      = $items ?? @()
+        Items      = $items
         ItemsFound = $itemsFound
         Count      = $items ? $items.Count : 0
     }
@@ -1468,126 +1450,60 @@ function Get-PaginationType {
         [string]$ProfileName
     )
 
-    # Check cache first
+    # Check cache first for maximum performance
     if ($script:PaginationTypeCache.ContainsKey($ProfileName)) {
-        $cachedType = $script:PaginationTypeCache[$ProfileName]
-        Write-Verbose "Using cached pagination type for '$ProfileName': $cachedType"
-        return $cachedType
+        return $script:PaginationTypeCache[$ProfileName]
     }
 
-    # Priority 1: Explicit configuration (highest priority)
+    # Check if profile has explicit pagination config (fastest)
     if ($Profile.PaginationDetails -and $Profile.PaginationDetails.Type) {
-        $configuredType = $Profile.PaginationDetails.Type
-        $script:PaginationTypeCache[$ProfileName] = $configuredType
-        Write-Verbose "Using explicitly configured pagination type for '$ProfileName': $configuredType"
-        return $configuredType
+        $type = $Profile.PaginationDetails.Type
+        $script:PaginationTypeCache[$ProfileName] = $type
+        return $type
     }
 
-    # Priority 2: Response-based detection
-    # Only detect LinkHeader if we have a valid Link header with next relation
-    if ($ResponseHeaders -and $ResponseHeaders.Count -gt 0) {
-        $linkValue = $null
-        foreach ($headerName in @('Link', 'link', 'LINK')) {
-            if ($ResponseHeaders.ContainsKey($headerName) -and ![string]::IsNullOrWhiteSpace($ResponseHeaders[$headerName])) {
-                $linkValue = $ResponseHeaders[$headerName]
-                break
-            }
-        }
-        
-        if ($linkValue -and $linkValue -match 'rel\s*=\s*["\]?next["\]?') {
-            $type = 'LinkHeader'
-            $script:PaginationTypeCache[$ProfileName] = $type
-            Write-Verbose "Detected LinkHeader pagination for '$ProfileName' (valid next relation found)"
-            return $type
-        }
+    # Auto-detect based on response headers (second fastest)
+    if ($ResponseHeaders -and $ResponseHeaders['Link']) {
+        $type = 'LinkHeader'
+        $script:PaginationTypeCache[$ProfileName] = $type
+        return $type
     }
 
-    # Check response content for pagination indicators
+    # Auto-detect based on response content
     if ($Response -is [PSCustomObject]) {
-        $props = $Response.PSObject.Properties.Name
-
-        # Microsoft Graph / OData style
+        # Microsoft Graph style (common)
         if ($Response.'@odata.nextLink' -or $Response.nextLink) {
             $type = 'Cursor'
             $script:PaginationTypeCache[$ProfileName] = $type
-            Write-Verbose "Detected Cursor pagination for '$ProfileName' (nextLink found)"
             return $type
         }
 
-        # Cursor tokens
-        if ('nextPageToken' -in $props -or 'cursor' -in $props) {
-            $type = 'Cursor'
-            $script:PaginationTypeCache[$ProfileName] = $type
-            Write-Verbose "Detected Cursor pagination for '$ProfileName' (token found)"
-            return $type
-        }
+        # Check for specific pagination indicators
+        $props = $Response.PSObject.Properties.Name
 
-        # Offset-based indicators
-        if (('offset' -in $props -and 'limit' -in $props) -or 'total' -in $props) {
+        # Quick checks for common patterns
+        if ('offset' -in $props -or 'limit' -in $props) {
             $type = 'OffsetLimit'
             $script:PaginationTypeCache[$ProfileName] = $type
-            Write-Verbose "Detected OffsetLimit pagination for '$ProfileName'"
             return $type
         }
 
-        # Page-based indicators
-        if ('page' -in $props -or 'pageNumber' -in $props -or 'currentPage' -in $props -or 'totalPages' -in $props) {
+        if ('page' -in $props -or 'pageNumber' -in $props -or 'currentPage' -in $props) {
             $type = 'PageBased'
             $script:PaginationTypeCache[$ProfileName] = $type
-            Write-Verbose "Detected PageBased pagination for '$ProfileName'"
+            return $type
+        }
+
+        if ('nextPageToken' -in $props) {
+            $type = 'Cursor'
+            $script:PaginationTypeCache[$ProfileName] = $type
             return $type
         }
     }
 
-    # Priority 3: Configuration-based inference
-    $pd = $Profile.PaginationDetails
-    if ($pd) {
-        if ($pd.PageParameter -or $pd.PageSizeParameter) {
-            $type = 'PageBased'
-            $script:PaginationTypeCache[$ProfileName] = $type
-            Write-Verbose "Inferred PageBased pagination for '$ProfileName' from configuration"
-            return $type
-        }
-        
-        if ($pd.OffsetParameter -or $pd.LimitParameter) {
-            $type = 'OffsetLimit'
-            $script:PaginationTypeCache[$ProfileName] = $type
-            Write-Verbose "Inferred OffsetLimit pagination for '$ProfileName' from configuration"
-            return $type
-        }
-        
-        if ($pd.NextTokenField -or $pd.TokenParameter) {
-            $type = 'Cursor'
-            $script:PaginationTypeCache[$ProfileName] = $type
-            Write-Verbose "Inferred Cursor pagination for '$ProfileName' from configuration"
-            return $type
-        }
-    }
-
-    # Default fallback - most APIs without metadata use page-based
-    $type = 'PageBased'
+    $type = 'None'
     $script:PaginationTypeCache[$ProfileName] = $type
-    Write-Verbose "Defaulting to PageBased pagination for '$ProfileName'"
     return $type
-}
-
-function Reset-AnyApiPaginationCache {
-    [CmdletBinding()]
-    param(
-        [Parameter()]
-        [string]$ProfileName
-    )
-    
-    if ($ProfileName) {
-        if ($script:PaginationTypeCache.ContainsKey($ProfileName)) {
-            $script:PaginationTypeCache.Remove($ProfileName)
-            Write-Verbose "Cleared pagination cache for profile: $ProfileName"
-        }
-    }
-    else {
-        $script:PaginationTypeCache.Clear()
-        Write-Verbose "Cleared all pagination cache entries"
-    }
 }
 
 function Get-NextPageParameters {
@@ -1599,484 +1515,130 @@ function Get-NextPageParameters {
         [string]$PaginationType
     )
 
-    $pd = $Profile.PaginationDetails ?? @{}
-    Write-Verbose "Get-NextPageParameters: Type='$PaginationType', CurrentPage params=$($CurrentParams.Keys -join ',')"
+    $pd = $Profile.PaginationDetails
+    if (-not $pd) { $pd = @{} }
 
-    switch -Wildcard ($PaginationType) {
+    switch ($PaginationType) {
         'LinkHeader' {
-            # Fixed LinkHeader detection with proper null checking
-            if ($ResponseHeaders -and $ResponseHeaders.Count -gt 0) {
-                $linkValue = $null
-                
-                # Try different case variations of Link header
-                foreach ($headerName in @('Link', 'link', 'LINK')) {
-                    if ($ResponseHeaders.ContainsKey($headerName)) {
-                        $linkValue = $ResponseHeaders[$headerName]
-                        break
-                    }
+            if ($ResponseHeaders['Link']) {
+                # Parse Link header for 'next' relation
+                if ($ResponseHeaders['Link'] -match '<([^>]+)>;\s*rel="next"') {
+                    return @{ NextUrl = $Matches[1] }
                 }
-                
-                if (![string]::IsNullOrWhiteSpace($linkValue)) {
-                    Write-Verbose "LinkHeader found: '$linkValue'"
-                    # More robust regex for Link header parsing
-                    if ($linkValue -match '<([^>]+)>.*?rel\s*=\s*["\]?next["\]?') {
-                        $nextUrl = $Matches[1]
-                        Write-Verbose "Next URL extracted: '$nextUrl'"
-                        return @{ NextUrl = $nextUrl }
-                    }
-                    else {
-                        Write-Verbose "Link header exists but no 'next' relation found"
-                    }
-                }
-                else {
-                    Write-Verbose "Link header key found but value is empty"
-                }
-            }
-            else {
-                Write-Verbose "No response headers or headers collection is empty"
             }
         }
 
         'Cursor' {
-            # Microsoft Graph and other cursor-based APIs
+            # Microsoft Graph style
             if ($Response.'@odata.nextLink') {
-                Write-Verbose "Found @odata.nextLink: $($Response.'@odata.nextLink')"
                 return @{ NextUrl = $Response.'@odata.nextLink' }
             }
             if ($Response.nextLink) {
-                Write-Verbose "Found nextLink: $($Response.nextLink)"
                 return @{ NextUrl = $Response.nextLink }
             }
 
-            # Token-based cursor pagination
+            # Token-based
             $tokenField = $pd.NextTokenField ?? 'nextPageToken'
             if ($Response.$tokenField) {
                 $tokenParam = $pd.TokenParameter ?? 'pageToken'
                 $newParams = $CurrentParams.Clone()
                 $newParams[$tokenParam] = $Response.$tokenField
-                Write-Verbose "Found cursor token, continuing with token: $($Response.$tokenField)"
                 return @{ QueryParameters = $newParams }
             }
-            
-            Write-Verbose "No cursor continuation found"
         }
 
-        { $_ -like 'Page*' -or $_ -eq 'Custom' } {
-            # Flexible page-based pagination - handles PageBased, PageNumber, Page, Custom, etc.
-            Write-Verbose "Processing page-based pagination (type: $PaginationType)"
-            
-            # Smart parameter detection with fallbacks
-            $pageField = $pd.PageParameter
-            if ([string]::IsNullOrEmpty($pageField)) {
-                # Auto-detect page parameter from current params
-                $pageParamCandidates = @('page', 'pageNumber', 'pageNum', 'p', 'pageIndex', 'Page')
-                foreach ($candidate in $pageParamCandidates) {
-                    if ($CurrentParams.ContainsKey($candidate)) {
-                        $pageField = $candidate
-                        Write-Verbose "Auto-detected page parameter: '$pageField'"
-                        break
-                    }
-                }
-                # Final fallback
-                if ([string]::IsNullOrEmpty($pageField)) {
-                    $pageField = 'page'
-                    Write-Verbose "Using default page parameter: '$pageField'"
-                }
+        'PageBased' {
+            $pageField = $pd.PageParameter ?? 'page'
+            $currentPage = if ($CurrentParams.ContainsKey($pageField)) {
+                [int]$CurrentParams[$pageField]
             }
-            
-            # Get current page with smart defaults
-            $currentPage = 1  # Always default to 1
-            if ($CurrentParams.ContainsKey($pageField)) {
-                try {
-                    $currentPage = [int]$CurrentParams[$pageField]
-                } catch {
-                    Write-Verbose "Failed to parse page value '$($CurrentParams[$pageField])', using 1"
-                    $currentPage = 1
-                }
-            }
-            
-            # Override with profile StartPage only if explicitly set to 0 (for APIs that start at 0)
-            if ($pd.StartPage -eq 0 -and $currentPage -eq 1 -and $CurrentParams[$pageField] -eq 1) {
-                $currentPage = 0
-                Write-Verbose "Profile configured for zero-based pagination"
-            }
-
-            # Smart page size detection
-            $pageSizeField = $pd.PageSizeParameter
-            if ([string]::IsNullOrEmpty($pageSizeField)) {
-                $pageSizeParamCandidates = @('pageSize', 'size', 'limit', 'count', 'per_page', 'perPage', 'take', 'pagesize')
-                foreach ($candidate in $pageSizeParamCandidates) {
-                    if ($CurrentParams.ContainsKey($candidate)) {
-                        $pageSizeField = $candidate
-                        Write-Verbose "Auto-detected page size parameter: '$pageSizeField'"
-                        break
-                    }
-                }
-                if ([string]::IsNullOrEmpty($pageSizeField)) {
-                    $pageSizeField = 'pageSize'
-                    Write-Verbose "Using default page size parameter: '$pageSizeField'"
-                }
-            }
-            
-            $pageSize = 25  # Conservative default
-            if ($CurrentParams.ContainsKey($pageSizeField)) {
-                try {
-                    $pageSize = [int]$CurrentParams[$pageSizeField]
-                } catch {
-                    Write-Verbose "Failed to parse page size '$($CurrentParams[$pageSizeField])', using default"
-                }
-            }
-            elseif ($pd.DefaultPageSize -gt 0) {
-                $pageSize = $pd.DefaultPageSize
-            }
-
-            # Enhanced response item extraction
-            $responseItems = Get-ResponseItems -Response $Response -PaginationDetails $pd
-            $itemCount = $responseItems.Count
-            
-            Write-Verbose "Page $currentPage`: received $itemCount items (expected page size: $pageSize)"
-
-            # Determine if there are more pages
-            $hasMore = $false
-
-            # Priority 1: Explicit pagination metadata in response
-            if ($pd.TotalPagesField -and $Response.($pd.TotalPagesField)) {
-                try {
-                    $totalPages = [int]$Response.($pd.TotalPagesField)
-                    $hasMore = $currentPage -lt $totalPages
-                    Write-Verbose "Using totalPages field: $currentPage of $totalPages (hasMore: $hasMore)"
-                } catch {
-                    Write-Verbose "Failed to parse totalPages field, falling back to item count logic"
-                }
-            }
-            elseif ($pd.HasMoreField -and $Response.PSObject.Properties.Name -contains $pd.HasMoreField) {
-                try {
-                    $hasMore = [bool]$Response.($pd.HasMoreField)
-                    Write-Verbose "Using hasMore field: $hasMore"
-                } catch {
-                    Write-Verbose "Failed to parse hasMore field, falling back to item count logic"
-                }
-            }
-            # Priority 2: Item count logic (most common case)
             else {
-                if ($itemCount -eq 0) {
-                    $hasMore = $false
-                    Write-Verbose "No items returned - stopping pagination"
+                1
+            }
+
+            # Get items using the helper function
+            $responseItems = Get-ResponseItems -Response $Response -PaginationDetails $pd
+
+            # Check if there are more pages using various strategies
+            $hasMore = $true
+
+            # Strategy 1: Explicit total pages field
+            if ($pd.TotalPagesField -and $Response.($pd.TotalPagesField)) {
+                $hasMore = $currentPage -lt [int]$Response.($pd.TotalPagesField)
+            }
+            # Strategy 2: Explicit hasMore field
+            elseif ($pd.HasMoreField -and $Response.PSObject.Properties.Name -contains $pd.HasMoreField) {
+                $hasMore = [bool]$Response.($pd.HasMoreField)
+            }
+            # Strategy 3: Check items count against page size
+            else {
+                $pageSize = if ($CurrentParams.ContainsKey($pd.PageSizeParameter ?? 'pageSize')) {
+                    [int]$CurrentParams[$pd.PageSizeParameter ?? 'pageSize']
                 }
-                elseif ($itemCount -lt $pageSize) {
-                    $hasMore = $false
-                    Write-Verbose "Partial page returned ($itemCount < $pageSize) - last page reached"
+                elseif ($pd.DefaultPageSize) {
+                    [int]$pd.DefaultPageSize
                 }
                 else {
+                    100  # Default fallback
+                }
+
+                # If we got zero items, we're definitely done
+                if ($responseItems.Count -eq 0) {
+                    $hasMore = $false
+                }
+                # If we got fewer items than page size, we might be done
+                elseif ($responseItems.Count -lt $pageSize) {
+                    $hasMore = $false
+                }
+                # If we got exactly page size, we might have more (will try next page)
+                else {
                     $hasMore = $true
-                    Write-Verbose "Full page returned ($itemCount >= $pageSize) - more pages likely available"
                 }
             }
 
             if ($hasMore) {
                 $newParams = $CurrentParams.Clone()
-                $nextPage = $currentPage + 1
-                $newParams[$pageField] = $nextPage
-                Write-Verbose "Continuing to page $nextPage"
+                $newParams[$pageField] = $currentPage + 1
                 return @{ QueryParameters = $newParams }
-            }
-            else {
-                Write-Verbose "No more pages available"
             }
         }
 
         'OffsetLimit' {
-            Write-Verbose "Processing offset-limit pagination"
-            
-            # Smart offset parameter detection
             $offsetField = $pd.OffsetParameter ?? 'offset'
-            $offsetParamCandidates = @('offset', 'skip', 'start', 'from')
-            if (-not $CurrentParams.ContainsKey($offsetField)) {
-                foreach ($candidate in $offsetParamCandidates) {
-                    if ($CurrentParams.ContainsKey($candidate)) {
-                        $offsetField = $candidate
-                        break
-                    }
-                }
-            }
+            $limitField = $pd.LimitParameter ?? 'limit'
 
-            # Smart limit parameter detection  
-            $limitField = $pd.LimitParameter ?? $pd.PageSizeParameter ?? 'limit'
-            $limitParamCandidates = @('limit', 'size', 'count', 'take', 'pageSize')
-            if (-not $CurrentParams.ContainsKey($limitField)) {
-                foreach ($candidate in $limitParamCandidates) {
-                    if ($CurrentParams.ContainsKey($candidate)) {
-                        $limitField = $candidate
-                        break
-                    }
-                }
-            }
-
-            $currentOffset = 0
-            if ($CurrentParams.ContainsKey($offsetField)) {
-                try {
-                    $currentOffset = [int]$CurrentParams[$offsetField]
-                } catch {
-                    Write-Verbose "Failed to parse offset, using 0"
-                }
-            }
-
-            $limit = 25
-            if ($CurrentParams.ContainsKey($limitField)) {
-                try {
-                    $limit = [int]$CurrentParams[$limitField]
-                } catch {
-                    Write-Verbose "Failed to parse limit, using default"
-                }
-            }
-            elseif ($pd.DefaultPageSize -gt 0) {
-                $limit = $pd.DefaultPageSize
-            }
-
-            # Check for more items
-            $responseItems = Get-ResponseItems -Response $Response -PaginationDetails $pd
-            $itemCount = $responseItems.Count
-            
-            Write-Verbose "Offset $currentOffset`: received $itemCount items (limit: $limit)"
-
-            $hasMore = $false
-            
-            # Check total count if available
-            if ($pd.TotalField -and $Response.($pd.TotalField)) {
-                try {
-                    $total = [int]$Response.($pd.TotalField)
-                    $hasMore = ($currentOffset + $limit) -lt $total
-                    Write-Verbose "Using total field: $total items total, next offset would be $($currentOffset + $limit)"
-                } catch {
-                    Write-Verbose "Failed to parse total field, using item count logic"
-                    $hasMore = $itemCount -ge $limit
-                }
+            $currentOffset = if ($CurrentParams.ContainsKey($offsetField)) {
+                [int]$CurrentParams[$offsetField]
             }
             else {
-                # Use item count logic
-                $hasMore = $itemCount -ge $limit
-                Write-Verbose "No total field, using item count logic: hasMore = $hasMore"
+                0
+            }
+
+            $limit = if ($CurrentParams.ContainsKey($limitField)) {
+                [int]$CurrentParams[$limitField]
+            }
+            else {
+                100
+            }
+
+            # Check if there are more items
+            $hasMore = $true
+            if ($pd.TotalField -and $Response.($pd.TotalField)) {
+                $hasMore = ($currentOffset + $limit) -lt [int]$Response.($pd.TotalField)
+            }
+            elseif ($pd.ItemsField -and $Response.($pd.ItemsField) -is [array]) {
+                $items = @($Response.($pd.ItemsField))
+                $hasMore = $items.Count -ge $limit
             }
 
             if ($hasMore) {
                 $newParams = $CurrentParams.Clone()
-                $newOffset = $currentOffset + $limit
-                $newParams[$offsetField] = $newOffset
-                Write-Verbose "Continuing with offset $newOffset"
+                $newParams[$offsetField] = $currentOffset + $limit
                 return @{ QueryParameters = $newParams }
             }
         }
-
-        default {
-            Write-Verbose "Unknown pagination type '$PaginationType' - no pagination logic applied"
-        }
     }
 
-    Write-Verbose "Pagination stopping - no more pages available"
-    return $null
-}
-
-function Get-PageBasedNextParameters {
-    param(
-        [hashtable]$Profile,
-        [object]$Response,
-        [hashtable]$CurrentParams
-    )
-    
-    $pd = $Profile.PaginationDetails ?? @{}
-    
-    # Determine page parameter name with intelligent fallback
-    $pageField = $pd.PageParameter
-    if (-not $pageField) {
-        # Try to find page parameter in current params
-        $commonPageParams = @('page', 'pageNumber', 'pageNum', 'p', 'pageIndex')
-        foreach ($param in $commonPageParams) {
-            if ($CurrentParams.ContainsKey($param)) {
-                $pageField = $param
-                break
-            }
-        }
-        if (-not $pageField) {
-            $pageField = 'page'  # Default fallback
-        }
-    }
-    
-    $currentPage = if ($CurrentParams.ContainsKey($pageField)) {
-        [int]$CurrentParams[$pageField]
-    }
-    else {
-        $pd.StartPage ?? 1
-    }
-
-    # Get items using the helper function
-    $responseItems = Get-ResponseItems -Response $Response -PaginationDetails $pd
-
-    # Enhanced logic for determining if there are more pages
-    $hasMore = $false
-
-    # Strategy 1: Explicit total pages field
-    if ($pd.TotalPagesField -and $Response.($pd.TotalPagesField)) {
-        $totalPages = [int]$Response.($pd.TotalPagesField)
-        $hasMore = $currentPage -lt $totalPages
-        Write-Verbose "Page-based pagination: Current page $currentPage of $totalPages"
-    }
-    # Strategy 2: Explicit hasMore field
-    elseif ($pd.HasMoreField -and $Response.PSObject.Properties.Name -contains $pd.HasMoreField) {
-        $hasMore = [bool]$Response.($pd.HasMoreField)
-        Write-Verbose "Page-based pagination: hasMore field indicates: $hasMore"
-    }
-    # Strategy 3: Check items count against page size (most common for APIs without metadata)
-    else {
-        # Determine the effective page size with more intelligent detection
-        $effectivePageSize = $null
-        
-        # Try to get page size from current parameters first
-        $pageSizeField = $pd.PageSizeParameter
-        if (-not $pageSizeField) {
-            # Try to find page size parameter in current params
-            $commonSizeParams = @('pageSize', 'size', 'limit', 'count', 'per_page', 'perPage', 'take')
-            foreach ($param in $commonSizeParams) {
-                if ($CurrentParams.ContainsKey($param)) {
-                    $pageSizeField = $param
-                    break
-                }
-            }
-        }
-        
-        if ($pageSizeField -and $CurrentParams.ContainsKey($pageSizeField)) {
-            $effectivePageSize = [int]$CurrentParams[$pageSizeField]
-        }
-        elseif ($pd.DefaultPageSize) {
-            $effectivePageSize = [int]$pd.DefaultPageSize
-        }
-        else {
-            # Final fallback
-            $effectivePageSize = 50  # Conservative default
-        }
-
-        $itemCount = $responseItems.Count
-        
-        # Enhanced stopping logic
-        if ($itemCount -eq 0) {
-            $hasMore = $false
-            Write-Verbose "Page-based pagination: No items returned, stopping pagination"
-        }
-        elseif ($itemCount -lt $effectivePageSize) {
-            $hasMore = $false
-            Write-Verbose "Page-based pagination: Received $itemCount items (less than page size $effectivePageSize), stopping pagination"
-        }
-        else {
-            # We got exactly the page size or more - there might be more pages
-            $hasMore = $true
-            Write-Verbose "Page-based pagination: Received $itemCount items (page size: $effectivePageSize), continuing to next page"
-        }
-    }
-
-    if ($hasMore) {
-        $newParams = $CurrentParams.Clone()
-        $nextPage = $currentPage + 1
-        $newParams[$pageField] = $nextPage
-        Write-Verbose "Page-based pagination: Moving to page $nextPage"
-        return @{ QueryParameters = $newParams }
-    }
-    else {
-        Write-Verbose "Page-based pagination: No more pages available"
-        return $null
-    }
-}
-
-function Get-OffsetLimitNextParameters {
-    param(
-        [hashtable]$Profile,
-        [object]$Response,
-        [hashtable]$CurrentParams
-    )
-    
-    $pd = $Profile.PaginationDetails ?? @{}
-    
-    # Determine offset parameter name
-    $offsetField = $pd.OffsetParameter
-    if (-not $offsetField) {
-        $commonOffsetParams = @('offset', 'skip', 'start')
-        foreach ($param in $commonOffsetParams) {
-            if ($CurrentParams.ContainsKey($param)) {
-                $offsetField = $param
-                break
-            }
-        }
-        if (-not $offsetField) {
-            $offsetField = 'offset'  # Default fallback
-        }
-    }
-    
-    # Determine limit parameter name
-    $limitField = $pd.LimitParameter ?? $pd.PageSizeParameter
-    if (-not $limitField) {
-        $commonLimitParams = @('limit', 'size', 'count', 'take', 'pageSize')
-        foreach ($param in $commonLimitParams) {
-            if ($CurrentParams.ContainsKey($param)) {
-                $limitField = $param
-                break
-            }
-        }
-        if (-not $limitField) {
-            $limitField = 'limit'  # Default fallback
-        }
-    }
-
-    $currentOffset = if ($CurrentParams.ContainsKey($offsetField)) {
-        [int]$CurrentParams[$offsetField]
-    }
-    else {
-        0
-    }
-
-    $limit = if ($CurrentParams.ContainsKey($limitField)) {
-        [int]$CurrentParams[$limitField]
-    }
-    elseif ($pd.DefaultPageSize) {
-        [int]$pd.DefaultPageSize
-    }
-    else {
-        50  # Default fallback
-    }
-
-    # Check if there are more items
-    $hasMore = $false
-    
-    # Strategy 1: Check total count field
-    if ($pd.TotalField -and $Response.($pd.TotalField)) {
-        $total = [int]$Response.($pd.TotalField)
-        $hasMore = ($currentOffset + $limit) -lt $total
-        Write-Verbose "Offset-based pagination: Current offset $currentOffset, limit $limit, total $total"
-    }
-    # Strategy 2: Check items count against limit
-    else {
-        $responseItems = Get-ResponseItems -Response $Response -PaginationDetails $pd
-        $itemCount = $responseItems.Count
-        
-        if ($itemCount -eq 0) {
-            $hasMore = $false
-            Write-Verbose "Offset-based pagination: No items returned, stopping"
-        }
-        elseif ($itemCount -lt $limit) {
-            $hasMore = $false
-            Write-Verbose "Offset-based pagination: Received $itemCount items (less than limit $limit), stopping"
-        }
-        else {
-            $hasMore = $true
-            Write-Verbose "Offset-based pagination: Received $itemCount items (limit: $limit), continuing"
-        }
-    }
-
-    if ($hasMore) {
-        $newParams = $CurrentParams.Clone()
-        $newOffset = $currentOffset + $limit
-        $newParams[$offsetField] = $newOffset
-        Write-Verbose "Offset-based pagination: Moving to offset $newOffset"
-        return @{ QueryParameters = $newParams }
-    }
-    
     return $null
 }
 
@@ -2322,65 +1884,31 @@ function Invoke-ApiRequestWithRetry {
 }
 
 # Internal function for actual API calls
-function Invoke-AnyApiEndpoint {
-    [CmdletBinding()]
+function Invoke-AnyApiEndpointInternal {
     param(
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory = $false)]
+        [hashtable]$Profile,
+        [Parameter(Mandatory = $false)]
         [string]$ProfileName,
-
-        [Parameter(Mandatory)]
+        [Parameter(Mandatory = $false)]
         [string]$Endpoint,
-
-        [Parameter()]
-        [ValidateSet("GET", "POST", "PUT", "PATCH", "DELETE")]
-        [string]$Method = "GET",
-
-        [Parameter()]
+        [Parameter(Mandatory = $false)]
+        [string]$Method,
+        [Parameter(Mandatory = $false)]
         [hashtable]$QueryParameters,
-
-        [Parameter()]
-        [hashtable]$PathParameters,
-
-        [Parameter()]
+        [Parameter(Mandatory = $false)]
         [object]$Body,
-
-        [Parameter()]
+        [Parameter(Mandatory = $false)]
         [hashtable]$Headers,
-
-        [Parameter()]
+        [Parameter(Mandatory = $false)]
         [string]$ContentType,
-
-        [Parameter()]
-        [string]$OutputFile,
-
-        [Parameter()]
-        [switch]$GetAllPages,
-
-        [Parameter()]
-        [scriptblock]$Stream,
-
-        [Parameter()]
-        [int]$PageSize,
-
-        [Parameter()]
-        [int]$MaxPages = 1000,
-
-        [Parameter()]
-        [int]$MaxRetries = 3,
-
-        [Parameter()]
-        [int]$InitialBackoffMs = 1000,
-
-        [Parameter()]
+        [Parameter(Mandatory = $false)]
+        [int]$MaxRetries,
+        [Parameter(Mandatory = $false)]
+        [int]$InitialBackoffMs,
+        [Parameter(Mandatory = $false)]
         [switch]$SuppressErrors,
-
-        [Parameter()]
-        [switch]$PassThru,
-
-        [Parameter()]
-        [hashtable]$SecureValues = @{}, # KeyName = SecureString or plain text for this profile
-
-        [Parameter()]
+        [Parameter(Mandatory = $false)]
         [ApiRequestBuilder]$RequestBuilder # New parameter for builder pattern
     )
 
@@ -2388,7 +1916,7 @@ function Invoke-AnyApiEndpoint {
     if ($RequestBuilder) {
         if (-not $RequestBuilder.IsValid()) {
             Write-Error "Invalid ApiRequestBuilder: ProfileName and Endpoint are required."
-            return
+            return $null
         }
 
         $builderParams = $RequestBuilder.Build()
@@ -2396,95 +1924,81 @@ function Invoke-AnyApiEndpoint {
         $Endpoint = $builderParams.Endpoint
         $Method = $builderParams.Method
         $QueryParameters = $builderParams.QueryParameters
-        $PathParameters = $builderParams.PathParameters
         $Body = $builderParams.Body
         $Headers = $builderParams.Headers
         $ContentType = $builderParams.ContentType
-        $GetAllPages = $builderParams.GetAllPages
-        $Stream = $builderParams.Stream
-        $PageSize = $builderParams.PageSize
-        $MaxPages = $builderParams.MaxPages
         $MaxRetries = $builderParams.MaxRetries
         $InitialBackoffMs = $builderParams.InitialBackoffMs
         $SuppressErrors = $builderParams.SuppressErrors
-        $SecureValues = $builderParams.SecureValues
     }
 
-    # Handle path parameters efficiently
-    if ($PathParameters -and $PathParameters.Count -gt 0) {
-        foreach ($param in $PathParameters.GetEnumerator()) {
-            $placeholder = "{$($param.Name)}"
-            if ($Endpoint.Contains($placeholder)) {
-                $Endpoint = $Endpoint.Replace($placeholder, $param.Value)
-            }
+    # Only load profile from global if not provided (for backward compatibility)
+    if (-not $Profile) {
+        _EnsureProfilesLoaded
+        if (-not $script:AnyApiProfiles.ContainsKey($ProfileName)) {
+            Write-Error "API Profile '$ProfileName' not found."
+            return $null
+        }
+        $Profile = $script:AnyApiProfiles[$ProfileName]
+    }
+
+    # Build URI using Build-ApiUri
+    $uri = Build-ApiUri -BaseUrl $Profile.BaseUrl -Endpoint $Endpoint -QueryParameters $QueryParameters -PathParameters $null -ProfileName $ProfileName
+
+    Write-Verbose "URI: $uri"
+
+    # Build headers using unified authentication header builder
+    $requestHeaders = @{
+    }
+    # Copy default headers efficiently
+    if ($Profile.DefaultHeaders -and $Profile.DefaultHeaders.Count -gt 0) {
+        foreach ($kvp in $Profile.DefaultHeaders.GetEnumerator()) {
+            $requestHeaders[$kvp.Name] = $kvp.Value
+        }
+    }
+    # Always use Build-AuthenticationHeaders for all authentication logic
+    $requestHeaders = Build-AuthenticationHeaders -Profile $Profile -ProfileName $ProfileName -Uri $uri -Method $Method -ExistingHeaders $requestHeaders
+
+    # Apply user headers last (override defaults and auth)
+    if ($Headers -and $Headers.Count -gt 0) {
+        foreach ($kvp in $Headers.GetEnumerator()) {
+            $requestHeaders[$kvp.Name] = $kvp.Value
         }
     }
 
-    # Load profile to get pagination configuration
-    $profile = Resolve-AnyApiProfile -ProfileName $ProfileName -SecureValues $SecureValues
-    if (-not $profile) { return }
-
-    # Check if pagination is requested
-    if ($GetAllPages -or $Stream) {
-        # Enhanced pagination parameter handling
-        if (-not $QueryParameters) { $QueryParameters = @{} }
-        
-        # Get pagination configuration with intelligent defaults  
-        $pd = $profile.PaginationDetails ?? @{}
-        
-        # Set up pagination parameters based on profile configuration or intelligent defaults
-        if ($PageSize -gt 0) {
-            # Determine the correct page size parameter name
-            $pageSizeParam = $pd.PageSizeParameter ?? $pd.LimitParameter ?? 'pageSize'
-            
-            # Override any existing page size parameter - pagination settings take precedence
-            $QueryParameters[$pageSizeParam] = $PageSize
-            Write-Verbose "Set pagination parameter '$pageSizeParam' = $PageSize (overriding any existing value)"
-        }
-        elseif ($pd.DefaultPageSize -gt 0) {
-            # Use profile's default page size if no PageSize specified
-            $pageSizeParam = $pd.PageSizeParameter ?? $pd.LimitParameter ?? 'pageSize'
-            $QueryParameters[$pageSizeParam] = $pd.DefaultPageSize
-            Write-Verbose "Using profile default page size: $($pd.DefaultPageSize)"
-        }
-        
-        # Initialize page number if not already set and we're doing page-based pagination
-        $pageParam = $pd.PageParameter ?? 'page'
-        if (-not $QueryParameters.ContainsKey($pageParam)) {
-            # Determine starting page (some APIs start at 0, others at 1)
-            $startPage = $pd.StartPage ?? 1
-            $QueryParameters[$pageParam] = $startPage
-            Write-Verbose "Initialized pagination parameter '$pageParam' = $startPage"
-        }
-        
-        # Handle offset-based pagination initialization
-        $offsetParam = $pd.OffsetParameter ?? 'offset'
-        if (-not $QueryParameters.ContainsKey($offsetParam) -and ($pd.Type -eq 'OffsetLimit' -or ($pd.OffsetParameter -and -not $pd.PageParameter))) {
-            $QueryParameters[$offsetParam] = 0
-            Write-Verbose "Initialized offset parameter '$offsetParam' = 0"
-        }
-
-        $baseParams = @{
-            Endpoint         = $Endpoint
-            Method           = $Method
-            QueryParameters  = $QueryParameters
-            Body             = $Body
-            Headers          = $Headers
-            ContentType      = $ContentType
-            MaxRetries       = $MaxRetries
-            InitialBackoffMs = $InitialBackoffMs
-            SuppressErrors   = $SuppressErrors
-        }
-
-        return Invoke-AnyApiEndpointWithPagination -BaseParams $baseParams -Profile $profile `
-            -ProfileName $ProfileName -GetAllPages:$GetAllPages -StreamCallback:$Stream -MaxPages $MaxPages
+    # Prepare request parameters for unified retry function
+    $invokeParams = @{
+        Uri     = $uri
+        Method  = $Method
+        Headers = $requestHeaders
     }
 
-    # Single request - no pagination changes needed
-    return Invoke-AnyApiEndpointInternal -Profile $profile -ProfileName $ProfileName -Endpoint $Endpoint `
-        -Method $Method -QueryParameters $QueryParameters -Body $Body -Headers $Headers `
-        -ContentType $ContentType -MaxRetries $MaxRetries `
-        -InitialBackoffMs $InitialBackoffMs -SuppressErrors:$SuppressErrors
+    # Handle body
+    if ($Body) {
+        if ($ContentType) {
+            $invokeParams.ContentType = $ContentType
+        }
+        elseif (($Body -is [hashtable] -or $Body -is [PSCustomObject]) -and
+                  ($null -eq $ContentType -or $ContentType -match "application/json")) {
+            $invokeParams.Body = ($Body | ConvertTo-Json -Depth 20 -Compress)
+            $invokeParams.ContentType = "application/json; charset=utf-8"
+        }
+        else {
+            $invokeParams.Body = $Body
+        }
+    }
+
+    # Use unified retry function for standardized response processing
+    $result = Invoke-ApiRequestWithRetry -RequestParams $invokeParams -MaxRetries $MaxRetries -InitialBackoffMs $InitialBackoffMs -SuppressErrors:$SuppressErrors
+
+    if ($result.Success) {
+        Write-Verbose "API request completed successfully after $($result.AttemptNumber) attempt(s)"
+        return $result.Response
+    }
+    else {
+        Write-Verbose "API request failed after $($result.AttemptNumber) attempt(s)"
+        return $null
+    }
 }
 
 function Invoke-AnyApiEndpointWithPagination {

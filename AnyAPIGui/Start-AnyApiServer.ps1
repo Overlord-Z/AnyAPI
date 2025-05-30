@@ -759,69 +759,151 @@ function Handle-TestEndpoint {
     param($Request, $Response, $Body)
     
     try {
+        Write-Host "🔍 Processing test endpoint request..." -ForegroundColor Cyan
+        Write-Host "📋 Request body: $($Body | ConvertTo-Json -Depth 3)" -ForegroundColor Gray
+        
+        # --- Resolve profile name to actual stored key (case-insensitive, trimmed) ---
+        $requestedProfileName = ($Body.profileName ?? '').Trim()
+        if (-not $requestedProfileName) {
+            throw "Profile name is required"
+        }
+        
+        $profiles = Get-AnyApiProfile
+        $actualProfileName = $null
+        if ($profiles -and $profiles.Count -gt 0) {
+            foreach ($key in $profiles.Keys) {
+                if ($key.Trim().ToLower() -eq $requestedProfileName.ToLower()) {
+                    $actualProfileName = $key
+                    break
+                }
+            }
+        }
+        if (-not $actualProfileName) {
+            throw "Profile '$requestedProfileName' not found. Available profiles: $($profiles.Keys -join ', ')"
+        }
+        
+        Write-Host "✅ Using profile: '$actualProfileName'" -ForegroundColor Green
+
+        # Build parameters for Invoke-AnyApiEndpoint
         $params = @{
-            ProfileName = $Body.profileName
-            Endpoint    = $Body.endpoint
+            ProfileName = $actualProfileName
+            Endpoint    = $Body.endpoint ?? ""
             Method      = $Body.method ?? "GET"
         }
         
-        if ($Body.queryParameters) {
-            $params.QueryParameters = $Body.queryParameters
+        Write-Host "🔧 Base parameters: ProfileName='$($params.ProfileName)', Endpoint='$($params.Endpoint)', Method='$($params.Method)'" -ForegroundColor Yellow
+        
+        # --- Handle QueryParameters properly ---
+        if ($Body.queryParameters -and $Body.queryParameters -is [hashtable] -and $Body.queryParameters.Count -gt 0) {
+            $params.QueryParameters = @{}
+            foreach ($k in $Body.queryParameters.Keys) {
+                $params.QueryParameters[$k] = $Body.queryParameters[$k]
+                Write-Host "  Query param: $k = $($Body.queryParameters[$k])" -ForegroundColor Cyan
+            }
         }
         
-        if ($Body.pathParameters) {
+        # --- Handle PathParameters ---
+        if ($Body.pathParameters -and $Body.pathParameters -is [hashtable] -and $Body.pathParameters.Count -gt 0) {
             $params.PathParameters = $Body.pathParameters
+            Write-Host "  Path parameters added: $($Body.pathParameters.Keys -join ', ')" -ForegroundColor Cyan
         }
         
-        if ($Body.headers) {
+        # --- Handle Headers ---
+        if ($Body.headers -and $Body.headers -is [hashtable] -and $Body.headers.Count -gt 0) {
             $params.Headers = $Body.headers
+            Write-Host "  Headers added: $($Body.headers.Keys -join ', ')" -ForegroundColor Cyan
         }
         
-        if ($Body.body) {
+        # --- Handle Body ---
+        if ($Body.body -and $Body.body.Trim() -ne '') {
             $params.Body = $Body.body
+            Write-Host "  Body added: $($Body.body.Length) characters" -ForegroundColor Cyan
         }
         
-        if ($Body.contentType) {
+        # --- Handle ContentType ---
+        if ($Body.contentType -and $Body.contentType.Trim() -ne '') {
             $params.ContentType = $Body.contentType
+            Write-Host "  ContentType: $($Body.contentType)" -ForegroundColor Cyan
         }
         
-        if ($Body.getAllPages) {
+        # --- Handle Pagination options ---
+        if ($Body.getAllPages -eq $true) {
             $params.GetAllPages = $true
-            if ($Body.pageSize) { $params.PageSize = $Body.pageSize }
-            if ($Body.maxPages) { $params.MaxPages = $Body.maxPages }
+            Write-Host "  GetAllPages: enabled" -ForegroundColor Cyan
+            
+            if ($Body.pageSize -and $Body.pageSize -gt 0) { 
+                $params.PageSize = $Body.pageSize 
+                Write-Host "  PageSize: $($Body.pageSize)" -ForegroundColor Cyan
+            }
+            if ($Body.maxPages -and $Body.maxPages -gt 0) { 
+                $params.MaxPages = $Body.maxPages 
+                Write-Host "  MaxPages: $($Body.maxPages)" -ForegroundColor Cyan
+            }
         }
         
-        # Add secure values if provided
-        if ($Body.secureValues) {
+        # --- Handle SecureValues ---
+        if ($Body.secureValues -and $Body.secureValues -is [hashtable] -and $Body.secureValues.Count -gt 0) {
             $params.SecureValues = $Body.secureValues
+            Write-Host "  SecureValues added: $($Body.secureValues.Keys -join ', ')" -ForegroundColor Cyan
+        }
+        
+        Write-Host "🚀 Calling Invoke-AnyApiEndpoint with parameters:" -ForegroundColor Green
+        foreach ($key in $params.Keys) {
+            if ($key -eq 'SecureValues') {
+                Write-Host "  $key`: [SECURE - keys: $($params[$key].Keys -join ', ')]" -ForegroundColor Green
+            } elseif ($key -eq 'Body' -and $params[$key].Length -gt 100) {
+                Write-Host "  $key`: [${($params[$key].Length)} chars] $($params[$key].Substring(0, 100))..." -ForegroundColor Green
+            } else {
+                Write-Host "  $key`: $($params[$key])" -ForegroundColor Green
+            }
         }
         
         $startTime = Get-Date
+        
+        # ✅ FIXED: Use correct function name - Invoke-AnyApiEndpoint (not Invoke-AnyApiEndpointInternal)
         $result = Invoke-AnyApiEndpoint @params
+        
         $endTime = Get-Date
         $duration = ($endTime - $startTime).TotalMilliseconds
         
-        # Get response headers if available
-        $responseHeaders = if ($script:LastResponseHeaders) {
-            $script:LastResponseHeaders
+        Write-Host "✅ Request completed successfully in $([Math]::Round($duration))ms" -ForegroundColor Green
+        
+        # Get response headers if available from global variable
+        $responseHeaders = @{
         }
-        else {
-            @{}
+        if (Get-Variable -Name 'LastResponseHeaders' -Scope Global -ErrorAction SilentlyContinue) {
+            $responseHeaders = $Global:LastResponseHeaders
         }
         
-        Send-JsonResponse -Response $Response -Data @{
+        # Build successful response
+        $responseData = @{
             success  = $true
             result   = $result
             duration = [Math]::Round($duration)
             headers  = $responseHeaders
+            metadata = @{
+                profileUsed = $actualProfileName
+                endpoint = $params.Endpoint
+                method = $params.Method
+                timestamp = $startTime.ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
+            }
         }
+        
+        Send-JsonResponse -Response $Response -Data $responseData
     }
     catch {
         $errorDetails = @{
             message    = $_.Exception.Message
             type       = $_.Exception.GetType().FullName
             stackTrace = $_.ScriptStackTrace
+            category   = $_.CategoryInfo.Category.ToString()
+            targetObject = if ($_.TargetObject) { $_.TargetObject.ToString() } else { $null }
         }
+        
+        Write-Host "❌ Error in Handle-TestEndpoint:" -ForegroundColor Red
+        Write-Host "  Message: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "  Type: $($_.Exception.GetType().FullName)" -ForegroundColor Red
+        Write-Host "  StackTrace: $($_.ScriptStackTrace)" -ForegroundColor Red
         
         Send-JsonResponse -Response $Response -Data @{
             success = $false
@@ -829,7 +911,6 @@ function Handle-TestEndpoint {
         } -StatusCode 500
     }
 }
-
 function Handle-GetSecretInfo {
     param($Request, $Response)
     

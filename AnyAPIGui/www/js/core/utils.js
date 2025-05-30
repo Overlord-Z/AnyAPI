@@ -207,7 +207,8 @@ function removeShimmerEffect(element) {
 function isApiClientReady() {
     return window.apiClient && 
            typeof window.apiClient.testEndpoint === 'function' &&
-           typeof window.apiClient.checkConnection === 'function';
+           typeof window.apiClient.checkConnection === 'function' &&
+           window.apiClient.isConnected === true;
 }
 
 /**

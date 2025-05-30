@@ -659,7 +659,7 @@ class EnhancedResponseViewer {
         // Data type distribution with bars
         const typeDist = Object.entries(stats.dataTypes).map(([type, count]) => {
             const percent = ((count / stats.totalNodes) * 100).toFixed(1);
-            return `<div class="stats-type-row"><span class="stats-type-label">${type}</span><div class="stats-type-bar"><div class="stats-type-bar-fill" style="width:${percent}%;"></div></div><span class="stats-type-count">${count.toLocaleString()} <span class="stats-type-percent">(${percent}%)</span></span></div>`;
+            return `<div class="stats-type-row"><span class="stats-type-label">${type}</span><div class="stats-type-bar"><div class="stats-type-bar-fill" style="width:${percent}%;"></div></div><span class="stats-type-count">${count.toLocaleString()} <span class="stats-type-percent">(${percent}%)</span></div>`;
         }).join('');
 
         // Pattern analysis
@@ -675,10 +675,6 @@ class EnhancedResponseViewer {
             <div class="stats-card stats-duplicates">
                 <div class="stats-card-title">Top Duplicates</div>
                 <div class="stats-duplicates-list">
-                    <div class="stats-duplicates-header">
-                        <span class="stats-duplicate-value-header">Value</span>
-                        <span class="stats-duplicate-count-header">Count</span>
-                    </div>
                     <div class="stats-duplicates-scroll">
                     ${duplicates.map(([value, count], idx) => `
                         <div class="stats-duplicate-row${idx % 2 === 1 ? ' alt' : ''}" title="${escapeHtml(String(value))}">

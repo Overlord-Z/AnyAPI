@@ -125,12 +125,20 @@ export async function decryptData(encryptedData, salt, iv, passphrase) {
  * @returns {Promise<{encrypted: string, metadata: string}>} Encrypted password with metadata
  */
 export async function encryptSessionPassword(password) {
+    // Capture actual browser characteristics
+    const browserData = {
+        userAgent: navigator.userAgent,
+        screenResolution: window.screen.width + 'x' + window.screen.height,
+        language: navigator.language,
+        timestamp: Date.now().toString()
+    };
+    
     // Generate a session-specific encryption key from browser characteristics
     const sessionSeed = [
-        navigator.userAgent,
-        window.screen.width + 'x' + window.screen.height,
-        navigator.language,
-        Date.now().toString()
+        browserData.userAgent,
+        browserData.screenResolution,
+        browserData.language,
+        browserData.timestamp
     ].join('|');
     
     // Use the first part of the session seed as passphrase
@@ -145,7 +153,9 @@ export async function encryptSessionPassword(password) {
         metadata: btoa(JSON.stringify({
             salt: result.salt,
             iv: result.iv,
-            sessionFingerprint: await simpleHash(sessionSeed.substring(0, sessionSeed.lastIndexOf('|')))
+            sessionFingerprint: await simpleHash(sessionSeed.substring(0, sessionSeed.lastIndexOf('|'))),
+            // Include actual browser data for backend reconstruction
+            browserData: browserData
         }))
     };
 }

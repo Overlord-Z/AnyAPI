@@ -4,20 +4,25 @@
 
 /**
  * Returns true if SecretStore is available and unlocked, false otherwise.
- * Checks both info endpoint and secretManager singleton.
+ * Checks both secretManager singleton and info endpoint.
  */
 function isSecretStoreUnlocked() {
+    // Primary source: secretManager (which has the actual data from the API)
+    if (window.secretManager && window.secretManager.secretStoreInfo && window.secretManager.initialized) {
+        const secretStoreInfo = window.secretManager.secretStoreInfo;
+        const available = secretStoreInfo.isSecretStoreAvailable === true || secretStoreInfo.isSecretStoreAvailable === 'true';
+        const unlocked = window.secretManager.isSecretStoreUnlocked === true;
+        return available && unlocked;
+    }
+    
+    // Fallback: check window.info if secretManager not available
     const info = window.info && window.info.storageInfo ? window.info.storageInfo : null;
-    // Prefer explicit unlocked property if present
     if (info && typeof info.isSecretStoreUnlocked === 'boolean') {
         return info.isSecretStoreAvailable && info.isSecretStoreUnlocked;
     }
-    // Fallback: check secretManager singleton if available
-    if (window.secretManager && typeof window.secretManager.isSecretStoreUnlocked === 'boolean') {
-        return info && info.isSecretStoreAvailable && window.secretManager.isSecretStoreUnlocked;
-    }
-    // Fallback: only available
-    return !!(info && info.isSecretStoreAvailable);
+    
+    // If neither source has definitive data, return false
+    return false;
 }
 
 /**

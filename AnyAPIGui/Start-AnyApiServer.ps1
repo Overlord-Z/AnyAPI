@@ -1596,9 +1596,17 @@ function Decrypt-SessionPassword {
         $metadataJson = [System.Text.Encoding]::UTF8.GetString($metadataBytes)
         $metadata = $metadataJson | ConvertFrom-Json
         
+        # Extract browser data if available (new format)
+        $browserData = $null
+        if ($metadata.browserData) {
+            $browserData = $metadata.browserData
+            Write-Host "📊 Browser data found in metadata" -ForegroundColor Green
+        } else {
+            Write-Host "⚠️ No browser data in metadata, using fallback method" -ForegroundColor Yellow
+        }
+        
         # Generate session key from fingerprint 
-        # We need to work backwards from the sessionFingerprint to find the session key
-        $sessionKey = Get-SessionKeyFromFingerprint -SessionFingerprint $metadata.sessionFingerprint -UserAgent $UserAgent
+        $sessionKey = Get-SessionKeyFromFingerprint -SessionFingerprint $metadata.sessionFingerprint -UserAgent $UserAgent -BrowserData $browserData
         
         # Decode encrypted data, salt, and IV
         $encryptedBytes = [System.Convert]::FromBase64String($EncryptedPassword)
@@ -1621,8 +1629,36 @@ function Decrypt-SessionPassword {
 function Get-SessionKeyFromFingerprint {
     param(
         [string]$SessionFingerprint,
-        [string]$UserAgent
+        [string]$UserAgent,
+        [object]$BrowserData
     )
+    
+    # Use actual browser data if provided in metadata
+    if ($BrowserData) {
+        Write-Host "🔍 Using actual browser data for session key reconstruction" -ForegroundColor Blue       
+        # Reconstruct the exact session seed used by frontend
+        $sessionSeed = @(
+            $BrowserData.userAgent,
+            $BrowserData.screenResolution,
+            $BrowserData.language,
+            $BrowserData.timestamp
+        ) -join '|'
+        
+        # Verify fingerprint matches
+        $baseSeed = $sessionSeed.Substring(0, $sessionSeed.LastIndexOf('|'))
+        $calculatedFingerprint = Get-SHA256Hash -InputString $baseSeed
+               
+        if ($calculatedFingerprint -eq $SessionFingerprint) {
+            Write-Host "✅ Fingerprint match! Generating session key" -ForegroundColor Green
+            return Get-SHA256Hash -InputString $sessionSeed
+        } else {
+            Write-Host "❌ Fingerprint mismatch!" -ForegroundColor Red
+            throw "Session fingerprint verification failed"
+        }
+    }
+    
+    # Fallback to old method (should not be needed with new implementation)
+    Write-Host "⚠️ No browser data provided, attempting timestamp brute force" -ForegroundColor Yellow
     
     # Try different timestamps to match the session fingerprint
     # In practice, this should be within a reasonable time window (e.g., last few minutes)
@@ -1687,22 +1723,36 @@ function Get-DecryptedAESGCM {
     )
     
     try {
+       
         # AES-GCM decryption in .NET
         $aes = [System.Security.Cryptography.AesGcm]::new($Key)
         
-        # AES-GCM includes authentication tag in the encrypted data
+        # Web Crypto API format: [ciphertext][16-byte authentication tag]
         # The last 16 bytes are the authentication tag
         $tagLength = 16
         $cipherTextLength = $EncryptedData.Length - $tagLength
         
-        $cipherText = $EncryptedData[0..($cipherTextLength - 1)]
-        $tag = $EncryptedData[$cipherTextLength..($EncryptedData.Length - 1)]
+        
+        # Use proper array copying instead of slicing to avoid PowerShell array issues
+        $cipherText = New-Object byte[] $cipherTextLength
+        $tag = New-Object byte[] $tagLength
+        
+        # Copy ciphertext (first part)
+        [Array]::Copy($EncryptedData, 0, $cipherText, 0, $cipherTextLength)
+        
+        # Copy tag (last 16 bytes)
+        [Array]::Copy($EncryptedData, $cipherTextLength, $tag, 0, $tagLength)
+
+        # Debug: Show first few bytes of each part
+        $cipherHex = [System.BitConverter]::ToString($cipherText[0..([Math]::Min(7, $cipherText.Length-1))]).Replace('-', '')
+        $tagHex = [System.BitConverter]::ToString($tag[0..([Math]::Min(7, $tag.Length-1))]).Replace('-', '')
         
         $plainTextBytes = New-Object byte[] $cipherTextLength
         $aes.Decrypt($IV, $cipherText, $tag, $plainTextBytes)
         $aes.Dispose()
         
-        return [System.Text.Encoding]::UTF8.GetString($plainTextBytes)
+        $decryptedText = [System.Text.Encoding]::UTF8.GetString($plainTextBytes)
+        return $decryptedText
     }
     catch {
         throw "AES-GCM decryption failed: $($_.Exception.Message)"

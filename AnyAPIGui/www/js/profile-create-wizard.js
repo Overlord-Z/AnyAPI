@@ -32,19 +32,9 @@ class ProfileCreateWizard {
                 customSettings: {},
                 isSessionOnly: false,
                 description: '',
-            },
-            errors: {},
+            },            errors: {},
         };
         this.modal = null;
-        // Listen for info endpoint updates (if main app dispatches an event)
-        if (window.addEventListener) {
-            window.addEventListener('info-updated', () => {
-                // Only re-render if modal is open and step 2 (auth) is visible
-                if (this.modal && this.state.step === 2) {
-                    this.renderModal();
-                }
-            });
-        }
     }
 
     show() {
@@ -120,11 +110,11 @@ class ProfileCreateWizard {
                         <button class="btn btn-outline" onclick="window.profileCreateWizard.close()">Cancel</button>
                     </div>
                 </div>
-            `;
-        } else if (step === 2) {
+            `;        } else if (step === 2) {
             // Step 2: Auth & Header Config
             // Use the single source of truth for SecretStore status
             const isSecretStoreUnlockedVal = window.isSecretStoreUnlocked();
+            console.log('[ProfileWizard] Step 2 render - SecretStore status:', isSecretStoreUnlockedVal);
             const secretStoreStatus = isSecretStoreUnlockedVal
                 ? '<span style="font-weight:bold; color:#27d645;">🔓 SecretStore Unlocked</span>'
                 : '<span style="font-weight:bold; color:#e74c3c;">🔒 SecretStore Locked</span>';
@@ -457,19 +447,31 @@ class ProfileCreateWizard {
                 this.state.fields.authType = e.target.value;
                 this.renderModal();
                 this.updateHeaderPreview();
-            };
-            // SecretStore unlock link
+            };            // SecretStore unlock link - use existing global functions (DRY principle)
             const unlockLink = document.getElementById('wizard-unlock-secretstore-link');
             if (unlockLink) {
                 unlockLink.onclick = async (e) => {
                     e.preventDefault();
-                    const password = await window.showSecretStorePasswordPrompt();
-                    if (password === null) return; // User cancelled
-                    const result = await window.unlockSecretStoreAndRefresh(password);
-                    if (result && result.success) {
-                        this.renderModal();
+                    console.log('[ProfileWizard] SecretStore unlock clicked - using existing global unlock');
+                    
+                    // Simply call the existing global SecretStore unlock
+                    if (window.secretManager && typeof window.secretManager.promptForSecretStorePassword === 'function') {
+                        window.secretManager.promptForSecretStorePassword();
+                        // The global status indicator will update automatically
+                        // No need for complex event handling - just use a simple polling check
+                        const checkAndRefresh = () => {
+                            if (this.isSecretStoreUnlockedGlobally()) {
+                                console.log('[ProfileWizard] Status indicator shows unlocked, refreshing wizard');
+                                this.renderModal();
+                            } else {
+                                // Check again in 500ms (simple and reliable)
+                                setTimeout(checkAndRefresh, 500);
+                            }
+                        };
+                        setTimeout(checkAndRefresh, 500);
                     } else {
-                        alert(result && result.message ? result.message : 'Failed to unlock SecretStore.');
+                        console.warn('[ProfileWizard] SecretManager not available, using fallback');
+                        alert('SecretStore unlock not available. Please use the header unlock button.');
                     }
                 };
             }
@@ -597,15 +599,24 @@ class ProfileCreateWizard {
         } else if (step === 3) {
             this.handleStep3Next();
         }
-    }
-
-    validateStep() {
-        // Example: SecretStore validation for persistent profiles
-        if (this.state.step === 2 && !this.state.fields.isSessionOnly && !window.isSecretStoreUnlocked()) {
+    }    validateStep() {
+        // Use global SecretStore state from secretManager
+        if (this.state.step === 2 && !this.state.fields.isSessionOnly && !this.isSecretStoreUnlockedGlobally()) {
             this.state.errors.secretStore = 'SecretStore must be unlocked for persistent profiles.';
             return false;
         }
         return true;
+    }    // Helper method to check global SecretStore state (DRY principle)
+    // Simply reads the existing status indicator instead of duplicating logic
+    isSecretStoreUnlockedGlobally() {
+        const statusText = document.getElementById('secretstore-status-text');
+        if (statusText) {
+            const status = statusText.textContent || '';
+            console.log('[ProfileWizard] Reading existing status indicator:', status);
+            return status.includes('Unlocked') || status.includes('unlocked');
+        }
+        // Fallback to global function if indicator not available
+        return window.isSecretStoreUnlocked ? window.isSecretStoreUnlocked() : false;
     }
 
     handleStep2Next() {
@@ -637,16 +648,24 @@ class ProfileCreateWizard {
         // Proceed to step 3
         this.state.step = 3;
         this.renderModal();
-    }
-
-    async handleCreateProfile() {
-        // Block persistent profile creation if SecretStore is locked
-        const isSecretStoreUnlockedVal = window.isSecretStoreUnlocked();
-        if (!this.state.fields.isSessionOnly && !isSecretStoreUnlockedVal) {
-            this.state.errors.create = 'SecretStore must be unlocked to create a persistent profile. Unlock it or choose Session Only.';
-            this.renderModal();
-            return;
+    }    async handleCreateProfile() {
+        // Use global SecretStore state instead of duplicating logic
+        if (!this.state.fields.isSessionOnly && !this.isSecretStoreUnlockedGlobally()) {
+            // Use the existing global SecretManager to handle unlock if needed
+            if (window.secretManager && typeof window.secretManager.ensureSecretStoreAccess === 'function') {
+                const hasAccess = await window.secretManager.ensureSecretStoreAccess();
+                if (!hasAccess) {
+                    this.state.errors.create = 'SecretStore access is required to create a persistent profile. Unlock it or choose Session Only.';
+                    this.renderModal();
+                    return;
+                }
+            } else {
+                this.state.errors.create = 'SecretStore must be unlocked to create a persistent profile. Unlock it or choose Session Only.';
+                this.renderModal();
+                return;
+            }
         }
+        
         // Build the profile object using shared utility (DRY)
         const profileData = buildProfileObject(this.state.fields);
         // Log payload for debugging
@@ -673,9 +692,7 @@ class ProfileCreateWizard {
             this.state.errors.create = err && err.message ? err.message : 'Failed to create profile.';
             this.renderModal();
         }
-    }
-
-    close() {
+    }    close() {
         if (this.modal) {
             this.modal.remove();
             this.modal = null;

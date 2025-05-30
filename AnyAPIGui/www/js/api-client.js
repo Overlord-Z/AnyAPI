@@ -21,40 +21,93 @@ const CryptoUtils = {
         return typeof crypto !== 'undefined' && 
                typeof crypto.subtle !== 'undefined' && 
                typeof crypto.getRandomValues !== 'undefined';
-    },
-
-    /**
-     * Simple session-based encryption for SecretStore passwords
+    },    /**
+     * Simple session-based encryption for SecretStore passwords using AES-GCM
      */
     async encryptSessionPassword(password) {
         if (!this.isCryptoAvailable()) {
             throw new Error('Web Crypto API not available');
         }
 
+        // Capture actual browser characteristics
+        const browserData = {
+            userAgent: navigator.userAgent,
+            screenResolution: window.screen.width + 'x' + window.screen.height,
+            language: navigator.language,
+            timestamp: Date.now().toString()
+        };
+
         // Generate a session-specific encryption key from browser characteristics
         const sessionSeed = [
-            navigator.userAgent,
-            window.screen.width + 'x' + window.screen.height,
-            navigator.language,
-            Date.now().toString()
+            browserData.userAgent,
+            browserData.screenResolution,
+            browserData.language,
+            browserData.timestamp
         ].join('|');
         
-        // Simple hash for session key
+        // Generate session key (SHA-256 hash)
         const encoder = new TextEncoder();
         const data = encoder.encode(sessionSeed);
         const hashBuffer = await crypto.subtle.digest('SHA-256', data);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const sessionKey = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 32);
+        const sessionKey = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         
-        // For now, just return a simple obfuscated version
-        // In a real implementation, we'd use proper AES encryption
-        const obfuscated = btoa(password + '|' + sessionKey.substring(0, 8));
+        // Generate session fingerprint (without timestamp)
+        const baseSeed = sessionSeed.substring(0, sessionSeed.lastIndexOf('|'));
+        const fingerprintData = encoder.encode(baseSeed);
+        const fingerprintBuffer = await crypto.subtle.digest('SHA-256', fingerprintData);
+        const fingerprintArray = Array.from(new Uint8Array(fingerprintBuffer));
+        const sessionFingerprint = fingerprintArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        
+        // Generate salt and IV for AES-GCM
+        const salt = crypto.getRandomValues(new Uint8Array(16)); // 16 bytes salt
+        const iv = crypto.getRandomValues(new Uint8Array(12));   // 12 bytes IV for GCM
+        
+        // Derive AES key using PBKDF2
+        const keyMaterial = await crypto.subtle.importKey(
+            'raw',
+            encoder.encode(sessionKey.substring(0, 32)), // Use first 32 chars of session key
+            { name: 'PBKDF2' },
+            false,
+            ['deriveKey']
+        );
+        
+        const aesKey = await crypto.subtle.deriveKey(
+            {
+                name: 'PBKDF2',
+                salt: salt,
+                iterations: 100000,
+                hash: 'SHA-256'
+            },
+            keyMaterial,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt']
+        );
+        
+        // Encrypt the password using AES-GCM
+        const passwordBytes = encoder.encode(password);
+        const encryptedBuffer = await crypto.subtle.encrypt(
+            {
+                name: 'AES-GCM',
+                iv: iv
+            },
+            aesKey,
+            passwordBytes
+        );
+        
+        // Convert encrypted data to base64
+        const encryptedArray = new Uint8Array(encryptedBuffer);
+        const encryptedBase64 = btoa(String.fromCharCode.apply(null, encryptedArray));
         
         return {
-            encrypted: obfuscated,
+            encrypted: encryptedBase64,
             metadata: btoa(JSON.stringify({
-                timestamp: Date.now(),
-                fingerprint: sessionKey.substring(0, 16)
+                salt: btoa(String.fromCharCode.apply(null, salt)),
+                iv: btoa(String.fromCharCode.apply(null, iv)),
+                sessionFingerprint: sessionFingerprint,
+                // Include actual browser data for backend reconstruction
+                browserData: browserData
             }))
         };
     }

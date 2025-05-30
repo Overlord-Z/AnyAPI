@@ -283,6 +283,13 @@ async testSecretAccess() {
     }
 
     /**
+     * Make API request - alias for testEndpoint for compatibility
+     */
+    async makeRequest(requestData) {
+        return await this.testEndpoint(requestData);
+    }
+
+    /**
      * Get secret storage information
      */
     async getSecretInfo() {

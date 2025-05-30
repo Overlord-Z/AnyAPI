@@ -2,7 +2,6 @@
  * Core EndpointTester class - Business logic only, no DOM manipulation
  * Available globally for use by UI components
  */
-// Functions from utils.js are now available globally
 
 class EndpointTester {
     constructor() {
@@ -34,32 +33,21 @@ class EndpointTester {
         
         // Listen for profile changes from other components
         window.addEventListener('profileChanged', (e) => {
-            if (e.detail.profileName !== this.currentProfile) {
-                this.onProfileChange(e.detail.profileName);
-                
-                // Update the profile selector if it exists
-                const profileSelect = document.getElementById('test-profile');
-                if (profileSelect && profileSelect.value !== e.detail.profileName) {
-                    profileSelect.value = e.detail.profileName || '';
-                }
+            if (e.detail?.source !== 'endpointTester') {
+                this.onProfileChange(e.detail?.profileName);
             }
         });
         
         // Restore saved profile
         const savedProfile = localStorage.getItem('anyapi_current_profile');
         if (savedProfile) {
-            this.onProfileChange(savedProfile);
-        }
-        
-        // Initialize sections if the function exists
-        if (typeof this.initializeSections === 'function') {
-            this.initializeSections();
+            this.currentProfile = savedProfile;
+            this.updateProfileContext();
         }
         
         // Initial validation
         setTimeout(() => {
             this.validateEndpoint();
-            this.initializeWithSavedProfile();
         }, 100);
         
         // Setup body section visibility
@@ -76,9 +64,10 @@ class EndpointTester {
             const stored = localStorage.getItem('anyapi_request_history');
             if (stored) {
                 this.requestHistory = JSON.parse(stored);
+                console.log(`📚 Loaded ${this.requestHistory.length} history items`);
             }
         } catch (error) {
-            console.warn('Failed to load request history:', error);
+            console.error('Failed to load request history:', error);
             this.requestHistory = [];
         }
     }
@@ -88,9 +77,9 @@ class EndpointTester {
      */
     saveRequestHistory() {
         try {
-            localStorage.setItem('anyapi_request_history', JSON.stringify(this.requestHistory.slice(-this.maxHistoryItems)));
+            localStorage.setItem('anyapi_request_history', JSON.stringify(this.requestHistory));
         } catch (error) {
-            console.warn('Failed to save request history:', error);
+            console.error('Failed to save request history:', error);
         }
     }
 
@@ -123,7 +112,9 @@ class EndpointTester {
             exported: new Date().toISOString(),
             history: this.requestHistory
         };
-    }    /**
+    }
+
+    /**
      * Validate endpoint and provide feedback
      */
     validateEndpoint() {
@@ -171,69 +162,34 @@ class EndpointTester {
         
         // Check for common GitHub patterns
         if (this.githubPatterns.repos.test(normalizedEndpoint)) {
-            const repoMatch = normalizedEndpoint.match(/^\/repos\/([^\/]+)\/([^\/]+)(?:\/(.*))?/);
-            if (repoMatch) {
-                const [, owner, repo, path] = repoMatch;
-                
-                if (owner && repo) {
-                    validation.isValid = true;
-                    validation.level = 'success';
-                    validation.message = `✅ Valid GitHub repository endpoint: ${owner}/${repo}`;
-                    
-                    if (path) {
-                        validation.message += ` (accessing: ${path})`;
-                    }
-                } else {
-                    validation.message = '❌ Repository endpoint needs both owner and repository name';
-                    validation.suggestions.push('Format: /repos/owner/repository-name');
-                    validation.suggestions.push('Example: /repos/microsoft/vscode');
-                }
-            }
+            validation.isValid = true;
+            validation.level = 'success';
+            validation.message = 'Valid GitHub repository endpoint';
         } else if (this.githubPatterns.search.test(normalizedEndpoint)) {
             validation.isValid = true;
             validation.level = 'success';
-            validation.message = '✅ Valid GitHub search endpoint';
+            validation.message = 'Valid GitHub search endpoint';
         } else if (this.githubPatterns.user.test(normalizedEndpoint)) {
             validation.isValid = true;
             validation.level = 'success';
-            validation.message = '✅ Valid GitHub user endpoint (authenticated user)';
+            validation.message = 'Valid GitHub user endpoint';
         } else if (this.githubPatterns.users.test(normalizedEndpoint)) {
-            const userMatch = normalizedEndpoint.match(/^\/users\/([^\/]+)/);
-            if (userMatch) {
-                validation.isValid = true;
-                validation.level = 'success';
-                validation.message = `✅ Valid GitHub user endpoint: ${userMatch[1]}`;
-            }
+            validation.isValid = true;
+            validation.level = 'success';
+            validation.message = 'Valid GitHub users endpoint';
         } else if (this.githubPatterns.orgs.test(normalizedEndpoint)) {
-            const orgMatch = normalizedEndpoint.match(/^\/orgs\/([^\/]+)/);
-            if (orgMatch) {
-                validation.isValid = true;
-                validation.level = 'success';
-                validation.message = `✅ Valid GitHub organization endpoint: ${orgMatch[1]}`;
-            }
+            validation.isValid = true;
+            validation.level = 'success';
+            validation.message = 'Valid GitHub organization endpoint';
         } else {
-            // Provide helpful suggestions for common mistakes
             validation.level = 'warning';
-            validation.message = '⚠️ Endpoint format may not be correct for GitHub API';
-            
-            // Common mistake patterns
-            if (normalizedEndpoint.includes('/api/v3/')) {
-                validation.suggestions.push('Remove "/api/v3" - your base URL should handle the API version');
-                validation.suggestions.push('Use: /repos/owner/repo instead of /api/v3/repos/owner/repo');
-            }
-            
-            if (normalizedEndpoint.includes('github.com/') && !normalizedEndpoint.includes('/api/')) {
-                validation.suggestions.push('This looks like a web URL, not an API endpoint');
-                validation.suggestions.push('For repo info, use: /repos/owner/repo');
-            }
-            
-            // Provide common GitHub endpoint examples
-            validation.suggestions.push('Common patterns:');
-            validation.suggestions.push('• /repos/owner/repo - Get repository info');
-            validation.suggestions.push('• /repos/owner/repo/issues - Get repository issues');
-            validation.suggestions.push('• /search/repositories?q=javascript - Search repositories');
-            validation.suggestions.push('• /user - Get authenticated user info');
-            validation.suggestions.push('• /users/username - Get specific user info');
+            validation.message = 'Endpoint pattern not recognized for GitHub API';
+            validation.suggestions = [
+                'Try: /repos/owner/repo',
+                'Try: /user',
+                'Try: /users/username',
+                'Try: /search/repositories?q=query'
+            ];
         }
         
         return validation;
@@ -250,33 +206,9 @@ class EndpointTester {
             const style = document.createElement('style');
             style.id = 'endpoint-feedback-styles';
             style.textContent = `
-                .endpoint-feedback-success {
-                    background-color: var(--color-success-bg, rgba(40, 167, 69, 0.1));
-                    border-color: var(--color-success-border, rgba(40, 167, 69, 0.3));
-                    color: var(--color-success-text, #28a745);
-                }
-                .endpoint-feedback-warning {
-                    background-color: var(--color-warning-bg, rgba(255, 193, 7, 0.1));
-                    border-color: var(--color-warning-border, rgba(255, 193, 7, 0.3));
-                    color: var(--color-warning-text, #ffc107);
-                }
-                .endpoint-feedback-error {
-                    background-color: var(--color-danger-bg, rgba(220, 53, 69, 0.1));
-                    border-color: var(--color-danger-border, rgba(220, 53, 69, 0.3));
-                    color: var(--color-danger-text, #dc3545);
-                }
-                .endpoint-feedback-suggestions {
-                    margin-top: 0.5rem;
-                    font-size: 0.8rem;
-                    opacity: 0.9;
-                }
-                .endpoint-feedback-suggestions ul {
-                    margin: 0.25rem 0 0 1rem;
-                    padding: 0;
-                }
-                .endpoint-feedback-suggestions li {
-                    margin-bottom: 0.125rem;
-                }
+                .endpoint-feedback-success { color: #16a34a; background: rgba(34, 197, 94, 0.1); border-color: #16a34a; }
+                .endpoint-feedback-warning { color: #f97316; background: rgba(249, 115, 22, 0.1); border-color: #f97316; }
+                .endpoint-feedback-error { color: #dc2626; background: rgba(239, 68, 68, 0.1); border-color: #dc2626; }
             `;
             document.head.appendChild(style);
         }
@@ -295,10 +227,10 @@ class EndpointTester {
         let content = `<div>${validation.message}</div>`;
         
         if (validation.suggestions && validation.suggestions.length > 0) {
-            content += '<div class="endpoint-feedback-suggestions">';
-            content += '<ul>';
+            content += '<div style="margin-top: 0.5rem;"><strong>Suggestions:</strong>';
+            content += '<ul style="margin: 0.25rem 0 0 1rem;">';
             validation.suggestions.forEach(suggestion => {
-                content += `<li>${escapeHtml(suggestion)}</li>`;
+                content += `<li>${suggestion}</li>`;
             });
             content += '</ul></div>';
         }
@@ -315,7 +247,7 @@ class EndpointTester {
         
         if (!profile) {
             if (typeof showNotification !== 'undefined') {
-                showNotification('Please select a profile', 'error');
+                showNotification('Please select a profile first', 'error');
             }
             return false;
         }
@@ -327,7 +259,6 @@ class EndpointTester {
             return false;
         }
         
-        // Additional validation can be added here
         return true;
     }
 
@@ -337,7 +268,8 @@ class EndpointTester {
     buildRequestData() {
         const endpointInput = document.getElementById('endpoint-url');
         const endpoint = endpointInput ? endpointInput.value.trim() : '';
-          const data = {
+        
+        const data = {
             profileName: document.getElementById('test-profile')?.value || this.currentProfile,
             method: this.currentMethod,
             endpoint: endpoint,
@@ -348,23 +280,28 @@ class EndpointTester {
 
         // Add body for methods that support it
         if (['POST', 'PUT', 'PATCH'].includes(this.currentMethod)) {
-            const requestBody = document.getElementById('request-body')?.value?.trim();
-            const contentType = document.getElementById('content-type')?.value;
-            if (requestBody) {
-                data.body = requestBody;
-                data.contentType = contentType;
+            const requestBody = document.getElementById('request-body');
+            const contentType = document.getElementById('content-type');
+            
+            if (requestBody?.value?.trim()) {
+                data.body = requestBody.value.trim();
+            }
+            
+            if (contentType?.value) {
+                data.contentType = contentType.value;
             }
         }
 
         return data;
-    }    /**
+    }
+
+    /**
      * Collect key-value pairs from a container
      */
     collectKeyValuePairs(containerId) {
         const container = document.getElementById(containerId);
         if (!container) return {};
         
-        // Support both .key-value-pair and .key-value-pair-compact
         const pairs = container.querySelectorAll('.key-value-pair, .key-value-pair-compact');
         const result = {};
         
@@ -392,49 +329,69 @@ class EndpointTester {
         
         try {
             this.showResponseLoading();
+            
             const startTime = Date.now();
             
-            // Use apiClient if available
-            const response = window.apiClient 
-                ? await window.apiClient.testEndpoint(requestData)
-                : { success: false, error: 'API client not available' };
+            // Check if API client is ready using utils function
+            console.log('🔍 Checking API client readiness...');
+            
+            if (typeof window.isApiClientReady === 'function' && !window.isApiClientReady()) {
+                console.log('⏳ API client not ready, waiting...');
                 
+                // Wait for API client to be ready
+                const ready = typeof window.waitForApiClient === 'function' 
+                    ? await window.waitForApiClient(10000)
+                    : false;
+                
+                if (!ready) {
+                    throw new Error('API Client is not ready. Please check your connection and try again.');
+                }
+            }
+            
+            console.log('✅ API Client is ready, making request...');
+            
+            // Use consolidated makeRequest function from utils
+            let response;
+            if (typeof window.makeRequest === 'function') {
+                response = await window.makeRequest(requestData);
+            } else if (window.apiClient && typeof window.apiClient.makeRequest === 'function') {
+                response = await window.apiClient.makeRequest(requestData);
+            } else {
+                throw new Error('No API request function available. Please refresh the page and try again.');
+            }
+            
             const duration = Date.now() - startTime;
             
-            // Create history item
+            console.log('📊 Response received:', response);
+            
+            // Display response
+            this.displayResponse(response, duration, requestData);
+            
+            // Add to history
             const historyItem = {
-                profile: requestData.profileName,
-                method: requestData.method,
-                endpoint: requestData.endpoint,
-                timestamp: new Date().toISOString(),
+                ...requestData,
                 duration,
                 success: response.success,
-                status: response.success ? 'Success' : 'Error'
+                status: response.status || (response.success ? 'Success' : 'Error'),
+                responseSize: response.result ? JSON.stringify(response.result).length : 0
             };
-
-            if (!response.success && response.error) {
-                historyItem.error = response.error;
-            }
-
-            this.addToHistory(historyItem);
-            this.displayResponse(response, duration, requestData);
-
-        } catch (error) {
-            console.error('Request failed:', error);
             
+            this.addToHistory(historyItem);
+            
+        } catch (error) {
+            console.error('❌ Request failed:', error);
+            this.displayError(error);
+            
+            // Add failed request to history
             const historyItem = {
-                profile: requestData.profileName,
-                method: requestData.method,
-                endpoint: requestData.endpoint,
-                timestamp: new Date().toISOString(),
+                ...requestData,
                 duration: 0,
                 success: false,
-                status: 'Network Error',
+                status: 'Error',
                 error: error.message
             };
             
             this.addToHistory(historyItem);
-            this.displayError(error);
         }
     }
 
@@ -447,62 +404,50 @@ class EndpointTester {
         
         if (responseViewer) {
             responseViewer.innerHTML = `
-                <div class="loading-container" style="text-align: center; padding: 2rem;">
-                    <div class="loading-spinner" style="margin: 0 auto 1rem;"></div>
-                    <p>Sending request...</p>
+                <div class="empty-state">
+                    <div class="loading-spinner"></div>
+                    <h3>Sending Request...</h3>
+                    <p>Please wait while we process your request</p>
                 </div>
             `;
         }
         
         if (responseMeta) {
-            responseMeta.innerHTML = '<span class="text-muted">Sending request...</span>';
+            responseMeta.innerHTML = `
+                <span class="status-badge status-loading">
+                    <i data-feather="loader"></i>
+                    Sending...
+                </span>
+            `;
         }
-    }    /**
+    }
+
+    /**
      * Display API response using enhanced response viewer
      */
     displayResponse(response, duration, requestData) {
         const responseMeta = document.getElementById('response-meta');
         if (responseMeta) {
-            const status = response.success ? 'Success' : 'Error';
-            const statusClass = response.success ? 'text-success' : 'text-danger';
+            const statusClass = response.success ? 'status-success' : 'status-error';
             responseMeta.innerHTML = `
-                <span class="${statusClass}">Status: ${status}</span>
-                <span class="text-muted"> • Duration: ${formatDuration(duration)}</span>
+                <span class="status-badge ${statusClass}">
+                    <i data-feather="${response.success ? 'check-circle' : 'x-circle'}"></i>
+                    ${response.status || (response.success ? 'Success' : 'Error')}
+                </span>
+                <span class="response-time">${duration}ms</span>
             `;
-        }        // Use enhanced response viewer if available
+        }
+
         if (window.responseViewer && response.success && response.result) {
-            // Use the enhanced UI function that handles tabs and metadata
-            if (window.displayResponseData) {
-                window.displayResponseData(response.result, {
-                    url: requestData?.url,
-                    method: requestData?.method,
-                    timestamp: new Date().toISOString()
-                });
-            } else {
-                // Fallback to direct viewer call
-                window.responseViewer.displayResponse(response.result);
-            }
+            window.responseViewer.displayResponse(response.result);
         } else {
-            // Fallback to simple display
             const responseViewer = document.getElementById('response-viewer');
             if (responseViewer) {
-                if (response.success && response.result) {
-                    responseViewer.innerHTML = `<pre>${formatJson(response.result)}</pre>`;
-                } else if (response.error) {
-                    responseViewer.innerHTML = `
-                        <div class="error-response">
-                            <h4>Error Response</h4>
-                            <pre>${escapeHtml(response.error)}</pre>
-                        </div>
-                    `;
-                } else {
-                    responseViewer.innerHTML = `
-                        <div class="empty-response">
-                            <div class="empty-icon">📡</div>
-                            <p>No response data</p>
-                        </div>
-                    `;
-                }
+                responseViewer.innerHTML = `
+                    <div class="response-content">
+                        <pre>${JSON.stringify(response, null, 2)}</pre>
+                    </div>
+                `;
             }
         }
     }
@@ -515,16 +460,169 @@ class EndpointTester {
         const responseMeta = document.getElementById('response-meta');
         
         if (responseMeta) {
-            responseMeta.innerHTML = '<span class="text-danger">Status: Network Error</span>';
+            responseMeta.innerHTML = `
+                <span class="status-badge status-error">
+                    <i data-feather="x-circle"></i>
+                    Error
+                </span>
+            `;
         }
         
         if (responseViewer) {
-            const errorData = {
-                error: error.message,
-                type: 'NetworkError',
-                timestamp: new Date().toISOString()
-            };
-            responseViewer.innerHTML = `<pre>${formatJson(errorData)}</pre>`;
+            responseViewer.innerHTML = `
+                <div class="error-state">
+                    <div class="error-icon">
+                        <i data-feather="alert-triangle"></i>
+                    </div>
+                    <h3>Request Failed</h3>
+                    <p>${error.message || 'An unknown error occurred'}</p>
+                    <pre class="error-details">${error.stack || error.toString()}</pre>
+                </div>
+            `;
+        }
+    }
+
+    /**
+     * Setup body section visibility based on HTTP method
+     */
+    setupBodySection() {
+        console.log('🔄 Setting up body section visibility handler...');
+        
+        // Listen for method changes
+        window.addEventListener('methodChanged', (e) => {
+            console.log('🔄 Method changed event received:', e.detail.method);
+            this.updateBodySectionVisibility();
+        });
+        
+        // Initial setup
+        this.updateBodySectionVisibility();
+    }
+
+    /**
+     * Update body section visibility based on current method
+     */
+    updateBodySectionVisibility() {
+        const bodySection = document.getElementById('body-section');
+        if (!bodySection) {
+            console.warn('⚠️ Body section not found');
+            return;
+        }
+        
+        const methodsWithBody = ['POST', 'PUT', 'PATCH'];
+        const shouldShow = methodsWithBody.includes(this.currentMethod);
+        
+        console.log(`🔄 Updating body section visibility: ${shouldShow ? 'show' : 'hide'} for method ${this.currentMethod}`);
+        
+        if (shouldShow) {
+            bodySection.style.display = 'block';
+            // Auto-expand if it exists and is collapsed
+            if (!bodySection.classList.contains('expanded')) {
+                bodySection.classList.add('expanded');
+                const content = bodySection.querySelector('.collapsible-content');
+                const icon = bodySection.querySelector('.collapse-icon');
+                
+                if (content) {
+                    content.style.maxHeight = content.scrollHeight + 'px';
+                }
+                if (icon) {
+                    icon.style.transform = 'rotate(180deg)';
+                }
+            }
+        } else {
+            bodySection.style.display = 'none';
+        }
+    }
+
+    /**
+     * Set HTTP method and update UI/body section
+     */
+    setMethod(method) {
+        console.log('🔄 EndpointTester.setMethod called with:', method);
+        this.currentMethod = method;
+        
+        // Update method button states
+        document.querySelectorAll('.method-btn, .method-btn-compact').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.dataset.method === method || btn.textContent.trim() === method) {
+                btn.classList.add('active');
+            }
+        });
+        
+        // Update body section visibility
+        this.updateBodySectionVisibility();
+        
+        // Dispatch event for other components
+        window.dispatchEvent(new CustomEvent('methodChanged', {
+            detail: { method: this.currentMethod }
+        }));
+    }
+
+    /**
+     * Add key-value pair to a container
+     */
+    addKeyValuePair(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) {
+            console.error(`Container ${containerId} not found`);
+            return;
+        }
+        
+        console.log(`Adding key-value pair to: ${containerId}`);
+        const pair = document.createElement('div');
+        pair.className = 'key-value-pair-compact';
+        
+        let keyPlaceholder = 'Name';
+        let valuePlaceholder = 'Value';
+        
+        if (containerId === 'query-params') {
+            keyPlaceholder = 'Parameter Name';
+            valuePlaceholder = 'Parameter Value';
+        } else if (containerId === 'request-headers') {
+            keyPlaceholder = 'Header Name';
+            valuePlaceholder = 'Header Value';
+        }
+        
+        pair.innerHTML = `
+            <input type="text" class="kv-input-compact" placeholder="${keyPlaceholder}" autocomplete="off">
+            <input type="text" class="kv-input-compact" placeholder="${valuePlaceholder}" autocomplete="off">
+            <button class="kv-remove-btn" onclick="this.closest('.key-value-pair-compact').remove()" type="button" title="Remove this ${containerId === 'request-headers' ? 'header' : 'parameter'}">×</button>
+        `;
+        
+        container.appendChild(pair);
+        console.log(`Appended new pair to ${containerId}. Current children: ${container.children.length}`);
+        
+        // Auto-expand the section
+        const sectionId = container.closest('.collapsible-section')?.id;
+        if (sectionId) {
+            this.autoExpandSection(sectionId);
+        }
+        
+        // Focus the first input
+        const firstInput = pair.querySelector('input');
+        if (firstInput) {
+            firstInput.focus();
+        }
+    }
+
+    /**
+     * Auto-expand a collapsible section
+     */
+    autoExpandSection(sectionId) {
+        const section = document.getElementById(sectionId);
+        if (!section) return;
+
+        const content = section.querySelector('.collapsible-content');
+        if (!content) return;
+
+        const icon = section.querySelector('.collapse-icon');
+
+        if (!section.classList.contains('expanded')) {
+            section.classList.add('expanded');
+            content.style.maxHeight = content.scrollHeight + 'px';
+            if (icon) icon.style.transform = 'rotate(180deg)';
+        } else {
+            // Refresh height if already expanded
+            content.style.maxHeight = content.scrollHeight + 'px';
         }
     }
 
@@ -539,24 +637,15 @@ class EndpointTester {
         if (requestBody) requestBody.value = '';
 
         // Reset method to GET
-        const getMethod = document.querySelector('.method-btn[data-method="GET"]');
-        if (getMethod) {
-            document.querySelectorAll('.method-btn').forEach(btn => btn.classList.remove('active'));
-            getMethod.classList.add('active');
-            this.currentMethod = 'GET';
-        }
+        this.setMethod('GET');
 
         // Clear key-value pairs
         const containers = ['request-headers', 'query-params'];
         containers.forEach(containerId => {
             const container = document.getElementById(containerId);
             if (container) {
-                container.innerHTML = `
-                    <div class="key-value-pair">
-                        <input class="key-input" placeholder="${containerId.includes('headers') ? 'Header' : 'Key'}">
-                        <input class="value-input" placeholder="Value">
-                    </div>
-                `;
+                container.innerHTML = '';
+                this.addKeyValuePair(containerId); // Add one empty pair
             }
         });
     }
@@ -574,11 +663,10 @@ class EndpointTester {
         const modal = document.getElementById('code-modal');
         
         if (codeElement) codeElement.textContent = code;
-        if (modal) {
-            modal.style.display = 'block';
-            modal.classList.add('show');
-        }
-    }    /**
+        if (modal) modal.style.display = 'flex';
+    }
+
+    /**
      * Generate PowerShell code string
      */
     generatePowerShellCode(requestData) {
@@ -589,80 +677,26 @@ class EndpointTester {
 
         // Add query parameters
         if (requestData.queryParameters && Object.keys(requestData.queryParameters).length > 0) {
-            code += ' \\\n    -QueryParameters @{\n';
-            Object.entries(requestData.queryParameters).forEach(([key, value]) => {
-                code += `        "${key}" = "${value}"\n`;
-            });
-            code += '    }';
+            const params = Object.entries(requestData.queryParameters)
+                .map(([key, value]) => `"${key}"="${value}"`)
+                .join(',');
+            code += ` \\\n    -QueryParameters @{${params}}`;
         }
 
         // Add headers
         if (requestData.headers && Object.keys(requestData.headers).length > 0) {
-            code += ' \\\n    -Headers @{\n';
-            Object.entries(requestData.headers).forEach(([key, value]) => {
-                code += `        "${key}" = "${value}"\n`;
-            });
-            code += '    }';
+            const headers = Object.entries(requestData.headers)
+                .map(([key, value]) => `"${key}"="${value}"`)
+                .join(',');
+            code += ` \\\n    -Headers @{${headers}}`;
         }
 
         // Add body
         if (requestData.body) {
-            if (requestData.contentType === 'application/json') {
-                try {
-                    const parsed = JSON.parse(requestData.body);
-                    const formatted = JSON.stringify(parsed, null, 4);
-                    code += ' \\\n    -Body @\'\n' + formatted + '\n\'@';
-                } catch {
-                    code += ` \\\n    -Body '${requestData.body.replace(/'/g, "''")}'`;
-                }
-            } else {
-                code += ` \\\n    -Body '${requestData.body.replace(/'/g, "''")}'`;
-            }
+            code += ` \\\n    -Body '${requestData.body.replace(/'/g, "''")}'`;
         }
 
         return code;
-    }
-
-    /**
-     * Update history display
-     */
-    updateHistoryDisplay() {
-        const historyList = document.getElementById('history-list');
-        if (!historyList) return;
-
-        if (this.requestHistory.length === 0) {
-            historyList.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">📚</div>
-                    <h3>No requests yet</h3>
-                    <p>Your API request history will appear here</p>
-                </div>
-            `;
-            return;
-        }
-
-        historyList.innerHTML = this.requestHistory.map((item, index) => {
-            const statusIcon = item.success ? '✅' : '❌';
-            const statusClass = item.success ? 'history-status-success' : 'history-status-error';
-            
-            return `
-                <div class="history-item" data-index="${index}">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <div>
-                            <span class="history-method ${item.method}">${item.method}</span>
-                            <span class="history-url">${escapeHtml(item.endpoint)}</span>
-                        </div>
-                        <div class="history-meta">${new Date(item.timestamp).toLocaleString()}</div>
-                    </div>
-                    <div class="history-meta">
-                        Profile: ${escapeHtml(item.profile)} • 
-                        Status: <span class="${statusClass}">${statusIcon} ${item.status}</span> • 
-                        ${item.duration ? formatDuration(item.duration) : 'N/A'}
-                        ${item.error ? ` • Error: ${escapeHtml(item.error)}` : ''}
-                    </div>
-                </div>
-            `;
-        }).join('');
     }
 
     /**
@@ -677,45 +711,24 @@ class EndpointTester {
         
         if (this.currentProfile) {
             const profile = window.profileManager?.getProfile(this.currentProfile);
-            if (profile && profile.baseUrl) {
-                const baseUrl = profile.baseUrl.replace(/\/$/, ''); // Remove trailing slash
-                
-                // Update both preview elements
-                if (baseUrlPreview) {
-                    baseUrlPreview.textContent = baseUrl;
-                    baseUrlPreview.style.display = 'block';
-                }
-                
-                if (compactPreview) {
-                    compactPreview.textContent = baseUrl;
-                    compactPreview.style.display = 'block';
-                }
-                
-                console.log('✅ Profile context updated with base URL:', baseUrl);
-            } else {
-                console.warn('⚠️ Profile not found or missing base URL:', this.currentProfile);
-                this.clearProfileContext();
+            const baseUrl = profile?.baseUrl || 'No URL';
+            
+            if (baseUrlPreview) {
+                baseUrlPreview.textContent = baseUrl;
+            }
+            if (compactPreview) {
+                compactPreview.textContent = baseUrl;
+                compactPreview.classList.remove('empty');
             }
         } else {
-            this.clearProfileContext();
-        }
-    }
-
-    /**
-     * Clear profile context displays
-     */
-    clearProfileContext() {
-        const baseUrlPreview = document.getElementById('base-url-preview');
-        const compactPreview = document.querySelector('.base-url-preview-compact');
-        
-        if (baseUrlPreview) {
-            baseUrlPreview.textContent = 'No profile selected';
-            baseUrlPreview.style.display = 'block';
-        }
-        
-        if (compactPreview) {
-            compactPreview.textContent = 'No profile selected';
-            compactPreview.style.display = 'block';
+            const placeholder = 'Select a profile...';
+            if (baseUrlPreview) {
+                baseUrlPreview.textContent = placeholder;
+            }
+            if (compactPreview) {
+                compactPreview.textContent = placeholder;
+                compactPreview.classList.add('empty');
+            }
         }
     }
 
@@ -734,50 +747,6 @@ class EndpointTester {
         } else {
             localStorage.removeItem('anyapi_current_profile');
         }
-    }
-
-    /**
-     * Initialize with enhanced profile handling
-     */
-    init() {
-        console.log('🚀 Initializing EndpointTester...');
-        
-        this.loadRequestHistory();
-        
-        // Listen for profile changes from other components
-        window.addEventListener('profileChanged', (e) => {
-            if (e.detail.profileName !== this.currentProfile) {
-                this.onProfileChange(e.detail.profileName);
-                
-                // Update the profile selector if it exists
-                const profileSelect = document.getElementById('test-profile');
-                if (profileSelect && profileSelect.value !== e.detail.profileName) {
-                    profileSelect.value = e.detail.profileName || '';
-                }
-            }
-        });
-        
-        // Restore saved profile
-        const savedProfile = localStorage.getItem('anyapi_current_profile');
-        if (savedProfile) {
-            this.onProfileChange(savedProfile);
-        }
-        
-        // Initialize sections if the function exists
-        if (typeof this.initializeSections === 'function') {
-            this.initializeSections();
-        }
-        
-        // Initial validation
-        setTimeout(() => {
-            this.validateEndpoint();
-            this.initializeWithSavedProfile();
-        }, 100);
-        
-        // Setup body section visibility
-        this.setupBodySection();
-        
-        console.log('✅ EndpointTester initialized');
     }
 
     /**
@@ -800,23 +769,9 @@ class EndpointTester {
         };
         
         this.addToHistory(historyItem);
-          if (typeof showNotification !== 'undefined') {
+        
+        if (typeof showNotification !== 'undefined') {
             showNotification('Request saved to history', 'success');
-        }
-    }
-
-    /**
-     * Clear request history
-     */
-    clearHistory() {
-        if (confirm('Are you sure you want to clear all request history? This action cannot be undone.')) {
-            this.requestHistory = [];
-            localStorage.removeItem('anyapi_request_history');
-            this.historyManager.updateHistoryDisplay();
-            
-            if (typeof showNotification !== 'undefined') {
-                showNotification('Request history cleared', 'success');
-            }
         }
     }
 
@@ -869,167 +824,73 @@ class EndpointTester {
                 const data = JSON.parse(text);
                 
                 if (data.history && Array.isArray(data.history)) {
-                    // Merge with existing history
-                    const merged = [...data.history, ...this.requestHistory];
-                    this.requestHistory = merged.slice(0, this.maxHistoryItems);
-                    
-                    localStorage.setItem('anyapi_request_history', JSON.stringify(this.requestHistory));
-                    this.historyManager.updateHistoryDisplay();
+                    this.requestHistory = [...data.history, ...this.requestHistory];
+                    if (this.requestHistory.length > this.maxHistoryItems) {
+                        this.requestHistory = this.requestHistory.slice(0, this.maxHistoryItems);
+                    }
+                    this.saveRequestHistory();
                     
                     if (typeof showNotification !== 'undefined') {
                         showNotification(`Imported ${data.history.length} history items`, 'success');
                     }
                 } else {
-                    if (typeof showNotification !== 'undefined') {
-                        showNotification('Invalid history file format', 'error');
-                    }
+                    throw new Error('Invalid history file format');
                 }
             } catch (error) {
-                console.error('Failed to import history:', error);
+                console.error('Import failed:', error);
                 if (typeof showNotification !== 'undefined') {
-                    showNotification('Failed to import history file', 'error');
+                    showNotification('Failed to import history', 'error');
                 }
             }
-        };        
+        };
+        
         input.click();
-    }
-
-    /**
-     * Auto-expand a collapsible section
-     */
-    autoExpandSection(sectionId) {
-        const section = document.getElementById(sectionId);
-        if (section && !section.classList.contains('expanded')) {
-            if (typeof toggleSection === 'function') {
-                toggleSection(sectionId);
-            } else {
-                // Fallback manual toggle
-                section.classList.add('expanded');
-                const content = section.querySelector('.collapsible-content');
-                const icon = section.querySelector('.collapse-icon');
-                if (content) {
-                    content.style.maxHeight = content.scrollHeight + 'px';
-                }
-                if (icon) {
-                    icon.style.transform = 'rotate(180deg)';
-                }
-            }
-        }
-    }
-
-    /**
-     * Add key-value pair to a container
-     */
-    addKeyValuePair(containerId) {
-        const container = document.getElementById(containerId);
-        if (!container) {
-            console.warn(`Container not found: ${containerId}`);
-            return;
-        }
-        
-        const pair = document.createElement('div');
-        pair.className = 'key-value-pair-compact';
-        
-        // Set appropriate placeholders based on container type
-        let keyPlaceholder = 'Name';
-        let valuePlaceholder = 'Value';
-        
-        if (containerId.includes('query-param')) {
-            keyPlaceholder = 'Parameter Name';
-            valuePlaceholder = 'Parameter Value';
-        } else if (containerId.includes('header')) {
-            keyPlaceholder = 'Header Name';
-            valuePlaceholder = 'Header Value';
-        }
-        
-        pair.innerHTML = `
-            <input type="text" class="kv-input-compact" placeholder="${keyPlaceholder}" autocomplete="off">
-            <input type="text" class="kv-input-compact" placeholder="${valuePlaceholder}" autocomplete="off">
-            <button class="kv-remove-btn" onclick="this.closest('.key-value-pair-compact').remove()" type="button" title="Remove this ${containerId.includes('header') ? 'header' : 'parameter'}">×</button>
-        `;
-        
-        container.appendChild(pair);
-        
-        // Auto-expand the section if it's not already expanded
-        const sectionId = container.closest('.collapsible-section')?.id;
-        if (sectionId) {
-            this.autoExpandSection(sectionId);
-        }
-        
-        // Focus on the first input
-        const firstInput = pair.querySelector('input');
-        if (firstInput) {
-            setTimeout(() => firstInput.focus(), 100);
-        }
-        
-        console.log(`Added key-value pair to: ${containerId}`);
-    }
-
-    /**
-     * Setup body section visibility based on HTTP method
-     */
-    setupBodySection() {
-        this.updateBodySectionVisibility();
-        
-        // Listen for method changes
-        window.addEventListener('methodChanged', () => {
-            this.updateBodySectionVisibility();
-        });
-    }
-
-    /**
-     * Update body section visibility based on current method
-     */
-    updateBodySectionVisibility() {
-        const bodySection = document.getElementById('body-section');
-        if (bodySection) {
-            if (['POST', 'PUT', 'PATCH'].includes(this.currentMethod)) {
-                bodySection.style.display = 'block';
-            } else {
-                bodySection.style.display = 'none';
-                // Collapse the section if it's currently expanded
-                if (bodySection.classList.contains('expanded')) {
-                    bodySection.classList.remove('expanded');
-                    const content = bodySection.querySelector('.collapsible-content');
-                    if (content) {
-                        content.style.maxHeight = '0px';
-                    }
-                    const icon = bodySection.querySelector('.collapse-icon');
-                    if (icon) {
-                        icon.style.transform = 'rotate(0deg)';
-                    }                }
-            }
-        }
-    }
-
-    /**
-     * Initialize with saved profile from local storage
-     */
-    initializeWithSavedProfile() {
-        try {
-            const savedProfile = localStorage.getItem('selectedProfile');
-            if (savedProfile) {
-                const profileSelect = document.getElementById('test-profile');
-                if (profileSelect) {
-                    profileSelect.value = savedProfile;
-                    this.onProfileChange();
-                }
-            }
-        } catch (error) {
-            console.warn('⚠️ Could not load saved profile:', error.message);
-        }
     }
 }
 
-// Make EndpointTester globally available
+// Make EndpointTester available globally
 window.EndpointTester = EndpointTester;
 
-// Create global instance - will be initialized by app.js
+// Initialize function for app.js
 window.initializeEndpointTester = function() {
+    console.log('🚀 Initializing EndpointTester...');
+    
     if (!window.endpointTester) {
-        const endpointTester = new EndpointTester();
-        window.endpointTester = endpointTester;
-        console.log('✅ EndpointTester initialized globally');
+        window.endpointTester = new EndpointTester();
+        console.log('✅ EndpointTester created and available globally');
+    } else {
+        console.log('✅ EndpointTester already initialized');
     }
+    
     return window.endpointTester;
 };
+
+// Make functions globally available for onclick handlers
+window.addQueryParam = function() {
+    console.log('🔄 Global addQueryParam called');
+    if (window.endpointTester && window.endpointTester.addKeyValuePair) {
+        window.endpointTester.addKeyValuePair('query-params');
+    } else {
+        console.error('EndpointTester not available for addQueryParam');
+    }
+};
+
+window.addHeader = function() {
+    console.log('🔄 Global addHeader called');
+    if (window.endpointTester && window.endpointTester.addKeyValuePair) {
+        window.endpointTester.addKeyValuePair('request-headers');
+    } else {
+        console.error('EndpointTester not available for addHeader');
+    }
+};
+
+window.selectMethod = function(method) {
+    console.log('🔄 Global selectMethod called with:', method);
+    if (window.endpointTester && window.endpointTester.setMethod) {
+        window.endpointTester.setMethod(method);
+    } else {
+        console.error('EndpointTester not available for selectMethod');
+    }
+};
+
+console.log('📦 EndpointTester module loaded');

@@ -199,3 +199,59 @@ function removeShimmerEffect(element) {
     if (!element) return;
     element.classList.remove('shimmer-loading');
 }
+
+/**
+ * Check if API client is ready
+ * @returns {boolean} True if API client is ready
+ */
+function isApiClientReady() {
+    return window.apiClient && 
+           typeof window.apiClient.testEndpoint === 'function' &&
+           typeof window.apiClient.checkConnection === 'function';
+}
+
+/**
+ * Wait for API client to be ready
+ * @param {number} timeout - Timeout in milliseconds
+ * @returns {Promise<boolean>} True if ready, false if timeout
+ */
+async function waitForApiClient(timeout = 10000) {
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < timeout) {
+        if (isApiClientReady()) {
+            console.log('✅ API client is ready for requests');
+            return true;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    console.warn('⚠️ API client readiness timeout');
+    return false;
+}
+
+/**
+ * Make API request - Consolidated function for all API calls
+ * @param {Object} requestData - Request configuration
+ * @returns {Promise} Response from API
+ */
+async function makeRequest(requestData) {
+    console.log('🚀 Making API request with data:', requestData);
+    
+    // Check if API client is available
+    if (!window.apiClient) {
+        throw new Error('API Client not initialized. Please refresh the page and try again.');
+    }
+    
+    if (typeof window.apiClient.testEndpoint !== 'function') {
+        throw new Error('API Client testEndpoint function not available. Please refresh the page and try again.');
+    }
+    
+    // Check if connected (but don't fail if not - let the backend handle it)
+    if (!window.apiClient.isConnected) {
+        console.warn('⚠️ API client not connected, attempting request anyway...');
+    }
+    
+    // Use the API client's testEndpoint method
+    return await window.apiClient.testEndpoint(requestData);
+}

@@ -171,18 +171,33 @@ class AnyApiApp {
     /**
      * Update dark mode toggle button
      */
-    updateDarkModeToggle() {
-        const toggle = document.getElementById('dark-mode-toggle');
-        if (toggle) {
-            if (this.isDarkMode) {
-                toggle.innerHTML = '☀️ Light';
-                toggle.title = 'Switch to light mode';
-            } else {
-                toggle.innerHTML = '🌙 Dark';
-                toggle.title = 'Switch to dark mode';
-            }
+    // In your app.js or relevant component's method
+updateDarkModeToggle() {
+    const toggle = document.getElementById('dark-mode-toggle');
+    if (toggle) {
+        let newIconName = '';
+        let buttonText = ''; // Renamed from 'text' to avoid conflict if 'text' is a global
+
+        if (this.isDarkMode) {
+            newIconName = 'sun'; // Feather icon name
+            toggle.title = 'Switch to light mode';
+        } else {
+            newIconName = 'moon'; // Feather icon name
+            toggle.title = 'Switch to dark mode';
         }
+
+        // Update the innerHTML to use a Feather icon and a span for the text
+        // The MutationObserver in your index.html should automatically call feather.replace()
+        // to render the new SVG icon.
+        toggle.innerHTML = `<i data-feather="${newIconName}"></i> <span class="dmt-text">${buttonText}</span>`;
+
+        // OPTIONAL: If the MutationObserver doesn't catch this specific update reliably,
+        // you can explicitly call feather.replace() here for the specific icon attributes.
+        // However, your existing observer is likely sufficient.
+        // Example explicit call (usually not needed with your current observer):
+        // feather.replace({ 'width': 18, 'height': 18, 'stroke-width': 2 });
     }
+}
 
     /**
      * Set up global error handling

@@ -172,17 +172,22 @@
                     <div class="tester-container-optimized">
                         <div class="request-builder-compact">
                             <div class="request-builder-header">
-                                <div class="method-selector-compact">
-                                    <button class="method-btn-compact active" data-method="GET">GET</button>
-                                    <button class="method-btn-compact" data-method="POST">POST</button>
-                                    <button class="method-btn-compact" data-method="PUT">PUT</button>
-                                    <button class="method-btn-compact" data-method="PATCH">PATCH</button>
-                                    <button class="method-btn-compact" data-method="DELETE">DELETE</button>
+                                <div class="method-endpoint-row">
+                                    <div class="method-selector-compact">
+                                        <button class="method-btn-compact active" data-method="GET" onclick="selectMethod('GET')">GET</button>
+                                        <button class="method-btn-compact" data-method="POST" onclick="selectMethod('POST')">POST</button>
+                                        <button class="method-btn-compact" data-method="PUT" onclick="selectMethod('PUT')">PUT</button>
+                                        <button class="method-btn-compact" data-method="PATCH" onclick="selectMethod('PATCH')">PATCH</button>
+                                        <button class="method-btn-compact" data-method="DELETE" onclick="selectMethod('DELETE')">DELETE</button>
+                                    </div>
+                                    <div class="endpoint-input-group">
+                                        <div class="base-url-preview-compact" id="base-url-preview">Select a profile...</div>
+                                        <input type="text" id="endpoint-url" class="form-control endpoint-input" placeholder="/endpoint/path" />
+                                    </div>
                                 </div>
-                                <div class="endpoint-input-group">
-                                    <div class="base-url-preview-compact" id="base-url-preview">Select a profile...</div>
-                                    <input type="text" id="endpoint-url" class="form-control endpoint-input" placeholder="/endpoint/path" />
-                                </div>                            </div>
+                                <!-- Endpoint validation feedback -->
+                                <div id="endpoint-validation-feedback" style="display: none;"></div>
+                            </div>
 
                             <div class="request-builder-body">                                <div class="collapsible-section" id="query-params-section">
                                     <div class="collapsible-header" onclick="toggleSection('query-params-section')">
@@ -198,7 +203,7 @@
                                                     <button class="kv-remove-btn" onclick="this.closest('.key-value-pair-compact').remove()">×</button>
                                                 </div>
                                             </div>
-                                            <button class="btn btn-sm btn-outline" onclick="endpointTester.addKeyValuePair('query-params')">
+                                            <button class="btn btn-sm btn-outline" onclick="addQueryParam()">
                                                 <i data-feather="plus"></i>
                                                 Add Parameter
                                             </button>
@@ -218,7 +223,7 @@
                                                     <button class="kv-remove-btn" onclick="this.closest('.key-value-pair-compact').remove()">×</button>
                                                 </div>
                                             </div>
-                                            <button class="btn btn-sm btn-outline" onclick="endpointTester.addKeyValuePair('request-headers')">
+                                            <button class="btn btn-sm btn-outline" onclick="addHeader()">
                                                 <i data-feather="plus"></i>
                                                 Add Header
                                             </button>
@@ -274,7 +279,7 @@
                                 </div>
 
                                 <!-- Send Button -->
-                                <button class="btn btn-primary btn-lg send-btn" onclick="endpointTester.sendRequest()" style="width: 100%;">
+                                <button class="btn btn-primary btn-lg send-btn" id="send-btn" onclick="window.endpointTester?.sendRequest()" style="width: 100%;">
                                     <i data-feather="send"></i>
                                     <span>Send Request</span>
                                 </button>
@@ -282,13 +287,13 @@
 
                             <!-- Quick Actions Footer -->
                             <div class="request-actions-footer">
-                                <button class="quick-action-btn" onclick="endpointTester.generateCode()" title="Generate PowerShell Code">
+                                <button class="quick-action-btn" onclick="window.endpointTester?.generateCode()" title="Generate PowerShell Code">
                                     <i data-feather="code"></i>
                                 </button>
-                                <button class="quick-action-btn" onclick="endpointTester.clearRequest()" title="Clear Form">
+                                <button class="quick-action-btn" onclick="window.endpointTester?.clearRequest()" title="Clear Form">
                                     <i data-feather="trash-2"></i>
                                 </button>
-                                <button class="quick-action-btn" onclick="endpointTester.saveRequest()" title="Save to History">
+                                <button class="quick-action-btn" onclick="window.endpointTester?.saveRequest()" title="Save to History">
                                     <i data-feather="save"></i>
                                 </button>
                                 <button class="quick-action-btn" onclick="app.showSection('history')" title="View History">
@@ -488,7 +493,6 @@
     <script src="js/profile-edit-modal.js"></script>
     <script src="js/api-client.js"></script>
     <script src="js/secret-manager.js"></script>
-    <script src="js/modern-ui.js"></script>
     <script src="js/profile-manager.js"></script>
     <script src="js/template-manager.js"></script>
     <script src="js/core/utils.js"></script>

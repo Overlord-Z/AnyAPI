@@ -120,7 +120,8 @@ class EndpointTester {
     validateEndpoint() {
         const endpointInput = document.getElementById('endpoint-url');
         const feedbackElement = document.getElementById('endpoint-validation-feedback');
-        const profileSelect = document.getElementById('test-profile');
+        // Use global profile selector
+        const profileSelect = document.getElementById('global-profile-selector');
         
         if (!endpointInput || !feedbackElement) return;
         
@@ -242,7 +243,8 @@ class EndpointTester {
      * Validate current request - returns boolean for UI compatibility
      */
     validateRequest() {
-        const profile = document.getElementById('test-profile')?.value;
+        // Use global profile selector
+        const profile = document.getElementById('global-profile-selector')?.value;
         const endpoint = document.getElementById('endpoint-url')?.value?.trim();
         
         if (!profile) {
@@ -270,7 +272,8 @@ class EndpointTester {
         const endpoint = endpointInput ? endpointInput.value.trim() : '';
         
         const data = {
-            profileName: document.getElementById('test-profile')?.value || this.currentProfile,
+            // Use global profile selector
+            profileName: document.getElementById('global-profile-selector')?.value || this.currentProfile,
             method: this.currentMethod,
             endpoint: endpoint,
             queryParameters: this.collectKeyValuePairs('query-params'),
@@ -332,33 +335,27 @@ class EndpointTester {
             
             const startTime = Date.now();
             
-            // Check if API client is ready using utils function
+            // ✅ FIXED: Direct API client readiness check
             console.log('🔍 Checking API client readiness...');
             
-            if (typeof window.isApiClientReady === 'function' && !window.isApiClientReady()) {
-                console.log('⏳ API client not ready, waiting...');
-                
-                // Wait for API client to be ready
-                const ready = typeof window.waitForApiClient === 'function' 
-                    ? await window.waitForApiClient(10000)
-                    : false;
-                
-                if (!ready) {
-                    throw new Error('API Client is not ready. Please check your connection and try again.');
+            // Check if global API client exists and is connected
+            if (!window.apiClient) {
+                throw new Error('API Client is not initialized. Please refresh the page and try again.');
+            }
+            
+            // Check connection status
+            if (!window.apiClient.isConnected) {
+                console.log('⏳ API client not connected, attempting connection check...');
+                const isConnected = await window.apiClient.checkConnection();
+                if (!isConnected) {
+                    throw new Error('Cannot connect to AnyAPI backend server. Please ensure the PowerShell server is running on the correct port.');
                 }
             }
             
             console.log('✅ API Client is ready, making request...');
             
-            // Use consolidated makeRequest function from utils
-            let response;
-            if (typeof window.makeRequest === 'function') {
-                response = await window.makeRequest(requestData);
-            } else if (window.apiClient && typeof window.apiClient.makeRequest === 'function') {
-                response = await window.apiClient.makeRequest(requestData);
-            } else {
-                throw new Error('No API request function available. Please refresh the page and try again.');
-            }
+            // Make the request using the API client
+            const response = await window.apiClient.makeRequest(requestData);
             
             const duration = Date.now() - startTime;
             
@@ -708,9 +705,15 @@ class EndpointTester {
         // Update base URL preview if element exists
         const baseUrlPreview = document.getElementById('base-url-preview');
         const compactPreview = document.querySelector('.base-url-preview-compact');
+        // Use global profile selector
+        const profileSelect = document.getElementById('global-profile-selector');
+        let profileName = this.currentProfile;
+        if (profileSelect && profileSelect.value) {
+            profileName = profileSelect.value;
+        }
         
-        if (this.currentProfile) {
-            const profile = window.profileManager?.getProfile(this.currentProfile);
+        if (profileName) {
+            const profile = window.profileManager?.getProfile(profileName);
             const baseUrl = profile?.baseUrl || 'No URL';
             
             if (baseUrlPreview) {
@@ -892,5 +895,17 @@ window.selectMethod = function(method) {
         console.error('EndpointTester not available for selectMethod');
     }
 };
+
+// At the end of the file, add a listener to keep EndpointTester in sync with the global selector
+document.addEventListener('DOMContentLoaded', () => {
+    const globalProfileSelector = document.getElementById('global-profile-selector');
+    if (globalProfileSelector) {
+        globalProfileSelector.addEventListener('change', (e) => {
+            if (window.endpointTester && typeof window.endpointTester.onProfileChange === 'function') {
+                window.endpointTester.onProfileChange(e.target.value);
+            }
+        });
+    }
+});
 
 console.log('📦 EndpointTester module loaded');

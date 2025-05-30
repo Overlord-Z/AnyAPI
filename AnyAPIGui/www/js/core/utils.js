@@ -256,3 +256,50 @@ async function makeRequest(requestData) {
     // Use the API client's testEndpoint method
     return await window.apiClient.testEndpoint(requestData);
 }
+
+/**
+ * Simple global notification function - bypasses module issues
+ * @param {string} message - The message to display
+ * @param {string} type - The type of notification (success, error, info, warning)
+ * @param {number} duration - Duration in milliseconds
+ */
+function showNotification(message, type = 'info', duration = 3000) {
+    const container = document.getElementById('notifications') || createNotificationsContainer();
+    
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `<span class="notification-message">${escapeHtml(message)}</span>`;
+    
+    // Set initial hidden state
+    notification.style.opacity = '0';
+    notification.style.transform = 'translateY(10px)';
+    
+    container.appendChild(notification);
+    
+    // Force reflow and show
+    notification.offsetHeight;
+    notification.style.transition = 'all 0.2s ease-out';
+    notification.style.opacity = '0.95';
+    notification.style.transform = 'translateY(0)';
+    
+    // Remove after duration
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateY(-10px)';
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 200);
+        }
+    }, duration);
+}
+
+function createNotificationsContainer() {
+    const container = document.createElement('div');
+    container.id = 'notifications';
+    container.className = 'notifications';
+    document.body.appendChild(container);
+    return container;
+}

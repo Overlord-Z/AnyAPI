@@ -801,6 +801,30 @@ h6 { font-size: var(--font-size-base); }
     box-shadow: var(--shadow-xs);
 }
 
+.detail-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-lg);
+    box-shadow: var(--shadow-xs);
+    margin-bottom: var(--spacing-lg);
+    font-size: var(--font-size-sm);
+}
+.detail-card.full-width { grid-column: 1 / -1; }
+
+.code-block {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacing-lg);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+    line-height: var(--line-height-relaxed);
+    overflow-x: auto;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-lg);
+}
+
 /* ===== MODERN MODALS ===== */
 .modal {
     display: none;
@@ -893,727 +917,84 @@ h6 { font-size: var(--font-size-base); }
     background: var(--bg-tertiary);
 }
 
-/* ===== MODERN NOTIFICATIONS ===== */
-.notifications {
-    position: fixed;
-    top: var(--spacing-xl);
-    right: var(--spacing-xl);
-    z-index: var(--z-notification);
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
-}
+/* ===== REMOVE PROFILE EDIT MODAL-SPECIFIC STYLES (now in profile-edit-modal.css) ===== */
+/* .profile-edit-modal, .profile-edit-modal-content, .profile-edit-modal-header, .profile-edit-modal-title, .profile-edit-modal-close, .profile-edit-modal-body, .form-section, .form-section-header, .form-section-title, .form-section-icon, .template-selector-section, .template-grid, .template-card, .template-card.selected, .template-card-title, .template-card-description, .form-group-enhanced, .form-label-enhanced, .form-label-required, .form-control-enhanced, .collapsible-section-enhanced, .collapsible-header-enhanced, .collapsible-title-enhanced, .collapsible-toggle-enhanced, .collapsible-content-enhanced, .collapsible-content-inner-enhanced, .dynamic-list-container, .dynamic-list-header, .dynamic-list-title, .dynamic-list-add-btn, .key-value-pair-enhanced, .key-value-input-enhanced, .key-value-remove-btn, .credential-row-enhanced, .credential-input-enhanced, .credential-key-input, .credential-value-input, .credential-toggle-btn, .code-editor-enhanced, .code-editor-header, .code-editor-title, .code-editor-actions, .code-editor-btn, .code-textarea-enhanced, .profile-edit-modal-footer, .profile-save-btn, .profile-cancel-btn, .form-validation-message, .form-validation-success, .save-progress, .save-spinner, [data-theme="dark"] .profile-edit-modal, [data-theme="dark"] .template-card, [data-theme="dark"] .template-card:hover, [data-theme="dark"] .form-control-enhanced:focus, .fade-in, .slide-down  */
+/* All these are now in profile-edit-modal.css and can be removed from styles.css if present. */
 
-.notification {
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-left: 4px solid var(--color-info);
-    border-radius: var(--border-radius-lg);
-    padding: var(--spacing-lg);
-    box-shadow: var(--shadow-lg);
-    min-width: 320px;
-    max-width: 420px;
-    animation: notificationSlideIn 0.3s ease-out;
-    position: relative;
-    overflow: hidden;
-}
-
-.notification.success {
-    border-left-color: var(--color-success);
-}
-
-.notification.error {
-    border-left-color: var(--color-danger);
-}
-
-.notification.warning {
-    border-left-color: var(--color-warning);
-}
-
-.notification.info {
-    border-left-color: var(--color-info);
-}
-
-@keyframes notificationSlideIn {
-    from {
-        opacity: 0;
-        transform: translateX(100%);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-/* ===== MODERN EMPTY STATES ===== */
-.empty-state {
-    text-align: center;
-    padding: var(--spacing-3xl);
-    color: var(--text-secondary);
-}
-
-.empty-icon {
-    width: 64px;
-    height: 64px;
-    margin: 0 auto var(--spacing-xl);
-    background: var(--bg-tertiary);
-    border-radius: var(--border-radius-xl);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 28px;
-}
-
-.empty-state h3 {
-    font-size: var(--font-size-xl);
-    margin-bottom: var(--spacing-sm);
-    color: var(--text-primary);
-    font-weight: var(--font-weight-semibold);
-}
-
-.empty-state p {
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-xl);
-}
-
-/* ===== OPTIMIZED ENDPOINT TESTER ===== */
-.tester-container-optimized {
-    display: grid;
-    grid-template-columns: 400px 1fr; /* Consider making the request builder slightly wider if needed e.g. 450px */
-    gap: var(--spacing-xl);
-    height: calc(100vh - 160px); /* Height of the container for request builder and response viewer */
-}
-
-/* ===== REQUEST BUILDER COMPACT (Refined) ===== */
-.request-builder-compact {
-    display: flex;
-    flex-direction: column;
-    background: var(--bg-primary);
-    border-radius: var(--border-radius-lg);
-    border: 1px solid var(--border-color);
-    max-height: calc(100vh - 200px); /* Max height before internal scrolling if content overflows */
-    overflow: hidden; /* Contains children, main scroll is in request-builder-body */
-}
-
-.request-builder-header {
-    padding: var(--spacing-md); /* MODIFIED: Reduced padding */
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column; /* Ensures children stack vertically */
-    gap: var(--spacing-md); /* Space between elements in the header if any besides method-endpoint-row */
-}
-
-.method-endpoint-row {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs); /* MODIFIED: Reduced gap */
-    width: 100%;
-}
-
-.request-builder-body {
-    display: block;
+/* ===== SCHEMA VIEW (RESTORED) ===== */
+.schema-container {
+    padding: 1rem;
+    max-height: 70vh;
     overflow-y: auto;
-    padding: var(--spacing-lg); /* MODIFIED: Consistent padding */
-    flex: 1; /* Allows this part to grow and shrink */
-    min-height: 0; /* Important for flex item to shrink properly */
-    position: relative;
 }
 
-/* ===== METHOD SELECTOR COMPACT (Refined) ===== */
-.method-selector-compact {
-    display: flex;
-    gap: 2px;
-    background: var(--bg-tertiary); /* Slightly different background for the group */
-    border-radius: var(--border-radius-sm);
-    padding: 2px; /* Small padding around the buttons */
-    justify-content: flex-start; /* Align buttons to the start */
-    width: 100%; /* Take full width */
-    flex-wrap: wrap; /* Allow buttons to wrap on very small screens if necessary */
-}
-
-.method-btn-compact {
-    padding: var(--spacing-xs) var(--spacing-sm); /* MODIFIED: Balanced padding */
-    border: 1px solid var(--border-color);
-    background: var(--bg-primary);
-    color: var(--text-secondary);
-    font-size: calc(var(--font-size-xs) * 0.95); /* MODIFIED: Slightly smaller font */
-    font-weight: var(--font-weight-medium);
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    min-width: 50px; /* MODIFIED: Ensure text like "DELETE" fits comfortably */
-    text-align: center;
-    outline: none;
-    position: relative;
-    z-index: 1;
-    flex-grow: 1; /* Allow buttons to share space if wrapped or desired */
-}
-
-.method-btn-compact.active,
-.method-btn-compact:focus {
-    background: var(--color-primary);
-    color: #fff;
-    border-color: var(--color-primary);
-    box-shadow: var(--shadow-sm);
-}
-
-.method-btn-compact:hover:not(.active) {
-    background: var(--bg-tertiary); /* Lighter hover */
-    color: var(--text-primary);
-    border-color: var(--color-primary-light); /* Hint of primary on hover */
-}
-
-/* ===== ENDPOINT INPUT GROUP (Refined) ===== */
-.endpoint-input-group {
-    display: flex;
-    align-items: center; /* Vertically align items if they have different heights */
-    width: 100%;
-    background: var(--bg-primary); /* MODIFIED: Use primary background for inputs */
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm);
-    overflow: hidden; /* Clip children like base URL preview */
-}
-
-.base-url-preview-compact {
-    padding: var(--spacing-xs) var(--spacing-sm); /* MODIFIED */
-    background: var(--bg-tertiary); /* MODIFIED: Use tertiary for distinct look from input */
-    border-right: 1px solid var(--border-color);
-    font-size: var(--font-size-xs); /* MODIFIED */
-    color: var(--text-secondary);
-    white-space: nowrap;
-    min-width: 110px; /* MODIFIED */
-    max-width: 170px; /* MODIFIED */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-family: var(--font-mono);
-    line-height: var(--line-height-normal); /* Ensure consistent height with input */
-}
-
-[data-theme="dark"] .base-url-preview-compact {
-    background: var(--color-gray-800); /* Dark mode specific */
-    color: var(--text-secondary);
-    border-right-color: var(--border-color-strong);
-}
-
-.base-url-preview-compact.empty {
-    color: var(--text-muted);
-    font-style: italic;
-}
-
-.base-url-preview-compact.error { /* Style for error state if profile load fails */
-    background: rgba(239, 68, 68, 0.1);
-    color: var(--color-danger);
-}
-[data-theme="dark"] .base-url-preview-compact.error {
-    background: rgba(239, 68, 68, 0.15);
-    color: var(--color-danger);
-}
-
-
-.endpoint-input {
-    border: none !important; /* Override other .form-control if necessary */
-    background: transparent !important; /* Make background transparent */
-    flex: 1; /* Take remaining space */
-    padding: var(--spacing-xs) var(--spacing-sm); /* MODIFIED */
-    font-size: var(--font-size-xs); /* MODIFIED */
-    font-family: var(--font-mono);
-    color: var(--text-primary); /* Ensure text color is correct */
-    line-height: var(--line-height-normal); /* Ensure consistent height */
-}
-
-.endpoint-input:focus {
-    outline: none;
-    box-shadow: none; /* Remove default focus shadow if group handles it */
-}
-
-.endpoint-input-group:focus-within {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px var(--color-primary-alpha);
-}
-
-
-/* ===== COLLAPSIBLE SECTIONS (Refined) ===== */
-.collapsible-section {
-    margin-bottom: var(--spacing-lg); /* MODIFIED: Spacing between sections */
-    /* margin-top is removed as .request-builder-body will have padding */
+.schema-item {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
-    overflow: visible;
     background: var(--bg-primary);
 }
 
-/* Ensure no top margin for the first collapsible section if parent has padding */
-.request-builder-body > .collapsible-section:first-child {
-    margin-top: 0;
-}
-
-.collapsible-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--spacing-sm) var(--spacing-md); /* MODIFIED: Reduced padding */
-    background: var(--bg-secondary);
-    cursor: pointer;
-    border-bottom: 1px solid var(--border-color);
-    transition: background-color var(--transition-fast);
-    user-select: none;
-    border-radius: var(--border-radius) var(--border-radius) 0 0; /* Top corners rounded */
-}
-
-.collapsible-section:not(.expanded) .collapsible-header {
-    border-radius: var(--border-radius); /* All corners rounded when collapsed */
-    border-bottom-color: transparent; /* Hide border when collapsed unless it's the main border */
-}
-.collapsible-section:not(.expanded) {
-    border-bottom-color: var(--border-color); /* Ensure main border is visible */
-}
-
-
-.collapsible-header:hover {
-    background: var(--bg-tertiary);
-}
-
-.collapsible-content {
-    background: var(--bg-primary);
-    display: none;
-    overflow: hidden; /* Changed from visible to work with maxHeight animation */
-    /* max-height will be set by JS for animation */
-}
-
-.collapsible-section.expanded .collapsible-content {
-    display: block;
-    /* overflow: visible; */ /* Let scrollHeight be calculated correctly, then JS sets maxHeight */
-    animation: slideDown 0.3s ease-out forwards; /* forwards to keep final state */
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.collapsible-content-inner {
-    padding: var(--spacing-md); /* MODIFIED: Reduced padding */
-    overflow: visible; /* Allow internal elements to not be clipped if needed, e.g. custom dropdowns */
-}
-
-.collapse-icon {
-    transition: transform 0.3s ease;
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-    transform: rotate(0deg);
-}
-
-.collapsible-section.expanded .collapse-icon {
-    transform: rotate(180deg);
-}
-
-/* Enhanced scrollbar styling for parent container */
-.request-builder-body::-webkit-scrollbar {
-    width: 10px; /* MODIFIED: Slightly slimmer */
-}
-
-.request-builder-body::-webkit-scrollbar-track {
-    background: var(--bg-tertiary);
-    border-radius: 5px; /* MODIFIED */
-    margin: 4px 0; /* MODIFIED */
-    border: 1px solid var(--border-color);
-}
-
-.request-builder-body::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, var(--color-primary-light), var(--color-primary));
-    border-radius: 5px; /* MODIFIED */
-    border: 2px solid var(--bg-tertiary);
-}
-
-.request-builder-body::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, var(--color-primary), var(--color-primary-dark));
-}
-
-.request-builder-body { /* Firefox scrollbar */
-    scrollbar-width: thin; /* MODIFIED */
-    scrollbar-color: var(--color-primary) var(--bg-tertiary);
-}
-
-.collapsible-section.expanded {
-    box-shadow: var(--shadow-sm);
-    border-color: var(--color-primary-alpha); /* Subtle border highlight */
-}
-
-.collapsible-section.expanded .collapsible-header {
-    background: var(--color-primary-alpha); /* Subtle background highlight */
-}
-
-
-/* ===== KEY-VALUE PAIRS (Refined) ===== */
-.key-value-container {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm); /* MODIFIED: Consistent spacing */
-    min-height: auto; /* MODIFIED: Let content define height */
-    max-height: none;
-    overflow: visible; /* Allow content to be fully visible */
-}
-
-.key-value-pair-compact {
-    display: flex;
-    gap: var(--spacing-xs); /* MODIFIED: Reduced gap for tighter packing */
-    align-items: center;
-    width: 100%;
-}
-
-.kv-input-compact {
-    flex: 1;
-    padding: var(--spacing-xs) var(--spacing-sm); /* MODIFIED: Reduced padding */
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm); /* MODIFIED: Smaller radius */
-    font-size: var(--font-size-sm); /* MODIFIED: Adjusted font size */
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    min-width: 0; /* Allow shrinking */
-    line-height: var(--line-height-normal); /* Consistent height */
-}
-
-.kv-input-compact:focus {
-    outline: none;
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px var(--color-primary-alpha); /* Use alpha for focus shadow */
-}
-
-.kv-remove-btn {
-    background: transparent; /* MODIFIED: Cleaner look */
-    color: var(--color-danger);
-    border: 1px solid transparent; /* No border by default */
-    border-radius: var(--border-radius-sm); /* MODIFIED */
-    padding: var(--spacing-xs); /* MODIFIED: Smaller padding makes button smaller */
-    cursor: pointer;
-    font-size: 1.2rem; /* Adjust 'x' size */
-    line-height: 1; /* Center 'x' */
-    flex-shrink: 0; /* Don't shrink */
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    /* Ensure height matches input or is visually balanced */
-    height: calc( (var(--font-size-sm) * var(--line-height-normal)) + (2 * var(--spacing-xs)) + 2px); /* Approx matching input height */
-}
-
-.kv-remove-btn:hover {
-    background: var(--color-danger); /* MODIFIED: Danger background on hover */
-    color: white; /* MODIFIED: White 'x' on hover */
-    border-color: var(--color-danger);
-}
-
-/* Add button styling (already uses .btn.btn-sm.btn-outline) */
-.collapsible-content-inner .btn.btn-sm.btn-outline {
-    margin-top: var(--spacing-md); /* MODIFIED: Consistent spacing */
-    border-color: var(--color-primary); /* Ensure primary color for outline */
+.schema-path {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    font-weight: var(--font-weight-semibold);
     color: var(--color-primary);
+    margin-bottom: 0.5rem;
 }
 
-.collapsible-content-inner .btn.btn-sm.btn-outline:hover {
-    background: var(--color-primary);
-    color: white;
+.schema-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.75rem;
 }
 
-/* Send Button Spacing */
-.request-builder-body > .send-btn { /* Target send button directly in request-builder-body */
-    margin-top: var(--spacing-xl); /* Space above send button */
-    width: 100%; /* Make it full width if desired */
-}
-
-.request-actions-footer {
-    padding: var(--spacing-md);
-    border-top: 1px solid var(--border-color);
-    background: var(--bg-secondary);
-    display: flex;
-    justify-content: flex-end; /* Or space-around */
-    gap: var(--spacing-sm);
-}
-
-.quick-action-btn {
-    background: transparent;
-    border: 1px solid transparent;
-    color: var(--text-secondary);
-    padding: var(--spacing-xs);
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.quick-action-btn:hover {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-    border-color: var(--border-color);
-}
-
-
-/* ===== RESPONSE VIEWER OPTIMIZED ===== */
-.response-viewer-optimized {
-    display: flex;
-    flex-direction: column;
-    background: var(--bg-primary);
-    border-radius: var(--border-radius-lg);
-    border: 1px solid var(--border-color);
-    overflow: hidden;
-    height: 100%; /* Take full height of its grid cell */
-}
-
-.response-header-enhanced {
-    padding: var(--spacing-lg);
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.response-title {
-    font-weight: var(--font-weight-medium);
-    color: var(--text-primary);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-}
-
-.response-meta-compact {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-lg);
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-}
-
-.response-content-enhanced {
-    flex: 1;
-    overflow: hidden; /* Parent handles overflow with scrollable child */
-    display: flex;
-    flex-direction: column; /* Stack tabs and viewer */
-}
-
-.response-viewer { /* This is the actual content area below tabs */
-    flex: 1;
-    overflow-y: auto; /* This is where individual tab content scrolls */
-    padding: var(--spacing-lg);
-}
-
-/* ===== ENHANCED RESPONSE VIEWER STYLES ===== */
-
-/* Response Viewer Container */
-.enhanced-response-viewer { /* This class is not used in provided HTML, keeping for reference if it was intended */
-    background: var(--bg-elevated);
-    border-radius: var(--border-radius-lg);
-    border: 1px solid var(--border-color);
-    overflow: hidden;
-    box-shadow: var(--shadow-md);
-}
-
-/* View Header */
-.view-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
-}
-
-.view-header h3 {
-    margin: 0;
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.view-actions {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.view-actions button {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.875rem;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.view-actions button:hover {
-    background: var(--color-gray-100);
-    border-color: var(--border-color-strong);
-    color: var(--text-primary);
-}
-
-/* General Content Styling */
-.view-message {
-    padding: 2rem;
-    text-align: center;
-    color: var(--text-secondary);
-    font-style: italic;
-}
-
-/* Raw and Formatted Views */
-.raw-json, .formatted-json {
-    margin: 0;
-    padding: 1rem;
-    background: var(--bg-tertiary);
-    border: none;
-    font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
-    font-size: 0.875rem;
-    line-height: 1.5;
-    color: var(--text-primary);
-    overflow: auto;
-    max-height: 70vh; /* Example max height */
-}
-
-.formatted-json {
-    white-space: pre-wrap;
-}
-
-/* JSON Syntax Highlighting */
-.json-key { color: var(--color-info); font-weight: 500; }
-.json-string { color: var(--color-success); }
-.json-number { color: var(--color-warning); }
-.json-boolean { color: var(--color-secondary); font-weight: 500; }
-.json-null { color: var(--text-tertiary); font-style: italic; }
-.json-punctuation { color: var(--text-secondary); }
-
-/* Enhanced Table View */
-.table-container {
-    max-height: 70vh; /* Example max height */
-    overflow: auto;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    margin: 1rem;
-}
-
-.enhanced-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.875rem;
-    background: var(--bg-primary);
-}
-
-.enhanced-table th {
-    background: var(--bg-secondary);
-    padding: 0.75rem;
-    text-align: left;
-    font-weight: 600;
-    color: var(--text-primary);
-    border-bottom: 2px solid var(--border-color-strong);
-    position: sticky;
-    top: 0;
-    cursor: pointer;
-    user-select: none;
-}
-
-.enhanced-table th:hover { background: var(--color-gray-200); } /* Light mode specific */
-[data-theme="dark"] .enhanced-table th:hover { background: var(--color-gray-700); } /* Dark mode specific */
-
-
-.enhanced-table th .sort-indicator {
-    float: right;
-    color: var(--text-tertiary);
+.schema-detail { display: flex; flex-direction: column; gap: 0.15rem; }
+.schema-detail-label {
     font-size: 0.75rem;
+    font-weight: var(--font-weight-medium);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.15rem;
+}
+.schema-detail-value { font-size: 0.9rem; color: var(--text-primary); }
+
+.schema-type {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.schema-type.string { background: var(--color-success-alpha); color: var(--color-success); }
+.schema-type.number { background: var(--color-info-alpha); color: var(--color-info); }
+.schema-type.boolean { background: var(--color-secondary-alpha); color: var(--color-secondary); }
+.schema-type.array { background: var(--color-warning-alpha); color: var(--color-warning); }
+.schema-type.object { background: var(--color-primary-alpha); color: var(--color-primary); }
+.schema-type.null { background: var(--bg-tertiary); color: var(--text-tertiary); }
+
+.schema-patterns { margin-top: 0.25rem; }
+.schema-pattern {
+    display: inline-block;
+    margin-right: 0.5rem;
+    margin-bottom: 0.15rem;
+    padding: 0.15rem 0.5rem;
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
 }
 
-.enhanced-table td {
-    padding: 0.75rem;
-    border-bottom: 1px solid var(--border-color);
-    vertical-align: middle;
-    text-align: left; /* Usually better for table data */
-    max-width: 300px; /* Prevent overly wide columns */
-    word-wrap: break-word;
-}
-
-.enhanced-table tr:hover { background: var(--color-gray-50); } /* Light mode */
-[data-theme="dark"] .enhanced-table tr:hover { background: var(--color-gray-800); } /* Dark mode */
-
-
-/* Table Cell Types */
-.cell-null { color: var(--text-tertiary); font-style: italic; }
-.cell-number { color: var(--color-info); } /* Recheck variables if these are primary/secondary */
-.cell-boolean { color: var(--color-secondary); font-weight: 500; }
-.cell-string { color: var(--text-primary); }
-.cell-array { color: var(--color-warning); cursor: pointer; }
-.cell-object { color: var(--color-success); cursor: pointer; }
-
-.null-value { color: var(--text-tertiary); font-style: italic; }
-.array-value {
-    color: var(--color-warning);
-    font-weight: 500;
-    cursor: pointer;
-    text-decoration: underline;
-    transition: all 0.2s ease;
-}
-.array-value:hover { background: var(--color-warning); color: white; padding: 2px 6px; border-radius: 4px; }
-.object-value {
-    color: var(--color-success);
-    font-weight: 500;
-    cursor: pointer;
-    text-decoration: underline;
-    transition: all 0.2s ease;
-}
-.object-value:hover { background: var(--color-success); color: white; padding: 2px 6px; border-radius: 4px; }
-.boolean-value.true { color: var(--color-success); }
-.boolean-value.false { color: var(--color-danger); }
-.truncated-value { cursor: help; }
-
-
-.table-info { font-size: 0.875rem; color: var(--text-secondary); }
-
-.table-pagination {
-    padding: 1rem;
-    text-align: center;
-    border-top: 1px solid var(--border-color);
-}
-.table-pagination button { /* Use .btn styles for consistency if possible */
-    padding: 0.5rem 1rem;
-    background: var(--color-primary);
-    color: white;
-    border: none;
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    font-weight: 500;
-}
-.table-pagination button:hover { background: var(--color-primary-dark); }
-
-
-/* Schema View (Tree and JSON) */
-.schema-view { position: relative; }
-.schema-json-view, .schema-tree-view { display: none; }
-.schema-json-view.active, .schema-tree-view.active { display: block; }
-
-.schema-json-view .formatted-json {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    padding: 1rem;
-    font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
-    font-size: 0.875rem;
-    line-height: 1.5;
-    overflow-x: auto;
-}
-
-/* Enhanced Tree View */
+/* ===== TREE VIEW (RESTORED) ===== */
 .tree-view.enhanced {
-    padding: 1rem;
-    max-height: 70vh; /* Example max height */
+    padding: 0.75rem;
+    max-height: 70vh;
     overflow: auto;
-    font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 0.875rem;
     line-height: 1.4;
 }
@@ -1627,7 +1008,7 @@ h6 { font-size: var(--font-size-base); }
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.25rem;
+    padding: 0.15rem 0.25rem;
     cursor: pointer;
     border-radius: var(--border-radius-sm);
     transition: background-color 0.2s ease;
@@ -1653,7 +1034,7 @@ h6 { font-size: var(--font-size-base); }
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.25rem;
+    padding: 0.15rem 0.25rem;
     border-radius: var(--border-radius-sm);
     transition: background-color 0.2s ease;
 }
@@ -1675,534 +1056,132 @@ h6 { font-size: var(--font-size-base); }
 }
 .tree-action:hover { background: var(--bg-tertiary); color: var(--text-primary); }
 
-
-/* ===== RESPONSE VIEWER TABS ===== */
-.response-tabs {
-    display: flex;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
-    overflow-x: auto; /* Allow tabs to scroll horizontally if they don't fit */
-    min-height: 40px; /* Ensure consistent height */
-}
-
-.response-tab {
-    padding: var(--spacing-sm) var(--spacing-lg);
-    background: transparent;
-    border: none; /* Remove individual borders */
-    border-bottom: 2px solid transparent; /* Bottom border for active state */
-    color: var(--text-secondary);
-    cursor: pointer;
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
-    transition: all var(--transition-fast);
-    white-space: nowrap; /* Prevent tab text from wrapping */
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-}
-
-.response-tab:hover {
-    background: var(--bg-tertiary); /* Subtle hover */
-    color: var(--text-primary);
-}
-
-.response-tab.active {
-    color: var(--color-primary);
-    border-bottom-color: var(--color-primary);
-    /* background: var(--color-primary-alpha); */ /* Optional: background for active tab */
-}
-
-/* ===== RESPONSE SEARCH ===== */
-.response-search-container {
-    padding: var(--spacing-md) var(--spacing-lg);
-    background: var(--bg-tertiary); /* Different background for search area */
-    border-bottom: 1px solid var(--border-color);
-}
-
-.search-input-wrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.search-icon {
-    position: absolute;
-    left: var(--spacing-sm); /* Position icon inside the input area */
-    color: var(--text-tertiary);
-    pointer-events: none; /* Icon shouldn't be interactive */
-    z-index: 1; /* Above input background */
-}
-
-.response-search-input {
-    flex: 1;
-    padding: var(--spacing-sm) var(--spacing-md); /* Adjust padding */
-    padding-left: calc(var(--spacing-sm) + 18px + var(--spacing-xs)); /* Make space for icon */
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    font-size: var(--font-size-sm);
-}
-
-.response-search-input:focus {
-    outline: none;
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px var(--color-primary-alpha);
-}
-
-.search-close-btn { /* Button to clear search or close search bar */
-    position: absolute;
-    right: var(--spacing-sm);
-    background: none;
+/* ===== RAW/FORMATTED JSON (RESTORED) ===== */
+.raw-json, .formatted-json {
+    margin: 0;
+    padding: 0.75rem 1rem;
+    background: var(--bg-tertiary);
     border: none;
-    color: var(--text-tertiary);
-    cursor: pointer;
-    padding: var(--spacing-xs);
-    border-radius: var(--border-radius-sm);
+    font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--text-primary);
+    overflow: auto;
+    max-height: 70vh;
 }
-.search-close-btn:hover { background: var(--bg-secondary); color: var(--text-primary); }
 
-.search-stats { margin-top: var(--spacing-sm); font-size: var(--font-size-xs); color: var(--text-secondary); }
+/* JSON Syntax Highlighting */
+.json-key { color: var(--color-info); font-weight: 500; }
+.json-string { color: var(--color-success); }
+.json-number { color: var(--color-warning); }
+.json-boolean { color: var(--color-secondary); font-weight: 500; }
+.json-null { color: var(--text-tertiary); font-style: italic; }
+.json-punctuation { color: var(--text-secondary); }
 
-
-/* ===== SEARCH RESULTS HIGHLIGHTING ===== */
+/* ===== SEARCH RESULTS HIGHLIGHTING (RESTORED) ===== */
 .search-highlight {
-    background: var(--color-warning); /* Or a dedicated highlight color */
-    color: var(--text-inverse); /* Ensure contrast, var(--color-warning-contrast) if defined */
+    background: var(--color-warning);
+    color: var(--text-inverse);
     padding: 0.125rem 0.25rem;
     border-radius: var(--border-radius-sm);
     font-weight: var(--font-weight-medium);
 }
 
-.search-result-item { /* Example styling for search results list */
-    padding: var(--spacing-sm);
+.search-result-item {
+    padding: 0.5rem;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
-    margin-bottom: var(--spacing-sm);
+    margin-bottom: 0.5rem;
     background: var(--bg-primary);
     cursor: pointer;
 }
 .search-result-item:hover { background: var(--bg-secondary); border-color: var(--color-primary); }
-.search-result-path { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--text-tertiary); margin-bottom: var(--spacing-xs); }
-.search-result-content { font-size: var(--font-size-sm); color: var(--text-primary); }
+.search-result-path { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-tertiary); margin-bottom: 0.15rem; }
+.search-result-content { font-size: 0.85rem; color: var(--text-primary); }
 
-
-/* ===== SCHEMA VIEW (Data Statistics / Schema Analysis) ===== */
-.schema-container {
-    padding: var(--spacing-lg);
-    max-height: 70vh; /* Example max height */
-    overflow-y: auto;
+/* ===== SCROLLBAR ===== */
+.request-builder-body::-webkit-scrollbar,
+.response-viewer-optimized::-webkit-scrollbar {
+    width: 7px;
 }
 
-.schema-item { /* Represents a single schema definition */
-    margin-bottom: var(--spacing-lg);
-    padding: var(--spacing-md);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    background: var(--bg-primary); /* Or --bg-secondary for slight differentiation */
+.request-builder-body::-webkit-scrollbar-thumb,
+.response-viewer-optimized::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--color-primary-light), var(--color-primary));
+    border-radius: 4px;
+    border: 2px solid var(--bg-tertiary);
 }
 
-.schema-path {
-    font-family: var(--font-mono);
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-primary);
-    margin-bottom: var(--spacing-sm);
-}
-
-.schema-details { /* Grid for schema properties like type, format, etc. */
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: var(--spacing-md);
-}
-
-.schema-detail { display: flex; flex-direction: column; gap: var(--spacing-xs); }
-.schema-detail-label {
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-medium);
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: var(--spacing-xs); /* If needed, or rely on gap */
-}
-.schema-detail-value { font-size: var(--font-size-sm); color: var(--text-primary); }
-
-.schema-type { /* For displaying data types like string, number as tags */
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    border-radius: var(--border-radius-sm);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-medium);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    /* Define alpha versions of your status colors for backgrounds */
-    /* --color-success-alpha: rgba(22, 163, 74, 0.1); ... etc. */
-}
-/* Example: Ensure these alpha colors are defined in :root or here */
-:root {
-    --color-success-alpha: rgba(22, 163, 74, 0.1);
-    --color-info-alpha: rgba(8, 145, 178, 0.1);
-    --color-secondary-alpha: rgba(124, 58, 237, 0.1); /* Assuming secondary is used for boolean */
-    --color-warning-alpha: rgba(249, 115, 22, 0.1);
-    --color-primary-alpha: rgba(37, 99, 235, 0.1); /* For object type */
-}
-
-.schema-type.string { background: var(--color-success-alpha); color: var(--color-success); }
-.schema-type.number { background: var(--color-info-alpha); color: var(--color-info); }
-.schema-type.boolean { background: var(--color-secondary-alpha); color: var(--color-secondary); }
-.schema-type.array { background: var(--color-warning-alpha); color: var(--color-warning); }
-.schema-type.object { background: var(--color-primary-alpha); color: var(--color-primary); }
-.schema-type.null { background: var(--bg-tertiary); color: var(--text-tertiary); }
-
-.schema-patterns { /* For displaying detected patterns like "email", "date" */
-    margin-top: var(--spacing-sm);
-}
-.schema-pattern {
-    display: inline-block;
-    margin-right: var(--spacing-sm);
-    margin-bottom: var(--spacing-xs);
-    padding: 0.25rem 0.5rem;
+.request-builder_body::-webkit-scrollbar-track,
+.response-viewer-optimized::-webkit-scrollbar-track {
     background: var(--bg-tertiary);
-    border-radius: var(--border-radius-sm);
-    font-size: var(--font-size-xs);
-    color: var(--text-secondary);
-}
-
-
-/* ===== PROFILE CARDS - ENHANCED STYLING ===== */
-.profile-card {
-    background: var(--bg-primary);
+    border-radius: 4px;
+    margin: 2px 0;
     border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    margin-bottom: var(--spacing-sm);
-    padding: var(--spacing-lg);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    position: relative;
-    overflow: hidden;
 }
 
-.profile-card:hover {
-    border-color: var(--border-color-strong);
-    box-shadow: var(--shadow-sm);
-    transform: translateY(-1px);
+.request-builder-body,
+.response-viewer-optimized {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-primary) var(--bg-tertiary);
 }
 
-.profile-card.active {
-    border-color: var(--color-primary);
-    background: var(--color-primary-alpha);
-    box-shadow: var(--shadow-md);
-}
-
-.profile-card.active::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: var(--color-primary);
-}
-
-/* Profile Card Header */
-.profile-card-header {
-    display: flex;
-    align-items: flex-start; /* Align items to top for multi-line titles */
-    justify-content: space-between;
-    margin-bottom: var(--spacing-md);
-    gap: var(--spacing-md);
-}
-
-.profile-card-title {
-    display: flex;
-    align-items: center; /* Icon and text alignment */
-    gap: var(--spacing-sm);
-    flex: 1; /* Allow title to take available space */
-    min-width: 0; /* Prevent overflow issues with long names */
-}
-
-.profile-name {
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
-    margin: 0;
-    line-height: var(--line-height-tight);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* Profile Card Body */
-.profile-card-body { display: flex; flex-direction: column; gap: var(--spacing-xs); }
-.profile-url {
-    font-family: var(--font-mono);
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    line-height: var(--line-height-normal);
-}
-.profile-description {
-    font-size: var(--font-size-sm);
-    color: var(--text-tertiary);
-    line-height: var(--line-height-normal);
-    margin-top: var(--spacing-xs);
-}
-
-/* Auth Chips */
-.auth-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    padding: var(--spacing-xs) var(--spacing-sm);
-    border-radius: var(--border-radius-sm);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-medium);
-    line-height: 1;
-    white-space: nowrap;
-    flex-shrink: 0; /* Prevent shrinking in flex contexts */
-}
-.auth-icon { font-size: 0.75em; line-height: 1;} /* Ensure icon size is relative */
-.auth-text { font-size: var(--font-size-xs); font-weight: var(--font-weight-medium); text-transform: uppercase; letter-spacing: 0.025em; }
-
-/* Auth chip variants */
-.auth-chip.auth-bearer { background: rgba(34, 197, 94, 0.1); color: var(--color-success); border: 1px solid rgba(34, 197, 94, 0.2); }
-.auth-chip.auth-basic { background: rgba(59, 130, 246, 0.1); color: var(--color-primary); border: 1px solid rgba(59, 130, 246, 0.2); }
-.auth-chip.auth-apikey { background: rgba(147, 51, 234, 0.1); color: var(--color-secondary); border: 1px solid rgba(147, 51, 234, 0.2); }
-.auth-chip.auth-customscript { background: rgba(249, 115, 22, 0.1); color: var(--color-warning); border: 1px solid rgba(249, 115, 22, 0.2); }
-.auth-chip.auth-none { background: var(--bg-tertiary); color: var(--text-tertiary); border: 1px solid var(--border-color); }
-
-
-/* Profile Actions (Edit, Test, Delete buttons on card) */
-.profile-actions { display: flex; gap: var(--spacing-xs); align-items: center; opacity: 0; transition: opacity var(--transition-fast); }
-.profile-card:hover .profile-actions { opacity: 1; }
-
-.action-btn { /* General styling for small action buttons */
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    padding: 0; /* Remove padding if size is fixed by width/height */
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius-sm);
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    font-size: var(--font-size-sm); /* Icon size */
-    line-height: 1;
-}
-.action-btn:hover { background: var(--bg-tertiary); border-color: var(--border-color-strong); color: var(--text-primary); }
-.action-btn.edit-btn:hover { background: rgba(59, 130, 246, 0.1); border-color: var(--color-primary); color: var(--color-primary); }
-.action-btn.test-btn:hover { background: rgba(34, 197, 94, 0.1); border-color: var(--color-success); color: var(--color-success); }
-.action-btn.delete-btn:hover { background: rgba(239, 68, 68, 0.1); border-color: var(--color-danger); color: var(--color-danger); }
-.btn-icon { font-size: 0.875em; line-height: 1; } /* For icons inside buttons */
-
-
-/* Empty State Enhancements (for Profile Details, History, etc.) */
-.empty-state { /* Already defined, ensure it matches */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: var(--spacing-3xl);
-    text-align: center;
-    min-height: 200px; /* Ensure it takes some space */
-    color: var(--text-secondary);
-}
-.empty-state-icon { /* If using a specific class for icon wrapper */
-    width: 64px; height: 64px;
-    background: var(--bg-tertiary);
-    border-radius: var(--border-radius-xl);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 28px; /* Feather icon size adjustment might be needed */
-    margin-bottom: var(--spacing-xl);
-    color: var(--text-tertiary);
-}
-.empty-state-content { margin-bottom: var(--spacing-xl); }
-.empty-state-content h3 { font-size: var(--font-size-xl); font-weight: var(--font-weight-semibold); color: var(--text-primary); margin-bottom: var(--spacing-sm); }
-.empty-state-content p { font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--spacing-lg); }
-.empty-state-meta { font-size: var(--font-size-xs); color: var(--text-tertiary); }
-
-
-/* Profile Details Container (Right panel when a profile is selected) */
-.profile-details-container {
-    background: var(--bg-primary);
-    border-radius: var(--border-radius-lg);
-    border: 1px solid var(--border-color);
-    overflow: hidden; /* Contains content */
-    height: 100%; /* Take full height of its grid cell */
-    display: flex; /* Added for cases like error/empty state centering */
-    flex-direction: column; /* Stack header and content */
-}
-.profile-details-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--spacing-xl);
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-color);
-    flex-shrink: 0; /* Header should not shrink */
-}
-.profile-title-section { display: flex; flex-direction: column; gap: var(--spacing-sm); }
-.profile-title { font-size: var(--font-size-2xl); font-weight: var(--font-weight-bold); color: var(--text-primary); margin: 0; line-height: var(--line-height-tight); }
-.profile-meta { display: flex; gap: var(--spacing-md); align-items: center; }
-
-.profile-status { /* Tag for "Session Only" or "Persistent" */
-    display: inline-flex; align-items: center; gap: var(--spacing-xs);
-    padding: var(--spacing-xs) var(--spacing-sm);
-    border-radius: var(--border-radius-sm);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-medium);
-    line-height: 1;
-}
-.profile-status.session-only { background: rgba(249, 115, 22, 0.1); color: var(--color-warning); border: 1px solid rgba(249, 115, 22, 0.2); }
-.profile-status.persistent { background: rgba(34, 197, 94, 0.1); color: var(--color-success); border: 1px solid rgba(34, 197, 94, 0.2); }
-
-.profile-header-actions { display: flex; gap: var(--spacing-sm); align-items: center; }
-
-/* Profile Details Grid & Content Area */
-.profile-details-content { /* New wrapper for scrollable content */
-    flex-grow: 1;
-    overflow-y: auto;
-    padding: var(--spacing-xl);
-}
-.profile-details-grid { /* Used inside .profile-details-content */
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: var(--spacing-lg);
-    /* padding: var(--spacing-xl); */ /* Padding moved to parent .profile-details-content */
-}
-
-.detail-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: var(--spacing-lg); }
-.detail-card.full-width { grid-column: 1 / -1; } /* Span full width if needed */
-
-.detail-label {
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-secondary);
-    margin-bottom: var(--spacing-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.025em;
-    /* margin-top: var(--spacing-md); */ /* Remove if using cards or sections */
-}
-.detail-content { font-size: var(--font-size-sm); color: var(--text-primary); line-height: var(--line-height-normal); }
-.detail-content.url-content {
-    font-family: var(--font-mono);
-    word-break: break-all;
-    background: var(--bg-tertiary);
-    padding: var(--spacing-sm);
-    border-radius: var(--border-radius-sm);
-    border:  1px solid var(--border-color);
-}
-.detail-content .auth-details { margin-left: var(--spacing-sm); font-size: var(--font-size-xs); color: var(--text-tertiary); }
-
-/* Detail Sections (alternative to cards if used) */
-.detail-section {
-    padding-bottom: var(--spacing-xl); /* Space between sections if not using cards */
-    margin-bottom: var(--spacing-xl);
-    border-bottom: 1px solid var(--border-color);
-}
-.detail-section:last-child { border-bottom: none; margin-bottom: 0; }
-/* .detail-section:first-child { border-top: none; } */ /* Usually not needed */
-
-
-.code-block { /* For displaying generated code or scripts */
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    padding: var(--spacing-lg);
-    font-family: var(--font-mono);
-    font-size: var(--font-size-sm);
-    line-height: var(--line-height-relaxed);
-    overflow-x: auto;
-    color: var(--text-primary); /* Ensure text is readable */
-}
-.setting-item { margin-bottom: var(--spacing-xs); }
-.setting-item strong { color: var(--color-primary); font-weight: var(--font-weight-semibold); }
-.script-content pre { margin: 0; white-space: pre-wrap; word-wrap: break-word; }
-.script-content code { font-family: var(--font-mono); font-size: var(--font-size-xs); line-height: var(--line-height-relaxed); }
-
-
-/* Error State for Profile Details */
-.profile-details-container.error-state { /* When profile fails to load or not found */
-    display: flex; /* Already set, ensure it works for centering */
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: var(--spacing-3xl); /* Use existing empty state padding */
-    flex-grow: 1; /* Take up space if header is present */
-}
-.error-icon { font-size: 48px; margin-bottom: var(--spacing-xl); color: var(--color-danger); }
-/* Use .empty-state structure if it matches */
-
-
-/* Global Profile Selector in Header (Not part of tester, but general UI element) */
-.profile-selector-container { display: flex; align-items: center; gap: var(--spacing-sm); }
-.profile-selector-label { font-size: var(--font-size-sm); font-weight: var(--font-weight-medium); color: var(--text-secondary); margin: 0; }
-.profile-selector-global { /* Assuming this is a select dropdown */
-    min-width: 200px; max-width: 300px;
-    /* Apply .form-control styles or similar custom select styling */
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    padding: var(--spacing-xs) var(--spacing-sm);
-    color: var(--text-primary);
-    font-size: var(--font-size-sm);
-    transition: all var(--transition-fast);
-}
-.profile-selector-global:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-alpha); }
-
-
-/* Responsive Design */
-@media (max-width: 992px) { /* Adjust breakpoint for tester layout change */
+/* ===== MEDIA QUERIES (COMPACT) ===== */
+@media (max-width: 992px) {
     .tester-container-optimized {
-        grid-template-columns: 1fr; /* Stack request and response on smaller screens */
-        height: auto; /* Allow natural height */
+        grid-template-columns: 1fr;
+        height: auto;
     }
-    .request-builder-compact {
-        max-height: none; /* Allow full height when stacked */
-    }
+    .request-builder-compact,
     .response-viewer-optimized {
-        min-height: 400px; /* Ensure response viewer has some min height */
+        max-height: none;
+        min-height: 320px;
     }
 }
 
 @media (max-width: 768px) {
-    .profile-card { padding: var(--spacing-md); }
-    .profile-card-header { flex-direction: column; align-items: flex-start; gap: var(--spacing-sm); }
-    .profile-actions { opacity: 1; align-self: flex-end; } /* Actions always visible on mobile */
-
-    .profile-details-grid { grid-template-columns: 1fr; gap: var(--spacing-md); }
-    /* .profile-details-content { padding: var(--spacing-lg); } */ /* Adjust padding if needed */
-    .profile-details-header { flex-direction: column; align-items: flex-start; gap: var(--spacing-md); }
-    .profile-header-actions { align-self: stretch; justify-content: flex-start; /* Or center */ }
+    .request-builder-header,
+    .response-header-enhanced {
+        padding: 0.5rem 0.5rem;
+    }
+    .request-builder-body,
+    .response-viewer {
+        padding: 0.5rem 0.5rem;
+    }
+    .collapsible-header,
+    .collapsible-content-inner {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
 }
 
 @media (max-width: 480px) {
-    .action-btn { width: 32px; height: 32px; } /* Slightly larger touch target if needed */
-    .profile-title { font-size: var(--font-size-xl); }
-    /* .detail-section { padding: var(--spacing-lg); } */ /* Already in .profile-details-content */
-    .method-btn-compact { min-width: 40px; font-size: calc(var(--font-size-xs) * 0.9); } /* Further shrink method buttons */
-    .base-url-preview-compact { min-width: 90px; max-width: 120px; }
+    .method-btn-compact {
+        min-width: 32px;
+        font-size: 0.75rem;
+        height: 24px;
+    }
+    .base-url-preview-compact {
+        min-width: 60px;
+        max-width: 90px;
+        font-size: 0.7rem;
+    }
+    .kv-input-compact,
+    .kv-remove-btn {
+        height: 24px;
+        font-size: 0.75rem;
+    }
+    .collapsible-header {
+        min-height: 28px;
+        font-size: 0.85rem;
+    }
+    .response-tab {
+        min-height: 28px;
+        font-size: 0.75rem;
+    }
 }
 
-/* Animation for smooth transitions (Profile Cards) */
-.profile-card { animation: fadeInUp 0.3s ease-out; }
-@keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-/* Dark mode adjustments for auth chips and profile status */
-[data-theme="dark"] {
-    .auth-chip.auth-bearer { background: rgba(34, 197, 94, 0.15); border-color: rgba(34, 197, 94, 0.3); }
-    .auth-chip.auth-basic { background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.3); }
-    .auth-chip.auth-apikey { background: rgba(147, 51, 234, 0.15); border-color: rgba(147, 51, 234, 0.3); }
-    .auth-chip.auth-customscript { background: rgba(249, 115, 22, 0.15); border-color: rgba(249, 115, 22, 0.3); }
-    .profile-status.session-only { background: rgba(249, 115, 22, 0.15); border-color: rgba(249, 115, 22, 0.3); }
-    .profile-status.persistent { background: rgba(34, 197, 94, 0.15); border-color: rgba(34, 197, 94, 0.3); }
-}
+/* Profile-related styles have been moved to profile-edit-modal.css */
 
 /* Ripple effect and Tooltip (General UI enhancements, ensure they don't conflict) */
 #tester-section .btn { /* Limit ripple to tester buttons if desired */
@@ -2242,16 +1221,8 @@ h6 { font-size: var(--font-size-base); }
 }
 @keyframes tooltipIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
-
-/* Enhanced form focus states for tester (already good, just ensure consistency) */
-#tester-section .form-control:focus { /* Already covered by global .form-control:focus */
-    /* background: var(--bg-primary); */ /* Ensure it doesn't override specific input backgrounds like .endpoint-input */
-    /* border-color: var(--color-primary); */
-    /* box-shadow: 0 0 0 2px var(--color-primary-alpha); */ /* --color-primary-bg was a typo, use --color-primary-alpha */
-}
-#tester-section .form-control.has-value { /* If using JS to add this class */
-    /* background: var(--bg-primary); */ /* Or some other indication */
-}
+/* Enhanced form focus states for tester - already handled by global .form-control:focus */
+/* #tester-section .form-control:focus and #tester-section .form-control.has-value styles removed as they're covered by global styles */
 
 /* Smooth transitions for tester elements (Global * might be too broad, but it's in original) */
 /* #tester-section * {
@@ -2259,4 +1230,32 @@ h6 { font-size: var(--font-size-base); }
     transition-duration: 200ms;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 } */
-/* Prefer transitions on specific elements or common classes like .btn, .form-control */
+
+/* ===== PROFILE CARDS - MOVED TO profile-edit-modal.css ===== */
+
+/* Empty State Enhancements (for Profile Details, History, etc.) */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-3xl);
+    text-align: center;
+    min-height: 200px;
+    color: var(--text-secondary);
+}
+.empty-state-icon {
+    width: 64px; height: 64px;
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius-xl);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+    margin-bottom: var(--spacing-xl);
+    color: var(--text-tertiary);
+}
+.empty-state-content { margin-bottom: var(--spacing-xl); }
+.empty-state-content h3 { font-size: var(--font-size-xl); font-weight: var(--font-weight-semibold); color: var(--text-primary); margin-bottom: var(--spacing-sm); }
+.empty-state-content p { font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--spacing-lg); }
+.empty-state-meta { font-size: var(--font-size-xs); color: var(--text-tertiary); }
+
+/* ===== PROFILE DETAILS - MOVED TO profile-edit-modal.css ===== */

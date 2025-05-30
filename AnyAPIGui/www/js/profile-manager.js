@@ -343,7 +343,8 @@ $RequestContext.Headers["Accept"] = "application/json"`
             // Batch DOM updates
             this.batchDOMUpdates(() => {
                 this.renderProfileList();
-                this.updateTestProfileDropdown();
+                // Removed: this.updateTestProfileDropdown();
+                this.updateGlobalProfileSelector();
                 this.initializeSharedProfileManagement();
             });
         }, 'Failed to load profiles');    }
@@ -563,6 +564,26 @@ $RequestContext.Headers["Accept"] = "application/json"`
     // Alias for compatibility with code expecting getProfile
     getProfile(profileName) {
         return this.findProfile(profileName);
+    }
+
+    // Add this method for global selector update
+    updateGlobalProfileSelector(selectedName) {
+        const select = document.getElementById('global-profile-selector');
+        if (!select) return;
+        const profiles = this.profiles || [];
+        const current = selectedName || this.currentSharedProfile?.name || '';
+        select.innerHTML = '<option value="">Select a profile...</option>';
+        profiles.forEach(profile => {
+            if (profile && profile.name) {
+                const opt = document.createElement('option');
+                opt.value = profile.name;
+                opt.textContent = profile.name;
+                select.appendChild(opt);
+            }
+        });
+        if (current && profiles.some(p => p.name === current)) {
+            select.value = current;
+        }
     }
 
     /**
@@ -1306,6 +1327,11 @@ $RequestContext.Headers["Accept"] = "application/json"`
         if (!profileName || profileName === '') {
             console.log('⚠️ No profile selected, clearing current profile');
             this.currentSharedProfile = null;
+            
+            // Notify endpoint tester
+            if (window.endpointTester && typeof window.endpointTester.onProfileChange === 'function') {
+                window.endpointTester.onProfileChange(null);
+            }
             return;
         }
 
@@ -1326,14 +1352,15 @@ $RequestContext.Headers["Accept"] = "application/json"`
             // Select the profile using existing method
             this.selectProfile(profileName);
             
-            // Notify other components if they have handlers
+            // Notify endpoint tester specifically
+            if (window.endpointTester && typeof window.endpointTester.onProfileChange === 'function') {
+                window.endpointTester.onProfileChange(profileName);
+            }
+            
+            // Notify other components
             this.notifyProfileChange(profile, source);
             
             console.log(`✅ Shared profile "${profileName}" selected from ${source}`);
-            
-            if (typeof showNotification === 'function') {
-                showNotification(`Profile "${profileName}" selected`, 'success');
-            }
             
         } catch (error) {
             console.error('❌ Error handling shared profile change:', error);
@@ -1369,26 +1396,8 @@ $RequestContext.Headers["Accept"] = "application/json"`
             }
         }
 
-        // Update other profile dropdowns that might exist
-        this.updateOtherProfileDropdowns(profile.name, source);
-    }
-
-    /**
-     * Update other profile dropdowns to stay in sync
-     * @param {string} profileName - The selected profile name
-     * @param {string} excludeSource - The source to exclude from updates
-     */
-    updateOtherProfileDropdowns(profileName, excludeSource) {
-        // List of known profile dropdown IDs
-        const dropdownIds = ['test-profile', 'profile-selector', 'main-profile'];
-        
-        dropdownIds.forEach(dropdownId => {
-            const dropdown = document.getElementById(dropdownId);
-            if (dropdown && dropdown.value !== profileName) {
-                dropdown.value = profileName;
-                console.log(`🔄 Updated ${dropdownId} dropdown to "${profileName}"`);
-            }
-        });
+        // Update global selector
+        this.updateGlobalProfileSelector(profile?.name);
     }
 }
 

@@ -48,6 +48,18 @@ class HistoryManager {
             return true;
         }        return false;
     }
+
+    // Optionally, add a filter method that uses the global selector:
+    filterByCurrentProfile() {
+        const select = document.getElementById('global-profile-selector');
+        const profileName = select ? select.value : '';
+        if (!profileName) {
+            this.render(); // Show all
+            return;
+        }
+        const filtered = this.history.filter(item => item.profileName === profileName);
+        this.render(filtered);
+    }
 }
 
 // Make HistoryManager globally available

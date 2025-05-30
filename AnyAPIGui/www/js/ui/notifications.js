@@ -1,26 +1,32 @@
 // Notification helpers (showNotification, etc.)
 // Exported as ES6 module
 
-export function showNotification(message, type = 'info', duration = 4000) {
+export function showNotification(message, type = 'info', duration = 3000) {
     const notificationsContainer = document.getElementById('notifications') || createNotificationsContainer();
     
     const notification = document.createElement('div');
-    notification.className = `notification notification-${type}`;
+    notification.className = `notification ${type}`;
     notification.innerHTML = `
-        <div class="notification-content">
-            <span class="notification-message">${message}</span>
-            <button class="notification-close" onclick="this.parentElement.parentElement.remove()">
-                <i data-feather="x"></i>
-            </button>
-        </div>
+        <span class="notification-message">${message}</span>
     `;
     
     notificationsContainer.appendChild(notification);
     
+    // Trigger slide-up animation immediately
+    requestAnimationFrame(() => {
+        notification.classList.add('show');
+    });
+    
     // Auto-remove after duration
     setTimeout(() => {
         if (notification.parentElement) {
-            notification.remove();
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateY(-20px)';
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 300);
         }
     }, duration);
     

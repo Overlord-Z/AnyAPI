@@ -3,6 +3,14 @@
 
 console.log('🚀 Index.js loaded, setting up dynamic initialization...');
 
+// Import the response UI module
+import { initResponseUI, displayResponseData, clearResponseData } from './ui/response-ui.js';
+
+// Make response functions globally available
+window.displayResponseData = displayResponseData;
+window.clearResponseData = clearResponseData;
+window.initResponseUI = initResponseUI;
+
 /**
  * Wait for dependencies to be available
  */
@@ -141,6 +149,25 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     
     initializeApp();
+});
+
+// Main application initialization
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 Initializing AnyAPI application...');
+    
+    try {
+        // Initialize response viewer first
+        initResponseUI();
+        
+        // Initialize other components if they exist
+        if (typeof app !== 'undefined' && app.init) {
+            await app.init();
+        }
+        
+        console.log('✅ AnyAPI application initialized successfully');
+    } catch (error) {
+        console.error('❌ Failed to initialize AnyAPI:', error);
+    }
 });
 
 // Provide minimal global app object for legacy HTML handlers

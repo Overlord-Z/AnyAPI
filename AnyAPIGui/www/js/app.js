@@ -37,8 +37,12 @@ class AnyApiApp {
             
             // Set up global error handling
             this.setupErrorHandling();
-              // Initialize dark mode
+            
+            // Initialize dark mode
             this.initializeDarkMode();
+            
+            // Initialize connection status
+            this.initializeConnectionStatus();
             
             // Initialize sidebar state
             this.initializeSidebar();
@@ -55,6 +59,7 @@ class AnyApiApp {
             
             if (connected) {
                 console.log('✅ Server connection established');
+                this.setConnectionStatus('connected', 'Connected', 'wifi');
                 
                 // Initialize all managers in parallel for better performance
                 await this.initializeManagers();
@@ -62,6 +67,7 @@ class AnyApiApp {
                 console.log('✅ All managers initialized');
             } else {
                 console.log('⚠️ Server connection failed - running in offline mode');
+                this.setConnectionStatus('disconnected', 'Disconnected', 'wifi-off');
                 this.showOfflineMode();
             }
             
@@ -82,6 +88,7 @@ class AnyApiApp {
             
         } catch (error) {
             console.error('❌ Failed to initialize application:', error);
+            this.setConnectionStatus('disconnected', 'Error', 'alert-circle');
             this.showInitializationError(error);
         }
     }
@@ -403,22 +410,77 @@ updateDarkModeToggle() {
     }
 
     /**
-     * Handle connection status changes
+     * Handle connection status changes - ENHANCED WITH PROPER STATES
      */
     handleConnectionChange(event) {
         const wasConnected = this.state.isConnected;
-        this.state.isConnected = event.detail.connected;
+        const newConnectionState = event.detail.connected;
+        const connectionStatus = document.getElementById('connection-status');
         
-        console.log(`🔄 Connection status changed: ${wasConnected} → ${this.state.isConnected}`);
+        console.log(`🔄 Connection status changed: ${wasConnected} → ${newConnectionState}`);
         
-        if (!wasConnected && this.state.isConnected) {
-            // Connection restored
-            showNotification('Connected to PowerShell backend', 'success');
-            this.refreshData();
-        } else if (wasConnected && !this.state.isConnected) {
-            // Connection lost
-            showNotification('Lost connection to PowerShell backend', 'warning');
+        if (!connectionStatus) {
+            console.warn('Connection status element not found');
+            return;
         }
+        
+        // Update internal state
+        this.state.isConnected = newConnectionState;
+        
+        // Handle state transitions
+        if (newConnectionState === 'connecting') {
+            // Show connecting state with pulse
+            this.setConnectionStatus('connecting', 'Connecting...', 'loader');
+            
+        } else if (newConnectionState === true || newConnectionState === 'connected') {
+            // Connection established
+            if (!wasConnected) {
+                // Connection restored
+                showNotification('Connected to PowerShell backend', 'success');
+                this.refreshData();
+            }
+            this.setConnectionStatus('connected', 'Connected', 'wifi');
+            
+        } else {
+            // Connection lost or failed
+            if (wasConnected) {
+                showNotification('Lost connection to PowerShell backend', 'warning');
+            }
+            this.setConnectionStatus('disconnected', 'Disconnected', 'wifi-off');
+        }
+    }
+
+    /**
+     * Set connection status with proper styling and icon
+     */
+    setConnectionStatus(state, text, iconName) {
+        const connectionStatus = document.getElementById('connection-status');
+        if (!connectionStatus) return;
+        
+        // Remove all state classes
+        connectionStatus.classList.remove('connected', 'disconnected', 'connecting');
+        
+        // Add new state class
+        connectionStatus.classList.add(state);
+        
+        // Update content with icon and text
+        connectionStatus.innerHTML = `
+            <i data-feather="${iconName}" class="connection-icon"></i>
+            <span>${text}</span>
+        `;
+        
+        // Re-render feather icons
+        if (window.feather) {
+            feather.replace();
+        }
+    }
+
+    /**
+     * Initialize connection status on app start
+     */
+    initializeConnectionStatus() {
+        // Start with connecting state
+        this.setConnectionStatus('connecting', 'Connecting...', 'loader');
     }
 
     /**

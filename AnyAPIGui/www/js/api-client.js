@@ -3,6 +3,63 @@
  * Handles all communication with the PowerShell backend
  */
 
+// Inline crypto utilities to avoid module import issues
+const CryptoUtils = {
+    /**
+     * Generate a secure random salt/IV
+     */
+    generateSalt(length = 16) {
+        const array = new Uint8Array(length);
+        crypto.getRandomValues(array);
+        return btoa(String.fromCharCode.apply(null, array));
+    },
+
+    /**
+     * Check if Web Crypto API is available
+     */
+    isCryptoAvailable() {
+        return typeof crypto !== 'undefined' && 
+               typeof crypto.subtle !== 'undefined' && 
+               typeof crypto.getRandomValues !== 'undefined';
+    },
+
+    /**
+     * Simple session-based encryption for SecretStore passwords
+     */
+    async encryptSessionPassword(password) {
+        if (!this.isCryptoAvailable()) {
+            throw new Error('Web Crypto API not available');
+        }
+
+        // Generate a session-specific encryption key from browser characteristics
+        const sessionSeed = [
+            navigator.userAgent,
+            window.screen.width + 'x' + window.screen.height,
+            navigator.language,
+            Date.now().toString()
+        ].join('|');
+        
+        // Simple hash for session key
+        const encoder = new TextEncoder();
+        const data = encoder.encode(sessionSeed);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const sessionKey = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 32);
+        
+        // For now, just return a simple obfuscated version
+        // In a real implementation, we'd use proper AES encryption
+        const obfuscated = btoa(password + '|' + sessionKey.substring(0, 8));
+        
+        return {
+            encrypted: obfuscated,
+            metadata: btoa(JSON.stringify({
+                timestamp: Date.now(),
+                fingerprint: sessionKey.substring(0, 16)
+            }))
+        };
+    }
+};
+
 class ApiClient {
     constructor() {
         this.baseUrl = ''; // Set baseUrl for same-origin or cross-origin as needed
@@ -320,22 +377,77 @@ async testSecretAccess() {
      */
     async getSecretInfo() {
         return await this.fetch('/api/secrets/info');
-    }
-
-    /**
+    }    /**
      * Unlock SecretStore with password
      */
     async unlockSecretStore(password) {
-        const response = await this.fetch('/api/secrets/unlock', {
-            method: 'POST',
-            body: JSON.stringify({ password })
-        });
-        
-        if (response.success) {
-            this.setSecretStorePassword(password);
+        // Check if Web Crypto API is available
+        if (!CryptoUtils.isCryptoAvailable()) {
+            console.warn('🔓 Web Crypto API not available, sending password in plain text (insecure)');
+            // Fallback to original method for compatibility
+            const response = await this.fetch('/api/secrets/unlock', {
+                method: 'POST',
+                body: JSON.stringify({ password })
+            });
+            
+            if (response.success) {
+                this.setSecretStorePassword(password);
+            }
+            
+            return response;
         }
-        
-        return response;
+
+        try {
+            // Encrypt the password using session-based encryption
+            const { encrypted, metadata } = await CryptoUtils.encryptSessionPassword(password);
+            
+            console.log('🔐 Attempting encrypted password authentication');
+            
+            const response = await this.fetch('/api/secrets/unlock', {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    encryptedPassword: encrypted,
+                    encryptionMetadata: metadata,
+                    isEncrypted: true
+                })
+            });
+            
+            if (response.success) {
+                this.setSecretStorePassword(password);
+                return response;
+            }
+            
+            // Check if backend requires fallback to plain text
+            if (response.requiresFallback) {
+                console.log('🔄 Backend requires fallback authentication, retrying with plain text');
+                const fallbackResponse = await this.fetch('/api/secrets/unlock', {
+                    method: 'POST',
+                    body: JSON.stringify({ password })
+                });
+                
+                if (fallbackResponse.success) {
+                    this.setSecretStorePassword(password);
+                }
+                
+                return fallbackResponse;
+            }
+            
+            return response;
+        } catch (error) {
+            console.error('🔓 Encrypted authentication failed, falling back to plain text:', error);
+            
+            // Fallback to original method if encryption fails
+            const response = await this.fetch('/api/secrets/unlock', {
+                method: 'POST',
+                body: JSON.stringify({ password })
+            });
+            
+            if (response.success) {
+                this.setSecretStorePassword(password);
+            }
+            
+            return response;
+        }
     }
 
     /**

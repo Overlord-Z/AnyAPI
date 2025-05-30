@@ -1,0 +1,687 @@
+// profile-create-wizard.js
+// ES6 Profile Create Wizard for AnyAPI GUI
+// Place in www/js/profile-create-wizard.js
+
+import {
+    AUTH_TYPES,
+    HEADER_TEMPLATES,
+    getMerakiHeaderOptions,
+    maskSecret,
+    validateProfileFields,
+    buildProfileObject
+} from './core/profile-wizard-utils.js';
+
+// Note: secret utils functions are now available globally via window object
+// import { isSecretStoreUnlocked, unlockSecretStoreAndRefresh, showSecretStorePasswordPrompt } from './core/secret-utils.js';
+
+class ProfileCreateWizard {
+    constructor() {
+        this.state = {
+            step: 1,
+            fields: {
+                name: '',
+                baseUrl: '',
+                authType: '',
+                apiKeyValue: '',
+                apiKeyHeader: '',
+                tokenValue: '',
+                customScript: '',
+                merakiStyle: 'apiKey',
+                defaultHeaders: {},
+                pagination: {},
+                customSettings: {},
+                isSessionOnly: false,
+                description: '',
+            },
+            errors: {},
+        };
+        this.modal = null;
+        // Listen for info endpoint updates (if main app dispatches an event)
+        if (window.addEventListener) {
+            window.addEventListener('info-updated', () => {
+                // Only re-render if modal is open and step 2 (auth) is visible
+                if (this.modal && this.state.step === 2) {
+                    this.renderModal();
+                }
+            });
+        }
+    }
+
+    show() {
+        this.renderModal();
+    }
+
+    renderModal() {
+        // Remove existing modal if present
+        const existing = document.getElementById('profile-wizard-modal');
+        if (existing) existing.remove();
+
+        const modal = document.createElement('div');
+        modal.id = 'profile-wizard-modal';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = this.renderContent();
+        document.body.appendChild(modal);
+        this.modal = modal;
+        this.attachEvents();
+    }
+
+    // Helper to mask secrets in header previews and review
+    maskSecret(value) {
+        if (!value) return '';
+        // Show only first and last char, mask the rest
+        if (typeof value === 'string' && value.length > 4) {
+            return value[0] + '***' + value[value.length - 1];
+        }
+        return '***';
+    }
+
+    renderContent() {
+        // Step 1: Basic Info, Step 2: Auth, Step 3: Headers/Advanced, Step 4: Review
+        const { step, fields, errors } = this.state;
+        let content = '';
+        // Show global error if present
+        let errorHtml = '';
+        if (this.state.errors && this.state.errors.create) {
+            errorHtml = `<div class="wizard-error">${this.state.errors.create}</div>`;
+        }
+        if (step === 1) {
+            // Step 1: Basic Info
+            content = `
+                <div class="modal-content large">
+                    <div class="modal-header">
+                        <h3>Create API Profile (Wizard)</h3>
+                        <button class="modal-close" onclick="window.profileCreateWizard.close()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>Profile Name</label>
+                            <input type="text" id="wizard-profile-name" class="form-control" value="${fields.name}" />
+                            ${errors.name ? `<div class="form-error">${errors.name}</div>` : ''}
+                        </div>
+                        <div class="form-group">
+                            <label>Base URL</label>
+                            <input type="url" id="wizard-profile-baseurl" class="form-control" value="${fields.baseUrl}" placeholder="https://api.example.com" />
+                            ${errors.baseUrl ? `<div class="form-error">${errors.baseUrl}</div>` : ''}
+                        </div>
+                        <div class="form-group">
+                            <label>Authentication Type</label>
+                            <select id="wizard-profile-authtype" class="form-control">
+                                <option value="">Select...</option>
+                                <option value="ApiKey">API Key</option>
+                                <option value="BearerToken">Bearer Token</option>
+                                <option value="CustomScript">Custom Script</option>
+                                <option value="Meraki">Meraki (API Key or Bearer)</option>
+                            </select>
+                            ${errors.authType ? `<div class="form-error">${errors.authType}</div>` : ''}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-primary" id="wizard-next-btn">Next</button>
+                        <button class="btn btn-outline" onclick="window.profileCreateWizard.close()">Cancel</button>
+                    </div>
+                </div>
+            `;
+        } else if (step === 2) {
+            // Step 2: Auth & Header Config
+            // Use the single source of truth for SecretStore status
+            const isSecretStoreUnlockedVal = window.isSecretStoreUnlocked();
+            const secretStoreStatus = isSecretStoreUnlockedVal
+                ? '<span style="font-weight:bold; color:#27d645;">🔓 SecretStore Unlocked</span>'
+                : '<span style="font-weight:bold; color:#e74c3c;">🔒 SecretStore Locked</span>';
+            const unlockLink = !isSecretStoreUnlockedVal
+                ? '<li><a href="#" id="wizard-unlock-secretstore-link">Unlock SecretStore</a> for persistent secure storage.</li>'
+                : '';
+            content = `
+                <div class="modal-content large">
+                    <div class="modal-header">
+                        <h3>Step 2: Authentication & Headers</h3>
+                        <button class="modal-close" onclick="window.profileCreateWizard.close()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>Authentication Type</label>
+                            <select id="wizard-auth-type" class="form-control">
+                                <option value="ApiKey" ${fields.authType === 'ApiKey' ? 'selected' : ''}>API Key</option>
+                                <option value="BearerToken" ${fields.authType === 'BearerToken' ? 'selected' : ''}>Bearer Token</option>
+                                <option value="CustomScript" ${fields.authType === 'CustomScript' ? 'selected' : ''}>Custom Script</option>
+                                <option value="Meraki" ${fields.authType === 'Meraki' ? 'selected' : ''}>Meraki (API Key or Bearer)</option>
+                            </select>
+                        </div>
+                        <div id="wizard-auth-fields">
+                            ${this.renderAuthFields()}
+                        </div>
+                        <div class="form-group">
+                            <label>Header Preview</label>
+                            <pre id="wizard-header-preview" class="code-block" style="min-height:2.5em;">${this.renderHeaderPreview()}</pre>
+                        </div>
+                        <div class="form-group">
+                            <div class="auth-help">
+                                <strong>🔒 Secure Secret Handling:</strong>
+                                <ul style="margin:0.5em 0 0 1.5em;">
+                                    <li>Secrets are stored using the most secure method available (SecretStore, OS Keychain, or in-memory).</li>
+                                    <li>Status: ${secretStoreStatus}</li>
+                                    ${unlockLink}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-outline" id="wizard-back-btn">Back</button>
+                        <button class="btn btn-primary" id="wizard-next-btn">Next</button>
+                        <button class="btn btn-outline" onclick="window.profileCreateWizard.close()">Cancel</button>
+                    </div>
+                </div>
+            `;
+        } else if (step === 3) {
+            // Step 3: Headers & Advanced Config
+            content = `
+                <div class="modal-content large">
+                    <div class="modal-header">
+                        <h3>Step 3: Headers & Advanced</h3>
+                        <button class="modal-close" onclick="window.profileCreateWizard.close()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>Default Headers (JSON)</label>
+                            <textarea id="wizard-default-headers" class="form-control code-input" rows="3" placeholder='{"Content-Type": "application/json"}'>${fields.defaultHeadersRaw || ''}</textarea>
+                            <small class="form-help">Optional: Headers to include with every request</small>
+                            ${errors.defaultHeaders ? `<div class="form-error">${errors.defaultHeaders}</div>` : ''}
+                        </div>
+                        <div class="form-group">
+                            <label>Pagination Details (JSON)</label>
+                            <textarea id="wizard-pagination-details" class="form-control code-input" rows="2" placeholder='{"PageParameter": "page", "PageSizeParameter": "pageSize"}'>${fields.paginationRaw || ''}</textarea>
+                            <small class="form-help">Optional: Advanced pagination configuration</small>
+                            ${errors.pagination ? `<div class="form-error">${errors.pagination}</div>` : ''}
+                        </div>
+                        <div class="form-group">
+                            <label>Custom Settings</label>
+                            <div id="wizard-customsettings-list" class="dynamic-list"></div>
+                            <button type="button" id="wizard-add-customsetting-btn" class="btn btn-outline btn-sm btn-add" style="margin-top:0.5em;">
+                                <span class="btn-icon">➕</span> Add Setting
+                            </button>
+                            <small class="form-help">Custom settings are sent with every request and may be required by some APIs.</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-outline" id="wizard-back-btn">Back</button>
+                        <button class="btn btn-primary" id="wizard-next-btn">Next</button>
+                        <button class="btn btn-outline" onclick="window.profileCreateWizard.close()">Cancel</button>
+                    </div>
+                </div>
+            `;
+        } else if (step === 4) {
+            // Step 4: Review & Create
+            const mergedHeaders = this.getMergedHeadersPreview();
+            content = `
+                <div class="modal-content large">
+                    <div class="modal-header">
+                        <h3>Step 4: Review & Create</h3>
+                        <button class="modal-close" onclick="window.profileCreateWizard.close()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="review-section">
+                            <h4>Profile Summary</h4>
+                            <table class="review-table">
+                                <tr><th>Name</th><td>${fields.name}</td></tr>
+                                <tr><th>Base URL</th><td>${fields.baseUrl}</td></tr>
+                                <tr><th>Auth Type</th><td>${fields.authType}</td></tr>
+                                <tr><th>Description</th><td>${fields.description || '<em>(none)</em>'}</td></tr>
+                                <tr><th>Session Only</th><td>${fields.isSessionOnly ? 'Yes' : 'No'}</td></tr>
+                                <tr><th>Default Headers</th><td><pre class="code-block">${fields.defaultHeaders && Object.keys(fields.defaultHeaders).length ? JSON.stringify(fields.defaultHeaders, null, 2) : '<em>(none)</em>'}</pre></td></tr>
+                                <tr><th>Auth Headers</th><td><pre class="code-block">${(() => { const h = this.getMergedHeadersPreview(); return Object.keys(h).length ? JSON.stringify(h, null, 2) : '<em>(none)</em>'; })()}</pre></td></tr>
+                                <tr><th>Pagination</th><td><pre class="code-block">${fields.pagination && Object.keys(fields.pagination).length ? JSON.stringify(fields.pagination, null, 2) : '<em>(none)</em>'}</pre></td></tr>
+                                <tr><th>Custom Settings</th><td><pre class="code-block">${fields.customSettings && Object.keys(fields.customSettings).length ? JSON.stringify(fields.customSettings, null, 2) : '<em>(none)</em>'}</pre></td></tr>
+                                ${fields.authType === 'ApiKey' ? `<tr><th>API Key</th><td>${fields.apiKeyValue ? '••••••••' : '<em>(none)</em>'}</td></tr><tr><th>Header Name</th><td>${fields.apiKeyHeader}</td></tr>` : ''}
+                                ${fields.authType === 'BearerToken' ? `<tr><th>Bearer Token</th><td>${fields.tokenValue ? '••••••••' : '<em>(none)</em>'}</td></tr>` : ''}
+                                ${fields.authType === 'CustomScript' ? `<tr><th>Custom Script</th><td><pre class="code-block">${fields.customScript ? fields.customScript : '<em>(none)</em>'}</pre></td></tr>` : ''}
+                                ${fields.authType === 'Meraki' ? `<tr><th>Meraki Style</th><td>${fields.merakiStyle}</td></tr><tr><th>API Key</th><td>${fields.apiKeyValue ? '••••••••' : '<em>(none)</em>'}</td></tr>` : ''}
+                            </table>
+                        </div>
+                        <div class="review-section">
+                            <h4>Headers Sent With Requests</h4>
+                            <pre class="code-block" style="margin-bottom:0;">${(() => { const h = this.getMergedHeadersPreview(); return Object.keys(h).length ? JSON.stringify(h, null, 2) : '// No headers'; })()}</pre>
+                        </div>
+                        ${errors.create ? `<div class="form-error" style="margin-top:1em;">${errors.create}</div>` : ''}
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-outline" id="wizard-back-btn">Back</button>
+                        <button class="btn btn-primary" id="wizard-create-btn">Create Profile</button>
+                        <button class="btn btn-outline" onclick="window.profileCreateWizard.close()">Cancel</button>
+                    </div>
+                </div>
+            `;
+        } else {
+            content = `<div style="padding:2em;">(Wizard step ${step} coming soon...)</div>`;
+        }
+        // For each field, show inline error if present
+        const fieldError = (field) => {
+            return this.state.errors && this.state.errors[field] ? `<div class="wizard-error-inline">${this.state.errors[field]}</div>` : '';
+        };
+        // Add errorHtml to the top of the modal
+        return errorHtml + content;
+    }
+
+    // Render dynamic auth fields for step 2
+    renderAuthFields() {
+        const { authType, apiKeyValue, apiKeyHeader, tokenValue, customScript, merakiStyle } = this.state.fields;
+        // Help text and dynamic fields per auth type
+        switch (authType) {
+            case 'ApiKey':
+                // Ensure apiKeyHeader is set in state if empty
+                if (!this.state.fields.apiKeyHeader) {
+                    this.state.fields.apiKeyHeader = 'X-API-Key';
+                }
+                return `
+                    <div class="auth-help">
+                        <strong>API Key Authentication</strong><br>
+                        Enter your API key and header name (default: X-API-Key).
+                    </div>
+                    <form id="wizard-apikey-form" autocomplete="off" style="margin:0;" onsubmit="return false;">
+                        <input type="text" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;" tabindex="-1" aria-hidden="true" autocomplete="username" />
+                        <div class="form-group">
+                            <label>API Key</label>
+                            <input type="password" id="wizard-apikey-value" class="form-control" value="${apiKeyValue || ''}" autocomplete="new-password" />
+                        </div>
+                        <div class="form-group">
+                            <label>Header Name</label>
+                            <input type="text" id="wizard-apikey-header" class="form-control" value="${this.state.fields.apiKeyHeader}" />
+                        </div>
+                    </form>
+                `;
+            case 'BearerToken':
+                return `
+                    <div class="auth-help">
+                        <strong>Bearer Token Authentication</strong><br>
+                        Enter your bearer token. It will be sent as an Authorization header.
+                    </div>
+                    <form id="wizard-bearer-form" autocomplete="off" style="margin:0;" onsubmit="return false;">
+                        <input type="text" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;" tabindex="-1" aria-hidden="true" autocomplete="username" />
+                        <div class="form-group">
+                            <label>Bearer Token</label>
+                            <input type="password" id="wizard-token-value" class="form-control" value="${tokenValue || ''}" autocomplete="new-password" />
+                        </div>
+                    </form>
+                `;
+            case 'CustomScript':
+                return `
+                    <div class="auth-help">
+                        <strong>Custom Authentication Script</strong><br>
+                        Provide a PowerShell script to generate authentication headers. Use <code>$RequestContext.GetPlainTextSecret.Invoke('credentialName')</code> to access credentials.
+                    </div>
+                    <div class="form-group">
+                        <label>Script</label>
+                        <textarea id="wizard-custom-script" class="form-control code-input" rows="7">${customScript || ''}</textarea>
+                    </div>
+                `;
+            case 'Meraki':
+                return `
+                    <div class="auth-help">
+                        <strong>Meraki Authentication</strong><br>
+                        Choose style and enter your Meraki API key.
+                    </div>
+                    <form id="wizard-meraki-form" autocomplete="off" style="margin:0;" onsubmit="return false;">
+                        <input type="text" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;" tabindex="-1" aria-hidden="true" autocomplete="username" />
+                        <div class="form-group">
+                            <label>Style</label>
+                            <select id="wizard-meraki-style" class="form-control">
+                                <option value="apiKey" ${merakiStyle === 'apiKey' ? 'selected' : ''}>X-Cisco-Meraki-API-Key header</option>
+                                <option value="bearer" ${merakiStyle === 'bearer' ? 'selected' : ''}>Bearer Token header</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>API Key</label>
+                            <input type="password" id="wizard-meraki-apikey" class="form-control" value="${apiKeyValue || ''}" autocomplete="new-password" />
+                        </div>
+                    </form>
+                `;
+            default:
+                return `<div class="auth-help">Select an authentication type above.</div>`;
+        }
+    }
+
+    // Render live header preview for step 2
+    renderHeaderPreview() {
+        const { authType, apiKeyValue, apiKeyHeader, tokenValue, merakiStyle } = this.state.fields;
+        let headers = {};
+        switch (authType) {
+            case 'ApiKey':
+                if (apiKeyHeader && apiKeyValue) headers[apiKeyHeader] = maskSecret(apiKeyValue);
+                break;
+            case 'BearerToken':
+                if (tokenValue) headers['Authorization'] = 'Bearer ' + maskSecret(tokenValue);
+                break;
+            case 'Meraki':
+                if (merakiStyle === 'bearer' && apiKeyValue) {
+                    headers['Authorization'] = 'Bearer ' + maskSecret(apiKeyValue);
+                    headers['Content-Type'] = 'application/json';
+                } else if (apiKeyValue) {
+                    headers['X-Cisco-Meraki-API-Key'] = maskSecret(apiKeyValue);
+                    headers['Content-Type'] = 'application/json';
+                }
+                break;
+            default:
+                break;
+        }
+        return Object.keys(headers).length ? JSON.stringify(headers, null, 2) : '// No auth headers yet';
+    }
+
+    // Utility: Merge default headers and auth headers for preview (step 4)
+    getMergedHeadersPreview() {
+        // Build auth headers (same logic as renderHeaderPreview, but unmasked for backend, masked for UI)
+        const { authType, apiKeyValue, apiKeyHeader, tokenValue, merakiStyle, defaultHeaders } = this.state.fields;
+        let authHeaders = {};
+        switch (authType) {
+            case 'ApiKey':
+                if (apiKeyHeader && apiKeyValue) authHeaders[apiKeyHeader] = maskSecret(apiKeyValue);
+                break;
+            case 'BearerToken':
+                if (tokenValue) authHeaders['Authorization'] = 'Bearer ' + maskSecret(tokenValue);
+                break;
+            case 'Meraki':
+                if (merakiStyle === 'bearer' && apiKeyValue) {
+                    authHeaders['Authorization'] = 'Bearer ' + maskSecret(apiKeyValue);
+                    authHeaders['Content-Type'] = 'application/json';
+                } else if (apiKeyValue) {
+                    authHeaders['X-Cisco-Meraki-API-Key'] = maskSecret(apiKeyValue);
+                    authHeaders['Content-Type'] = 'application/json';
+                }
+                break;
+            default:
+                break;
+        }
+        // Merge with default headers (defaultHeaders may be undefined)
+        return { ...(defaultHeaders || {}), ...authHeaders };
+    }
+
+    updateHeaderPreview() {
+        // Always update the header preview in the DOM for step 2
+        const preview = document.getElementById('wizard-header-preview');
+        if (preview) preview.textContent = this.renderHeaderPreview();
+    }
+
+    attachEvents() {
+        const { step } = this.state;
+        if (step === 1) {
+            document.getElementById('wizard-next-btn').onclick = () => this.handleNext();
+            document.getElementById('wizard-profile-name').oninput = (e) => {
+                this.state.fields.name = e.target.value;
+            };
+            document.getElementById('wizard-profile-baseurl').oninput = (e) => {
+                this.state.fields.baseUrl = e.target.value;
+            };
+            document.getElementById('wizard-profile-authtype').onchange = (e) => {
+                this.state.fields.authType = e.target.value;
+            };
+        } else if (step === 2) {
+            document.getElementById('wizard-back-btn').onclick = () => {
+                this.state.step = 1;
+                this.renderModal();
+            };
+            document.getElementById('wizard-next-btn').onclick = () => this.handleStep2Next();
+            document.getElementById('wizard-auth-type').onchange = (e) => {
+                this.state.fields.authType = e.target.value;
+                this.renderModal();
+            };
+            // Dynamic field events (ensure all update header preview)
+            if (this.state.fields.authType === 'ApiKey') {
+                document.getElementById('wizard-apikey-value').oninput = (e) => {
+                    this.state.fields.apiKeyValue = e.target.value;
+                    this.updateHeaderPreview();
+                };
+                document.getElementById('wizard-apikey-header').oninput = (e) => {
+                    this.state.fields.apiKeyHeader = e.target.value;
+                    this.updateHeaderPreview();
+                };
+            } else if (this.state.fields.authType === 'BearerToken') {
+                document.getElementById('wizard-token-value').oninput = (e) => {
+                    this.state.fields.tokenValue = e.target.value;
+                    this.updateHeaderPreview();
+                };
+            } else if (this.state.fields.authType === 'CustomScript') {
+                document.getElementById('wizard-custom-script').oninput = (e) => {
+                    this.state.fields.customScript = e.target.value;
+                    this.updateHeaderPreview();
+                };
+            } else if (this.state.fields.authType === 'Meraki') {
+                document.getElementById('wizard-meraki-style').onchange = (e) => {
+                    this.state.fields.merakiStyle = e.target.value;
+                    this.updateHeaderPreview();
+                };
+                document.getElementById('wizard-meraki-apikey').oninput = (e) => {
+                    this.state.fields.apiKeyValue = e.target.value;
+                    this.updateHeaderPreview();
+                };
+            }
+            // Also update header preview on any change in auth type
+            document.getElementById('wizard-auth-type').onchange = (e) => {
+                this.state.fields.authType = e.target.value;
+                this.renderModal();
+                this.updateHeaderPreview();
+            };
+            // SecretStore unlock link
+            const unlockLink = document.getElementById('wizard-unlock-secretstore-link');
+            if (unlockLink) {
+                unlockLink.onclick = async (e) => {
+                    e.preventDefault();
+                    const password = await window.showSecretStorePasswordPrompt();
+                    if (password === null) return; // User cancelled
+                    const result = await window.unlockSecretStoreAndRefresh(password);
+                    if (result && result.success) {
+                        this.renderModal();
+                    } else {
+                        alert(result && result.message ? result.message : 'Failed to unlock SecretStore.');
+                    }
+                };
+            }
+            // Always update header preview on initial render
+            this.updateHeaderPreview();
+        } else if (step === 3) {
+            // Step 3: Headers & Advanced Config
+            setTimeout(() => this.renderCustomSettingsList(), 0);
+            document.getElementById('wizard-back-btn').onclick = () => {
+                this.state.step = 2;
+                this.renderModal();
+            };
+            document.getElementById('wizard-next-btn').onclick = () => this.handleStep3Next();
+            document.getElementById('wizard-default-headers').oninput = (e) => {
+                this.state.fields.defaultHeadersRaw = e.target.value;
+            };
+            document.getElementById('wizard-pagination-details').oninput = (e) => {
+                this.state.fields.paginationRaw = e.target.value;
+            };
+            document.getElementById('wizard-add-customsetting-btn').onclick = () => {
+                this.addCustomSettingRow();
+            };
+        } else if (step === 4) {
+            document.getElementById('wizard-back-btn').onclick = () => {
+                this.state.step = 3;
+                this.renderModal();
+            };
+            document.getElementById('wizard-create-btn').onclick = () => this.handleCreateProfile();
+        }
+    }
+
+    // Render dynamic custom settings list for step 3
+    renderCustomSettingsList() {
+        const container = document.getElementById('wizard-customsettings-list');
+        if (!container) return;
+        container.innerHTML = '';
+        const settings = this.state.fields.customSettingsList || [{ key: '', value: '' }];
+        settings.forEach((item, idx) => {
+            const row = document.createElement('div');
+            row.className = 'dynamic-row customsetting-row';
+            row.innerHTML = `
+                <input type="text" class="form-control customsetting-key" placeholder="Setting Key" value="${item.key || ''}">
+                <input type="text" class="form-control customsetting-value" placeholder="Setting Value" value="${item.value || ''}">
+                <button type="button" class="btn-remove" title="Remove">🗑️</button>
+            `;
+            row.querySelector('.customsetting-key').oninput = (e) => {
+                this.state.fields.customSettingsList[idx].key = e.target.value;
+            };
+            row.querySelector('.customsetting-value').oninput = (e) => {
+                this.state.fields.customSettingsList[idx].value = e.target.value;
+            };
+            row.querySelector('.btn-remove').onclick = () => {
+                this.state.fields.customSettingsList.splice(idx, 1);
+                this.renderCustomSettingsList();
+            };
+            container.appendChild(row);
+        });
+    }
+
+    addCustomSettingRow() {
+        if (!this.state.fields.customSettingsList) this.state.fields.customSettingsList = [];
+        this.state.fields.customSettingsList.push({ key: '', value: '' });
+        this.renderCustomSettingsList();
+    }
+
+    handleStep3Next() {
+        // Validate JSON fields and custom settings
+        const { defaultHeadersRaw, paginationRaw, customSettingsList } = this.state.fields;
+        const errors = {};
+        let defaultHeaders = {};
+        let pagination = {};
+        if (defaultHeadersRaw && defaultHeadersRaw.trim()) {
+            try {
+                defaultHeaders = JSON.parse(defaultHeadersRaw);
+            } catch {
+                errors.defaultHeaders = 'Invalid JSON for headers.';
+            }
+        }
+        if (paginationRaw && paginationRaw.trim()) {
+            try {
+                pagination = JSON.parse(paginationRaw);
+            } catch {
+                errors.pagination = 'Invalid JSON for pagination.';
+            }
+        }
+        // Validate custom settings (no duplicate keys)
+        const keys = (customSettingsList || []).map(s => s.key).filter(k => k);
+        if (new Set(keys).size !== keys.length) {
+            errors.customSettings = 'Duplicate custom setting keys.';
+        }
+        this.state.errors = errors;
+        if (Object.keys(errors).length > 0) {
+            this.renderModal();
+            return;
+        }
+        // Save parsed values
+        this.state.fields.defaultHeaders = defaultHeaders;
+        this.state.fields.pagination = pagination;
+        // Convert custom settings list to object
+        const customSettings = {};
+        (customSettingsList || []).forEach(({ key, value }) => {
+            if (key) customSettings[key] = value;
+        });
+        this.state.fields.customSettings = customSettings;
+        // Proceed to review step
+        this.state.step = 4;
+        this.renderModal();
+    }
+
+    handleNext() {
+        const { step } = this.state;
+        if (step === 1) {
+            // Validate step 1 fields
+            const errors = validateProfileFields(this.state.fields, step);
+            this.state.errors = errors;
+            if (Object.keys(errors).length > 0) {
+                this.renderModal();
+                return;
+            }
+            // Proceed to step 2
+            this.state.step = 2;
+            this.renderModal();
+        } else if (step === 2) {
+            this.handleStep2Next();
+        } else if (step === 3) {
+            this.handleStep3Next();
+        }
+    }
+
+    validateStep() {
+        // Example: SecretStore validation for persistent profiles
+        if (this.state.step === 2 && !this.state.fields.isSessionOnly && !window.isSecretStoreUnlocked()) {
+            this.state.errors.secretStore = 'SecretStore must be unlocked for persistent profiles.';
+            return false;
+        }
+        return true;
+    }
+
+    handleStep2Next() {
+        const { fields } = this.state;
+        // Validate auth fields based on auth type
+        let authErrors = {};
+        switch (fields.authType) {
+            case 'ApiKey':
+                if (!fields.apiKeyValue) authErrors.apiKeyValue = 'API Key is required.';
+                if (!fields.apiKeyHeader) authErrors.apiKeyHeader = 'Header name is required.';
+                break;
+            case 'BearerToken':
+                if (!fields.tokenValue) authErrors.tokenValue = 'Bearer token is required.';
+                break;
+            case 'CustomScript':
+                if (!fields.customScript) authErrors.customScript = 'Custom script is required.';
+                break;
+            case 'Meraki':
+                if (!fields.apiKeyValue) authErrors.apiKeyValue = 'API Key is required.';
+                break;
+            default:
+                break;
+        }
+        this.state.errors = authErrors;
+        if (Object.keys(authErrors).length > 0) {
+            this.renderModal();
+            return;
+        }
+        // Proceed to step 3
+        this.state.step = 3;
+        this.renderModal();
+    }
+
+    async handleCreateProfile() {
+        // Block persistent profile creation if SecretStore is locked
+        const isSecretStoreUnlockedVal = window.isSecretStoreUnlocked();
+        if (!this.state.fields.isSessionOnly && !isSecretStoreUnlockedVal) {
+            this.state.errors.create = 'SecretStore must be unlocked to create a persistent profile. Unlock it or choose Session Only.';
+            this.renderModal();
+            return;
+        }
+        // Build the profile object using shared utility (DRY)
+        const profileData = buildProfileObject(this.state.fields);
+        // Log payload for debugging
+        if (window.console && window.console.log) {
+            console.log('[ProfileCreateWizard] Creating profile with payload:', profileData);
+        }
+        try {
+            const response = await window.apiClient.createProfile(profileData);
+            if (window.console && window.console.log) {
+                console.log('[ProfileCreateWizard] Backend response:', response);
+            }
+            if (response && response.success) {
+                if (window.showNotification) window.showNotification('Profile created successfully', 'success');
+                this.close();
+                // Optionally reload profiles in the main app
+                if (window.profileManager && typeof window.profileManager.loadProfiles === 'function') {
+                    window.profileManager.loadProfiles();
+                }
+            } else {
+                this.state.errors.create = response && response.error ? response.error : 'Failed to create profile.';
+                this.renderModal();
+            }
+        } catch (err) {
+            this.state.errors.create = err && err.message ? err.message : 'Failed to create profile.';
+            this.renderModal();
+        }
+    }
+
+    close() {
+        if (this.modal) {
+            this.modal.remove();
+            this.modal = null;
+        }
+    }
+}
+
+// Auto-instantiate wizard for convenience
+window.profileCreateWizard = new ProfileCreateWizard();

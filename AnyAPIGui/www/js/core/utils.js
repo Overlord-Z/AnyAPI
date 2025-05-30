@@ -303,3 +303,6 @@ function createNotificationsContainer() {
     document.body.appendChild(container);
     return container;
 }
+
+// Make showNotification globally available
+window.showNotification = showNotification;

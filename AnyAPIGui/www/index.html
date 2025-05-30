@@ -191,6 +191,10 @@
                         <i data-feather="wifi"></i>
                         <span>Connected</span>
                     </div>
+                    <div class="secretstore-status" id="secretstore-status" style="display:inline-flex;align-items:center;margin-left:1em;">
+                        <i data-feather="lock" id="secretstore-status-icon"></i>
+                        <span id="secretstore-status-text" style="margin-left:0.3em;">Checking...</span>
+                    </div>
                 </div>
             </div>
         </header>        <!-- Main Content -->
@@ -240,6 +244,10 @@
                             <button class="btn btn-primary" onclick="profileManager.showCreateModal()">
                                 <i data-feather="plus"></i>
                                 New Profile
+                            </button>
+                            <button class="btn btn-outline" onclick="window.profileCreateWizard.show()">
+                                <i data-feather="zap"></i>
+                                Create Profile (Wizard)
                             </button>
                         </div>
                     </div>
@@ -603,11 +611,13 @@
     <script src="js/profile-manager.js"></script>
     <script src="js/template-manager.js"></script>
     <script src="js/core/utils.js"></script>
+    <script src="js/core/secret-utils.js"></script>
     <script src="js/core/history-manager.js"></script>
     <script src="js/core/endpoint-tester.js"></script>
     <script src="js/app.js"></script>
     <script type="module" src="js/ui/response-ui.js"></script>
     <script type="module" src="js/index.js"></script>
+    <script type="module" src="js/profile-create-wizard.js"></script>
 
     <script>
         // Initialize the application

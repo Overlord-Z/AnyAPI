@@ -29,6 +29,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Prevent SecretStore password prompts
+$env:SECRETSTORE_SUPPRESS_PASSWORD_PROMPT = "1"
+
 # Import required modules
 try {
     Import-Module -Name (Resolve-Path $ModulePath) -Force
@@ -520,32 +523,37 @@ function Handle-UpdateProfile {
                 if ($hasNewCredentials) {
             Write-Host "Processing credentials for update... (fetching secrets if needed)" -ForegroundColor Cyan
             foreach ($key in $Body.credentials.Keys) {
-                $newValue = $Body.credentials[$key]
-                # If masked or preserve marker, fetch from vault and use; fallback to existing profile if vault is missing
+                $newValue = $Body.credentials[$key]                # If masked or preserve marker, fetch from vault and use; fallback to existing profile if vault is missing
                 if ($newValue -in @('***HIDDEN***', '***MASKED***', '***SECRET***', '***PRESERVE_EXISTING***')) {
                     $vaultKey = "AnyAPI.$ProfileName.$key"
                     $secret = $null
-                    Write-Host "  [DEBUG] Attempting to fetch secret with key: '$vaultKey' from vault 'AnyAPI'" -ForegroundColor DarkGray
-                    try {
-                        $secret = Get-Secret -Name $vaultKey -Vault "AnyAPI" -ErrorAction Stop
-                        Write-Host "  $key`: fetched from vault and set for update (masked or preserve marker)" -ForegroundColor Yellow
-                    } catch {
-                        Write-Host "  $key`: could not fetch from vault with key '$vaultKey', will try alternate casing and existing profile value" -ForegroundColor Red
-                        # Try alternate casing (lowercase key)
-                        $altVaultKey = "AnyAPI.$ProfileName.$($key.ToLower())"
+                    
+                    # Only attempt to fetch from vault if SecretStore is unlocked (password cached)
+                    if ($script:secretStorePassword) {
+                        Write-Host "  [DEBUG] SecretStore is unlocked, attempting to fetch secret with key: '$vaultKey' from vault 'AnyAPI'" -ForegroundColor DarkGray
                         try {
-                            $secret = Get-Secret -Name $altVaultKey -Vault "AnyAPI" -ErrorAction Stop
-                            Write-Host "  $key`: fetched from vault with alternate key '$altVaultKey' (lowercase)" -ForegroundColor Yellow
+                            $secret = Get-Secret -Name $vaultKey -Vault "AnyAPI" -ErrorAction Stop
+                            Write-Host "  $key`: fetched from vault and set for update (masked or preserve marker)" -ForegroundColor Yellow
                         } catch {
-                            Write-Host "  $key`: still could not fetch from vault with alternate key, will try existing profile value" -ForegroundColor Red
-                            # For debugging, list all available keys in the vault
+                            Write-Host "  $key`: could not fetch from vault with key '$vaultKey', will try alternate casing" -ForegroundColor Red
+                            # Try alternate casing (lowercase key)
+                            $altVaultKey = "AnyAPI.$ProfileName.$($key.ToLower())"
                             try {
-                                $allVaultSecrets = Get-SecretInfo -Vault "AnyAPI" | Select-Object -ExpandProperty Name
-                                Write-Host "  [DEBUG] Available secrets in vault: $($allVaultSecrets -join ', ')" -ForegroundColor DarkGray
+                                $secret = Get-Secret -Name $altVaultKey -Vault "AnyAPI" -ErrorAction Stop
+                                Write-Host "  $key`: fetched from vault with alternate key '$altVaultKey' (lowercase)" -ForegroundColor Yellow
                             } catch {
-                                Write-Host "  [DEBUG] Could not list secrets in vault 'AnyAPI'" -ForegroundColor DarkGray
+                                Write-Host "  $key`: still could not fetch from vault with alternate key" -ForegroundColor Red
+                                # For debugging, list all available keys in the vault (only if unlocked)
+                                try {
+                                    $allVaultSecrets = Get-SecretInfo -Vault "AnyAPI" | Select-Object -ExpandProperty Name
+                                    Write-Host "  [DEBUG] Available secrets in vault: $($allVaultSecrets -join ', ')" -ForegroundColor DarkGray
+                                } catch {
+                                    Write-Host "  [DEBUG] Could not list secrets in vault 'AnyAPI'" -ForegroundColor DarkGray
+                                }
                             }
                         }
+                    } else {
+                        Write-Host "  [DEBUG] SecretStore is locked (no password cached), skipping vault access for key: '$vaultKey'" -ForegroundColor Yellow
                     }
                     if (-not $secret -and $existingProfile -and $existingProfile.AuthenticationDetails -and $existingProfile.AuthenticationDetails.ContainsKey($key)) {
                         $fallback = $existingProfile.AuthenticationDetails[$key]
@@ -915,39 +923,73 @@ function Handle-GetSecretInfo {
     param($Request, $Response)
     
     try {
-        # Get secret storage info
-        $storageInfo = @{
-            provider                    = Get-SecretStorageProvider
-            isSecretManagementAvailable = $null -ne (Get-Module Microsoft.PowerShell.SecretManagement -ListAvailable)
-            isSecretStoreAvailable      = $null -ne (Get-Module Microsoft.PowerShell.SecretStore -ListAvailable)
-        }
-        
-        # Get vault info if available
-        if ($storageInfo.provider -eq 'SecretManagement') {
-            try {
-                $vaults = Get-SecretVault -ErrorAction SilentlyContinue
-                $storageInfo.vaults = @()
-                foreach ($vault in $vaults) {
-                    $storageInfo.vaults += @{
-                        name       = $vault.Name
-                        moduleName = $vault.ModuleName
-                        isDefault  = $vault.IsDefault
+        $isSecretStoreAvailable = $false
+        $isSecretStoreUnlocked = $false
+        $provider = $null
+        $vaultName = $null
+        $vaultStatus = $null
+        $details = @{}
+
+        try {
+            # Check if SecretManagement module is available without triggering password prompts
+            if (Get-Module -ListAvailable -Name Microsoft.PowerShell.SecretManagement) {
+                # Check if SecretStore vault is registered without accessing it
+                $vaults = Get-SecretVault -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq "AnyAPI" -or $_.ModuleName -eq "Microsoft.PowerShell.SecretStore" }
+                if ($vaults) {
+                    $isSecretStoreAvailable = $true
+                    $provider = 'SecretManagement'
+                    $vaultName = 'SecretStore'
+                    
+                    # Only check if unlocked based on our cached password state
+                    if ($script:secretStorePassword) {
+                        $isSecretStoreUnlocked = $true
+                        $vaultStatus = 'Unlocked'
+                        # Only get configuration when we know we're unlocked
+                        try {
+                            $config = Get-SecretStoreConfiguration -ErrorAction Stop
+                            $details = $config | Select-Object * | ConvertTo-Json -Depth 5 | ConvertFrom-Json
+                        } catch {
+                            # If we can't get config even when unlocked, just use basic details
+                            $details = @{ status = "Configuration not accessible" }
+                        }
+                    } else {
+                        $isSecretStoreUnlocked = $false
+                        $vaultStatus = 'Locked'
+                        $details = @{ status = "SecretStore is locked" }
                     }
+                } else {
+                    $isSecretStoreAvailable = $false
+                    $provider = 'None'
+                    $vaultStatus = 'No SecretStore vault found'
                 }
+            } else {
+                $isSecretStoreAvailable = $false
+                $provider = 'None'
+                $vaultStatus = 'SecretManagement module not available'
             }
-            catch {
-                $storageInfo.vaultError = $_.Exception.Message
-            }
+        } catch {
+            Write-Host "Error checking SecretStore availability: $_" -ForegroundColor Red
+            $isSecretStoreAvailable = $false
+            $provider = 'None'
+            $vaultStatus = 'Error checking availability'
+            $details = @{ error = $_.Exception.Message }
         }
-        
+
+        $storageInfo = @{
+            provider = $provider
+            vaultName = $vaultName
+            vaultStatus = $vaultStatus
+            isSecretStoreAvailable = $isSecretStoreAvailable
+            isSecretStoreUnlocked = $isSecretStoreUnlocked
+            details = $details
+        }
+
         Send-JsonResponse -Response $Response -Data @{
-            success     = $true
+            success = $true
             storageInfo = $storageInfo
         }
-    }
-    catch {
+    } catch {
         Send-JsonResponse -Response $Response -Data @{
-            success = $false
             error   = $_.Exception.Message
         } -StatusCode 500
     }
@@ -957,9 +999,60 @@ function Handle-UnlockSecretStore {
     param($Request, $Response, $Body)
     
     try {
+        # Check if this is an encrypted password request
+        if ($Body.isEncrypted -eq $true -and $Body.encryptedPassword -and $Body.encryptionMetadata) {
+            Write-Host "🔐 Received encrypted password request" -ForegroundColor Green
+            
+            try {
+                # Decrypt the password using PowerShell cryptographic functions
+                $decryptedPassword = Decrypt-SessionPassword -EncryptedPassword $Body.encryptedPassword -EncryptionMetadata $Body.encryptionMetadata -UserAgent ($Request.Headers['User-Agent'])
+                
+                Write-Host "✅ Password decrypted successfully" -ForegroundColor Green
+                Write-Host "ℹ️ Processing SecretStore unlock with decrypted password" -ForegroundColor Blue
+                
+                # Convert decrypted password to SecureString
+                $securePassword = ConvertTo-SecureString $decryptedPassword -AsPlainText -Force
+                
+                # Clear the plain text password from memory
+                $decryptedPassword = $null
+                [System.GC]::Collect()
+                
+                # Try to unlock the secret store
+                Unlock-SecretStore -Password $securePassword -ErrorAction Stop
+                
+                # Store for future use in this session
+                $script:secretStorePassword = $securePassword
+                
+                Write-Host "✅ SecretStore unlocked successfully with encrypted password" -ForegroundColor Green
+                
+                Send-JsonResponse -Response $Response -Data @{
+                    success = $true
+                    message = "SecretStore unlocked successfully"
+                    encryptionUsed = $true
+                }
+                return
+            }
+            catch {
+                Write-Host "❌ Failed to decrypt password: $($_.Exception.Message)" -ForegroundColor Red
+                
+                # Fall back to legacy authentication
+                Send-JsonResponse -Response $Response -Data @{
+                    success = $false
+                    error   = "Failed to decrypt password. Please use fallback authentication."
+                    requiresFallback = $true
+                }
+                return
+            }
+        }
+        
+        # Legacy password-based authentication
         if (-not $Body.password) {
             throw "Password is required"
         }
+        
+        Write-Host "🔑 Processing authentication request" -ForegroundColor Yellow
+        # Don't log the actual password for security
+        Write-Host "ℹ️ Password length: $($Body.password.Length) characters" -ForegroundColor Blue
         
         $securePassword = ConvertTo-SecureString $Body.password -AsPlainText -Force
         
@@ -969,12 +1062,15 @@ function Handle-UnlockSecretStore {
         # Store for future use in this session
         $script:secretStorePassword = $securePassword
         
+        Write-Host "✅ SecretStore unlocked successfully" -ForegroundColor Green
+        
         Send-JsonResponse -Response $Response -Data @{
             success = $true
             message = "SecretStore unlocked successfully"
         }
     }
     catch {
+        Write-Host "❌ SecretStore unlock failed: $($_.Exception.Message)" -ForegroundColor Red
         Send-JsonResponse -Response $Response -Data @{
             success = $false
             error   = $_.Exception.Message
@@ -1479,6 +1575,137 @@ function Handle-UpdateCustomScript {
             error   = $_.Exception.Message
             details = $_.Exception.ToString()
         } -StatusCode 500
+    }
+}
+
+function Decrypt-SessionPassword {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$EncryptedPassword,
+        
+        [Parameter(Mandatory=$true)]
+        [string]$EncryptionMetadata,
+        
+        [Parameter(Mandatory=$false)]
+        [string]$UserAgent = ""
+    )
+    
+    try {
+        # Decode the metadata
+        $metadataBytes = [System.Convert]::FromBase64String($EncryptionMetadata)
+        $metadataJson = [System.Text.Encoding]::UTF8.GetString($metadataBytes)
+        $metadata = $metadataJson | ConvertFrom-Json
+        
+        # Generate session key from fingerprint 
+        # We need to work backwards from the sessionFingerprint to find the session key
+        $sessionKey = Get-SessionKeyFromFingerprint -SessionFingerprint $metadata.sessionFingerprint -UserAgent $UserAgent
+        
+        # Decode encrypted data, salt, and IV
+        $encryptedBytes = [System.Convert]::FromBase64String($EncryptedPassword)
+        $saltBytes = [System.Convert]::FromBase64String($metadata.salt)
+        $ivBytes = [System.Convert]::FromBase64String($metadata.iv)
+        
+        # Derive decryption key using PBKDF2
+        $keyBytes = Get-PBKDF2Key -Password $sessionKey.Substring(0, [Math]::Min(32, $sessionKey.Length)) -Salt $saltBytes -Iterations 100000
+        
+        # Decrypt using AES-GCM
+        $decryptedPassword = Get-DecryptedAESGCM -EncryptedData $encryptedBytes -Key $keyBytes -IV $ivBytes
+        
+        return $decryptedPassword
+    }
+    catch {
+        throw "Failed to decrypt session password: $($_.Exception.Message)"
+    }
+}
+
+function Get-SessionKeyFromFingerprint {
+    param(
+        [string]$SessionFingerprint,
+        [string]$UserAgent
+    )
+    
+    # Try different timestamps to match the session fingerprint
+    # In practice, this should be within a reasonable time window (e.g., last few minutes)
+    $currentTime = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    
+    # Try timestamps within the last 5 minutes (300,000 ms)
+    for ($i = 0; $i -lt 300000; $i += 1000) {
+        $testTime = $currentTime - $i
+        
+        $testSessionSeed = @(
+            $UserAgent,
+            "1920x1080",
+            "en-US",
+            $testTime.ToString()
+        ) -join '|'
+        
+        $baseSeed = $testSessionSeed.Substring(0, $testSessionSeed.LastIndexOf('|'))
+        $testFingerprint = Get-SHA256Hash -InputString $baseSeed
+        
+        if ($testFingerprint -eq $SessionFingerprint) {
+            # Found matching timestamp, return the session key
+            return Get-SHA256Hash -InputString $testSessionSeed
+        }
+    }
+    
+    throw "Could not reconstruct session key from fingerprint"
+}
+
+function Get-SHA256Hash {
+    param([string]$InputString)
+    
+    $hasher = [System.Security.Cryptography.SHA256]::Create()
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($InputString)
+    $hashBytes = $hasher.ComputeHash($bytes)
+    $hasher.Dispose()
+    
+    return [System.BitConverter]::ToString($hashBytes).Replace('-', '').ToLower()
+}
+
+function Get-PBKDF2Key {
+    param(
+        [string]$Password,
+        [byte[]]$Salt,
+        [int]$Iterations = 100000
+    )
+    
+    $passwordBytes = [System.Text.Encoding]::UTF8.GetBytes($Password)
+    
+    # Use .NET's Rfc2898DeriveBytes for PBKDF2
+    $rfc2898 = New-Object System.Security.Cryptography.Rfc2898DeriveBytes($passwordBytes, $Salt, $Iterations, [System.Security.Cryptography.HashAlgorithmName]::SHA256)
+    $keyBytes = $rfc2898.GetBytes(32) # 256 bits = 32 bytes
+    $rfc2898.Dispose()
+    
+    return $keyBytes
+}
+
+function Get-DecryptedAESGCM {
+    param(
+        [byte[]]$EncryptedData,
+        [byte[]]$Key,
+        [byte[]]$IV
+    )
+    
+    try {
+        # AES-GCM decryption in .NET
+        $aes = [System.Security.Cryptography.AesGcm]::new($Key)
+        
+        # AES-GCM includes authentication tag in the encrypted data
+        # The last 16 bytes are the authentication tag
+        $tagLength = 16
+        $cipherTextLength = $EncryptedData.Length - $tagLength
+        
+        $cipherText = $EncryptedData[0..($cipherTextLength - 1)]
+        $tag = $EncryptedData[$cipherTextLength..($EncryptedData.Length - 1)]
+        
+        $plainTextBytes = New-Object byte[] $cipherTextLength
+        $aes.Decrypt($IV, $cipherText, $tag, $plainTextBytes)
+        $aes.Dispose()
+        
+        return [System.Text.Encoding]::UTF8.GetString($plainTextBytes)
+    }
+    catch {
+        throw "AES-GCM decryption failed: $($_.Exception.Message)"
     }
 }
 

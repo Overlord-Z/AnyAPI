@@ -9,25 +9,40 @@ class SecretManager {
         this.secretStoreInfo = null;
         this.passwordAttempts = 0;
         this.maxPasswordAttempts = 3;
+        this.initialized = false;
         
         // --- Add: Try to load cached password from sessionStorage ---
         this.cachedPassword = sessionStorage.getItem('anyapi_secretstore_password') || null;
         
-        // Initialize secret manager
-        this.init();
-    }
-
-    /**
+        // Don't auto-initialize - let the main app do it
+        // this.init();
+    }    /**
      * Initialize secret manager
      */
     async init() {
+        if (this.initialized) {
+            console.log('🔧 SecretManager already initialized, skipping');
+            return;
+        }
+        
         try {
+            console.log('🔧 Initializing SecretManager...');
             await this.loadSecretInfo();
             // --- Try auto-unlock if password is cached ---
             if (this.cachedPassword) {
                 await this.tryAutoUnlock();
             } else {
                 await this.checkSecretStoreStatus();
+            }
+            
+            this.initialized = true;
+            console.log('✅ SecretManager initialization complete');
+              // Update status indicator after initialization
+            console.log('🔧 SecretManager init complete, updating status indicator');
+            if (typeof window.updateSecretStoreStatusIndicator === 'function') {
+                window.updateSecretStoreStatusIndicator();
+            } else {
+                console.warn('updateSecretStoreStatusIndicator not available globally');
             }
         } catch (error) {
             console.warn('Failed to initialize secret manager:', error);
@@ -55,9 +70,7 @@ class SecretManager {
             sessionStorage.removeItem('anyapi_secretstore_password');
             await this.checkSecretStoreStatus();
         }
-    }
-
-    /**
+    }    /**
      * Load secret storage information from backend
      */
     async loadSecretInfo() {
@@ -66,6 +79,15 @@ class SecretManager {
             if (response.success) {
                 this.secretStoreInfo = response.storageInfo;
                 console.log('Secret storage info loaded:', this.secretStoreInfo);
+                  // Dispatch event to update UI indicators
+                window.dispatchEvent(new CustomEvent('secretStoreInfoUpdated', { 
+                    detail: this.secretStoreInfo 
+                }));
+                
+                // Update status indicator immediately
+                if (typeof window.updateSecretStoreStatusIndicator === 'function') {
+                    window.updateSecretStoreStatusIndicator();
+                }
             }
         } catch (error) {
             console.error('Failed to load secret info:', error);
@@ -170,9 +192,13 @@ class SecretManager {
                 
                 // Clear password input
                 passwordInput.value = '';
-                
-                // Emit event for other components
+                  // Emit event for other components
                 window.dispatchEvent(new CustomEvent('secretStoreUnlocked'));
+                
+                // Update status indicator immediately
+                if (typeof window.updateSecretStoreStatusIndicator === 'function') {
+                    window.updateSecretStoreStatusIndicator();
+                }
                 
             } else {
                 throw new Error(response.error || 'Failed to unlock SecretStore');
@@ -834,5 +860,8 @@ function validatePasswordStrength(password) {
     };
 }
 
-// Initialize global secret manager
+// Initialize global secret manager (but don't auto-init)
 const secretManager = new SecretManager();
+
+// Make it globally available
+window.secretManager = secretManager;

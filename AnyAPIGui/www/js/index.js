@@ -1,68 +1,34 @@
-import { showNotification } from './ui/notifications.js';
-import { initEndpointUI } from './ui/endpoint-ui.js';
-import { initResponseUI } from './ui/response-ui.js';
-import EndpointTester from './core/endpoint-tester.js';
-
-// Make showNotification globally available for core modules
-window.showNotification = showNotification;
+// Note: showNotification, initEndpointUI, and initResponseUI should be loaded via script tags
+// They will be available globally when their respective scripts load
 
 console.log('🚀 Index.js loaded, setting up dynamic initialization...');
 
-/**
- * Wait for a global object to be available
- */
-function waitForGlobal(globalName, timeout = 2000) {
-    return new Promise((resolve, reject) => {
-        const startTime = Date.now();
-        
-        function check() {
-            if (window[globalName] !== undefined) {
-                console.log(`✅ ${globalName} is now available`);
-                resolve(window[globalName]);
-            } else if (Date.now() - startTime > timeout) {
-                console.warn(`⚠️ Timeout waiting for ${globalName}`);
-                reject(new Error(`Timeout waiting for ${globalName}`));
-            } else {
-                setTimeout(check, 25); // Check every 25ms for faster detection
-            }
-        }
-        
-        check();
-    });
-}
+// Import the response UI module
+import { initResponseUI, displayResponseData, clearResponseData } from './ui/response-ui.js';
+
+// Make response functions globally available
+window.displayResponseData = displayResponseData;
+window.clearResponseData = clearResponseData;
+window.initResponseUI = initResponseUI;
 
 /**
- * Wait for multiple global objects to be available
+ * Wait for dependencies to be available
  */
 async function waitForDependencies() {
-    const dependencies = [
-        { name: 'apiClient', required: false },
-        { name: 'profileManager', required: false },
-        { name: 'templateManager', required: false },
-        { name: 'secretManager', required: false }
-    ];
-    
     console.log('🔍 Checking for dependencies...');
     
-    // Check all dependencies in parallel for faster loading
-    const promises = dependencies.map(async (dep) => {
-        try {
-            await waitForGlobal(dep.name, 800); // Very short timeout for optional deps
-            return { name: dep.name, success: true };
-        } catch (error) {
-            if (dep.required) {
-                throw error;
-            } else {
-                console.warn(`⚠️ Optional dependency ${dep.name} not available: ${error.message}`);
-                return { name: dep.name, success: false };
-            }
-        }
-    });
+    // Give scripts time to load and create global instances
+    await new Promise(resolve => setTimeout(resolve, 200));
     
-    // Wait for all checks to complete (but don't block on failures)
-    await Promise.allSettled(promises);
+    // Check what's available without waiting
+    const available = [];
+    if (window.apiClient) available.push('apiClient');
+    if (window.templateManager) available.push('templateManager');
+    if (window.secretManager) available.push('secretManager');
+    if (window.profileManager) available.push('profileManager');
+    if (window.endpointTester) available.push('endpointTester');
     
-    console.log('✅ All dependencies checked');
+    console.log('✅ Available dependencies:', available.join(', ') || 'none');
 }
 
 /**
@@ -72,41 +38,41 @@ async function initializeApp() {
     try {
         console.log('🔧 Starting AnyAPI initialization...');
         
-        // Add a maximum wait time for the entire initialization
-        const initTimeout = setTimeout(() => {
-            console.warn('⚠️ Initialization taking too long, proceeding without optional dependencies...');
-        }, 2000);
-        
-        // Wait for all dependencies to be loaded (with timeout)
-        await Promise.race([
-            waitForDependencies(),
-            new Promise(resolve => setTimeout(resolve, 1500)) // Max 1.5 seconds total wait
-        ]);
-        
-        clearTimeout(initTimeout);
-        
-        // Ensure global objects are available on window
-        if (typeof apiClient !== 'undefined') {
-            window.apiClient = apiClient;
-            console.log('✅ ApiClient available globally');
+        // Wait for dependencies
+        await waitForDependencies();
+          // Check for EndpointTester initialization function
+        if (typeof window.initializeEndpointTester === 'function') {
+            console.log('🔌 Initializing EndpointTester...');
+            try {
+                const endpointTester = window.initializeEndpointTester();
+                if (endpointTester) {
+                    console.log('✅ EndpointTester initialized successfully');
+                } else {
+                    console.warn('⚠️ EndpointTester initialization returned null');
+                }
+            } catch (error) {
+                console.error('❌ EndpointTester initialization failed:', error);
+            }
+        } else {
+            console.warn('⚠️ EndpointTester initialization function not available');
         }
         
-        // Initialize core endpoint tester
-        console.log('🔌 Creating EndpointTester instance...');
-        window.endpointTester = new EndpointTester();
-        console.log('✅ EndpointTester created');
+        if (typeof initResponseUI === 'function') {
+            initResponseUI();
+            console.log('✅ Response UI initialized');
+        } else {
+            console.log('⚠️ initResponseUI not available');
+        }
         
-        // Initialize UI modules
-        console.log('🎨 Initializing UI modules...');
-        initEndpointUI();
-        initResponseUI();
-        console.log('✅ UI modules initialized');
-        
-        // Hide loading screen and show the app
-        console.log('🎭 Showing application...');
+        console.log('✅ UI modules initialization complete');
+          // Hide loading screen and show the app
         showApplication();
         
-        showNotification('AnyAPI initialized successfully', 'success', 3000);
+        if (typeof showNotification === 'function') {
+            showNotification('AnyAPI initialized successfully', 'success', 3000);
+        } else {
+            console.log('✅ AnyAPI initialized successfully');
+        }
         console.log('🎉 AnyAPI initialization complete!');
         
     } catch (error) {
@@ -166,17 +132,37 @@ function showInitializationError(error) {
 
 // Initialize when DOM is ready
 window.addEventListener('DOMContentLoaded', () => {
-    console.log('📋 DOM Content Loaded, starting dynamic initialization...');
+    console.log('📋 DOM Content Loaded, starting initialization...');
     
     // Initialize dark mode from localStorage
     const savedDarkMode = localStorage.getItem('anyapi_dark_mode') === 'true';
     if (savedDarkMode) {
         document.documentElement.setAttribute('data-theme', 'dark');
     }
-      initializeApp();
+    
+    initializeApp();
 });
 
-// Provide minimal global app object for legacy HTML handlers (only if not already set)
+// Main application initialization
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 Initializing AnyAPI application...');
+    
+    try {
+        // Initialize response viewer first
+        initResponseUI();
+        
+        // Initialize other components if they exist
+        if (typeof app !== 'undefined' && app.init) {
+            await app.init();
+        }
+        
+        console.log('✅ AnyAPI application initialized successfully');
+    } catch (error) {
+        console.error('❌ Failed to initialize AnyAPI:', error);
+    }
+});
+
+// Provide minimal global app object for legacy HTML handlers
 if (!window.app) {
     window.app = {
         closeModal: (modalId) => {
@@ -186,6 +172,7 @@ if (!window.app) {
                 modal.classList.remove('show');
             }
         },
+        
         copyToClipboard: async (elementId) => {
             const element = document.getElementById(elementId);
             if (!element) return;
@@ -200,13 +187,21 @@ if (!window.app) {
                     textArea.select();
                     document.execCommand('copy');
                     document.body.removeChild(textArea);
+                }                if (typeof showNotification === 'function') {
+                    showNotification('Copied to clipboard', 'success', 2000);
+                } else {
+                    console.log('✅ Copied to clipboard');
                 }
-                showNotification('Copied to clipboard', 'success', 2000);
             } catch (error) {
                 console.error('Failed to copy to clipboard:', error);
-                showNotification('Failed to copy to clipboard', 'error');
+                if (typeof showNotification === 'function') {
+                    showNotification('Failed to copy to clipboard', 'error');
+                } else {
+                    console.error('❌ Failed to copy to clipboard');
+                }
             }
-        },        toggleDarkMode: () => {
+        },
+          toggleDarkMode: () => {
             const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
             const newTheme = !isDark;
             
@@ -216,88 +211,29 @@ if (!window.app) {
                 document.documentElement.removeAttribute('data-theme');
             }
             
-            // Save preference
             localStorage.setItem('anyapi_dark_mode', newTheme.toString());
-            
-            showNotification(
-                `Switched to ${newTheme ? 'dark' : 'light'} mode`,
-                'info',
-                2000
-            );
-        },
-        showAppInfo: () => {
-            // Simple modal for app info
-            const modal = document.createElement('div');
-            modal.className = 'modal show';
-            modal.id = 'app-info-modal';
-            modal.innerHTML = `<div class="modal-content large"><div class="modal-header"><h3>About AnyAPI</h3><button class="modal-close" onclick="app.closeModal('app-info-modal')">&times;</button></div><div class="modal-body"><p>AnyAPI GUI - Modern API testing and management tool.</p></div></div>`;
-            document.body.appendChild(modal);
-        },
-        exportProfiles: () => {
-            if (window.profileManager && typeof window.profileManager.exportProfiles === 'function') {
-                window.profileManager.exportProfiles();
+            if (typeof showNotification === 'function') {
+                showNotification(`Switched to ${newTheme ? 'dark' : 'light'} mode`, 'info', 2000);
             } else {
-                showNotification('Profile export not available', 'warning');
+                console.log(`✅ Switched to ${newTheme ? 'dark' : 'light'} mode`);
             }
         },
-        importProfiles: () => {
-            if (window.profileManager && typeof window.profileManager.importProfiles === 'function') {
-                window.profileManager.importProfiles();
-            } else {
-                showNotification('Profile import not available', 'warning');
-            }
-        },
-        showSection: (sectionName) => {
-            // Simple section switcher for legacy handlers
-            document.querySelectorAll('.content-section').forEach(section => {
-                section.classList.remove('active');
-            });
-            const target = document.getElementById(`${sectionName}-section`);
-            if (target) target.classList.add('active');
-        },        filterHistory: () => {
-            const searchTerm = document.getElementById('history-search')?.value?.toLowerCase() || '';
-            const selectedProfile = document.getElementById('history-profile-filter')?.value || '';
-            const historyItems = document.querySelectorAll('.history-item');
-            
-            historyItems.forEach(item => {
-                const text = item.textContent.toLowerCase();
-                const itemProfile = app.extractProfileFromHistoryItem(item);
-                
-                // Check both search term and profile filter
-                const matchesSearch = !searchTerm || text.includes(searchTerm);
-                const matchesProfile = !selectedProfile || itemProfile === selectedProfile;
-                
-                if (matchesSearch && matchesProfile) {
-                    item.style.display = 'block';
-                    item.classList.remove('filtered-out');
-                } else {
-                    item.style.display = 'none';
-                    item.classList.add('filtered-out');
-                }
-            });
-        },
-        filterHistoryByProfile: () => {
-            // Delegate to the main filter function which handles both search and profile filtering
-            app.filterHistory();
-        },
-        extractProfileFromHistoryItem: (historyItem) => {
-            try {
-                // Look for "Profile: [name]" pattern in the text
-                const text = historyItem.textContent;
-                const match = text.match(/Profile:\s*([^•]+)/);
-                return match ? match[1].trim() : '';
-            } catch (error) {
-                console.warn('Error extracting profile from history item:', error);
-                return '';
-            }
-        },        clearHistory: () => {
+          clearHistory: () => {
             if (window.endpointTester && typeof window.endpointTester.clearHistory === 'function') {
                 if (confirm('Are you sure you want to clear all request history?')) {
                     window.endpointTester.clearHistory();
-                    showNotification('Request history cleared', 'success');
+                    if (typeof showNotification === 'function') {
+                        showNotification('Request history cleared', 'success');
+                    } else {
+                        console.log('✅ Request history cleared');
+                    }
                 }
             } else {
-                showNotification('History functionality not available', 'warning');
+                if (typeof showNotification === 'function') {
+                    showNotification('History functionality not available', 'warning');
+                } else {
+                    console.warn('⚠️ History functionality not available');
+                }
             }
         }
     };

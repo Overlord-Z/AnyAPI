@@ -1,6 +1,5 @@
 // Core EnhancedResponseViewer class (logic only, no direct DOM manipulation)
-// Exported as ES6 module
-import { formatJson, escapeHtml } from './utils.js';
+// Using global functions from utils.js (loaded via script tag)
 
 class EnhancedResponseViewer {
     constructor() {
@@ -252,7 +251,7 @@ class EnhancedResponseViewer {
                     <button class="export-raw-btn">💾 Export</button>
                 </div>
             </div>
-            <pre class="raw-json">${escapeHtml(rawContent)}</pre>
+            <pre class="raw-json modern-scrollbar">${escapeHtml(rawContent)}</pre>
         `;
             
             // Add event listeners
@@ -281,7 +280,7 @@ class EnhancedResponseViewer {
                         <button class="export-formatted-btn">💾 Export</button>
                     </div>
                 </div>
-                <div class="formatted-json">${syntaxHighlightedContent}</div>
+                <div class="formatted-json modern-scrollbar">${syntaxHighlightedContent}</div>
             `;
             
             // Add event listeners
@@ -337,7 +336,7 @@ class EnhancedResponseViewer {
                     ${showBack ? '<button class="table-back-btn">⬅️ Back</button>' : ''}
                 </div>
             </div>
-            <div class="table-container">
+            <div class="table-container modern-scrollbar">
                 <table class="enhanced-table">
                     <thead>
                         <tr>                            ${headers.map(header => `
@@ -525,6 +524,7 @@ class EnhancedResponseViewer {
         const schemaJson = JSON.stringify(this.dataSchema, null, 2);
         const syntaxHighlightedSchema = this.syntaxHighlightJson(this.dataSchema);
 
+        // Only one view is visible at a time: default to JSON view
         const schemaHtml = `
             <div class="view-header">
                 <h3>Data Schema</h3>
@@ -535,17 +535,16 @@ class EnhancedResponseViewer {
                 </div>
             </div>
             <div class="schema-view">
-                <div class="schema-json-view active">
+                <div class="schema-json-view active" style="display:block;">
                     <div class="formatted-json">${syntaxHighlightedSchema}</div>
                 </div>
-                <div class="schema-tree-view">
+                <div class="schema-tree-view" style="display:none;">
                     ${this.renderSchemaNode(this.dataSchema, 'root', 0)}
                 </div>
             </div>
         `;
-        
         responseViewer.innerHTML = schemaHtml;
-        
+
         // Add event listeners for schema actions
         const exportSchemaBtn = responseViewer.querySelector('.export-schema-btn');
         const generateDocsBtn = responseViewer.querySelector('.generate-docs-btn');
@@ -643,120 +642,85 @@ class EnhancedResponseViewer {
         const duplicates = Array.from(stats.duplicateValues.entries())
             .filter(([value, count]) => count > 1)
             .sort((a, b) => b[1] - a[1])
-            .slice(0, 10);        const statsHtml = `
-            <div class="view-header">
-                <h3>Data Statistics</h3>
-                <div class="view-actions">
-                    <button class="export-stats-btn">📊 Export Stats</button>
-                    <button class="generate-report-btn">📄 Generate Report</button>
+            .slice(0, 10);
+
+        // Modern compact summary row
+        const summaryRow = `
+            <div class="stats-summary-row">
+                <div class="stats-summary-item" title="Total Nodes"><span>🧩</span> ${stats.totalNodes.toLocaleString()}<div class="stats-summary-label">Nodes</div></div>
+                <div class="stats-summary-item" title="Objects"><span>🗂️</span> ${stats.totalObjects.toLocaleString()}<div class="stats-summary-label">Objects</div></div>
+                <div class="stats-summary-item" title="Arrays"><span>📚</span> ${stats.totalArrays.toLocaleString()}<div class="stats-summary-label">Arrays</div></div>
+                <div class="stats-summary-item" title="Primitives"><span>🔢</span> ${stats.totalPrimitives.toLocaleString()}<div class="stats-summary-label">Primitives</div></div>
+                <div class="stats-summary-item" title="Null Values"><span>⛔</span> ${stats.nullValues.toLocaleString()}<div class="stats-summary-label">Nulls</div></div>
+                <div class="stats-summary-item" title="Max Depth"><span>🌳</span> ${stats.maxDepth}<div class="stats-summary-label">Max Depth</div></div>
+            </div>
+        `;
+
+        // Data type distribution with bars
+        const typeDist = Object.entries(stats.dataTypes).map(([type, count]) => {
+            const percent = ((count / stats.totalNodes) * 100).toFixed(1);
+            return `<div class="stats-type-row"><span class="stats-type-label">${type}</span><div class="stats-type-bar"><div class="stats-type-bar-fill" style="width:${percent}%;"></div></div><span class="stats-type-count">${count.toLocaleString()} <span class="stats-type-percent">(${percent}%)</span></div>`;
+        }).join('');
+
+        // Pattern analysis
+        const patterns = [
+            { icon: '✉️', label: 'Emails', value: stats.patterns.emails },
+            { icon: '🔗', label: 'URLs', value: stats.patterns.urls },
+            { icon: '📅', label: 'Dates', value: stats.patterns.dates },
+            { icon: '🆔', label: 'IDs', value: stats.patterns.ids }
+        ].map(p => `<div class="stats-pattern"><span>${p.icon}</span> <span class="stats-pattern-label">${p.label}</span> <span class="stats-pattern-value">${p.value.toLocaleString()}</span></div>`).join('');
+
+        // Duplicates
+        const duplicatesHtml = duplicates.length > 0 ? `
+            <div class="stats-card stats-duplicates">
+                <div class="stats-card-title">Top Duplicates</div>
+                <div class="stats-duplicates-list">
+                    <div class="stats-duplicates-scroll">
+                    ${duplicates.map(([value, count], idx) => `
+                        <div class="stats-duplicate-row${idx % 2 === 1 ? ' alt' : ''}" title="${escapeHtml(String(value))}">
+                            <span class="stats-duplicate-value">${escapeHtml(String(value)).substring(0, 32)}${String(value).length > 32 ? '…' : ''}</span>
+                            <span class="stats-duplicate-count">×${count}</span>
+                        </div>
+                    `).join('')}
+                    </div>
                 </div>
             </div>
-            <div class="stats-view">
+        ` : '';
+
+        // Main grid layout
+        const statsHtml = `
+            <div class="stats-modern">
+                <div class="view-header compact">
+                    <h3>Data Statistics</h3>
+                    <div class="view-actions">
+                        <button class="export-stats-btn">📊 Export Stats</button>
+                        <button class="generate-report-btn">📄 Generate Report</button>
+                    </div>
+                </div>
+                ${summaryRow}
                 <div class="stats-grid">
-                    <div class="stats-card">
-                        <h4>Structure Overview</h4>
-                        <div class="stats-item">
-                            <span class="stats-label">Total Nodes:</span>
-                            <span class="stats-value">${stats.totalNodes.toLocaleString()}</span>
-                        </div>
-                        <div class="stats-item">
-                            <span class="stats-label">Max Depth:</span>
-                            <span class="stats-value">${stats.maxDepth}</span>
-                        </div>
-                        <div class="stats-item">
-                            <span class="stats-label">Objects:</span>
-                            <span class="stats-value">${stats.totalObjects.toLocaleString()}</span>
-                        </div>
-                        <div class="stats-item">
-                            <span class="stats-label">Arrays:</span>
-                            <span class="stats-value">${stats.totalArrays.toLocaleString()}</span>
-                        </div>
-                        <div class="stats-item">
-                            <span class="stats-label">Primitives:</span>
-                            <span class="stats-value">${stats.totalPrimitives.toLocaleString()}</span>
-                        </div>
-                        <div class="stats-item">
-                            <span class="stats-label">Null Values:</span>
-                            <span class="stats-value">${stats.nullValues.toLocaleString()}</span>
-                        </div>
+                    <div class="stats-card stats-types">
+                        <div class="stats-card-title">Type Distribution</div>
+                        <div class="stats-types-list">${typeDist}</div>
                     </div>
-
-                    <div class="stats-card">
-                        <h4>Data Types</h4>
-                        ${Object.entries(stats.dataTypes).map(([type, count]) => `
-                            <div class="stats-item">
-                                <span class="stats-label">${type}:</span>
-                                <span class="stats-value">${count.toLocaleString()}</span>
-                                <div class="stats-bar">
-                                    <div class="stats-bar-fill" style="width: ${(count / stats.totalNodes) * 100}%"></div>
-                                </div>
-                            </div>
-                        `).join('')}
+                    <div class="stats-card stats-patterns">
+                        <div class="stats-card-title">Pattern Analysis</div>
+                        <div class="stats-patterns-list">${patterns}</div>
                     </div>
-
-                    <div class="stats-card">
-                        <h4>Pattern Analysis</h4>
-                        <div class="stats-item">
-                            <span class="stats-label">Email addresses:</span>
-                            <span class="stats-value">${stats.patterns.emails.toLocaleString()}</span>
-                        </div>
-                        <div class="stats-item">
-                            <span class="stats-label">URLs:</span>
-                            <span class="stats-value">${stats.patterns.urls.toLocaleString()}</span>
-                        </div>
-                        <div class="stats-item">
-                            <span class="stats-label">Dates:</span>
-                            <span class="stats-value">${stats.patterns.dates.toLocaleString()}</span>
-                        </div>
-                        <div class="stats-item">
-                            <span class="stats-label">IDs:</span>
-                            <span class="stats-value">${stats.patterns.ids.toLocaleString()}</span>
-                        </div>
-                    </div>
-
-                    ${stats.arrayLengths.length > 0 ? `
-                        <div class="stats-card">
-                            <h4>Array Statistics</h4>
-                            <div class="stats-item">
-                                <span class="stats-label">Average Length:</span>
-                                <span class="stats-value">${(stats.arrayLengths.reduce((a, b) => a + b, 0) / stats.arrayLengths.length).toFixed(1)}</span>
-                            </div>
-                            <div class="stats-item">
-                                <span class="stats-label">Min Length:</span>
-                                <span class="stats-value">${Math.min(...stats.arrayLengths)}</span>
-                            </div>
-                            <div class="stats-item">
-                                <span class="stats-label">Max Length:</span>
-                                <span class="stats-value">${Math.max(...stats.arrayLengths)}</span>
-                            </div>
-                        </div>
-                    ` : ''}
-
-                    ${duplicates.length > 0 ? `
-                        <div class="stats-card">
-                            <h4>Duplicate Values</h4>
-                            ${duplicates.map(([value, count]) => `
-                                <div class="stats-item">
-                                    <span class="stats-label">${escapeHtml(String(value).substring(0, 30))}${String(value).length > 30 ? '...' : ''}:</span>
-                                    <span class="stats-value">${count} times</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    ` : ''}
+                    ${duplicatesHtml}
                 </div>
             </div>
         `;
-          responseViewer.innerHTML = statsHtml;
-        
+        responseViewer.innerHTML = statsHtml;
+
         // Add event listeners for stats actions
         const exportStatsBtn = responseViewer.querySelector('.export-stats-btn');
         const generateReportBtn = responseViewer.querySelector('.generate-report-btn');
-        
         if (exportStatsBtn) {
             exportStatsBtn.addEventListener('click', () => this.exportData('stats'));
         }
         if (generateReportBtn) {
-            generateReportBtn.addEventListener('click', () => this.generateReport());
+            generateReportBtn.addEventListener('click', () => this.generateStatsReport());
         }
     }/**
      * Render enhanced tree view with better interaction
@@ -773,7 +737,7 @@ class EnhancedResponseViewer {
                     <button class="export-tree-btn">💾 Export</button>
                 </div>
             </div>
-            <div class="tree-view enhanced">
+            <div class="tree-view enhanced modern-scrollbar">
                 ${this.renderTreeNode(this.currentData, [], 'root', 0)}
             </div>
         `;
@@ -1403,18 +1367,17 @@ class EnhancedResponseViewer {
 
         const jsonView = schemaView.querySelector('.schema-json-view');
         const treeView = schemaView.querySelector('.schema-tree-view');
-        
         if (jsonView && treeView) {
             if (jsonView.classList.contains('active')) {
                 jsonView.classList.remove('active');
-                treeView.classList.add('active');
                 jsonView.style.display = 'none';
+                treeView.classList.add('active');
                 treeView.style.display = 'block';
             } else {
-                jsonView.classList.add('active');
                 treeView.classList.remove('active');
-                jsonView.style.display = 'block';
                 treeView.style.display = 'none';
+                jsonView.classList.add('active');
+                jsonView.style.display = 'block';
             }
         }
     }

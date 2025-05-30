@@ -10,10 +10,8 @@ export function initResponseUI() {
     window.responseViewer = enhancedViewer; // Global reference for HTML event handlers
     window.displayResponseData = displayResponseData; // Make the function globally accessible
 
-    // Initialize view mode tabs - call this after a brief delay to ensure DOM is ready
-    setTimeout(() => {
-        createViewModeTabs();
-    }, 100);
+    // Initialize view mode tabs immediately and make them visible
+    createViewModeTabs();
     
     // Initialize search functionality
     initSearchFeatures();
@@ -21,6 +19,10 @@ export function initResponseUI() {
     // Initialize keyboard shortcuts
     initKeyboardShortcuts();
     
+    // Set default view to raw
+    enhancedViewer.setViewMode('raw');
+    updateActiveTab('raw');
+
     console.log('✅ Enhanced Response Viewer initialized');
 }
 
@@ -52,52 +54,49 @@ function initViewModeTabs() {
  */
 function createViewModeTabs() {
     let tabsContainer = document.querySelector('.response-tabs');
-    
-    if (!tabsContainer || tabsContainer.children.length === 0) {
-        // Find the tabs container in HTML or create it
-        tabsContainer = document.getElementById('response-tabs') || 
-                       document.querySelector('.response-tabs');
-        
-        if (!tabsContainer) {
-            // Create tabs container if it doesn't exist
-            const responseViewer = document.getElementById('response-viewer');
-            
-            if (responseViewer) {
-                const tabsDiv = document.createElement('div');
-                tabsDiv.className = 'response-tabs';
-                tabsDiv.id = 'response-tabs';
-                responseViewer.parentElement.insertBefore(tabsDiv, responseViewer);
-                tabsContainer = tabsDiv;
+    if (!tabsContainer) {
+        const responseContainer = document.querySelector('.response-viewer-optimized');
+        if (responseContainer) {
+            const tabsDiv = document.createElement('div');
+            tabsDiv.className = 'response-tabs';
+            tabsDiv.id = 'response-tabs';
+            const responseHeader = responseContainer.querySelector('.response-header-enhanced');
+            if (responseHeader) {
+                responseHeader.insertAdjacentElement('afterend', tabsDiv);
+            } else {
+                responseContainer.insertBefore(tabsDiv, responseContainer.firstChild);
             }
+            tabsContainer = tabsDiv;
         }
-        
-        if (tabsContainer && enhancedViewer) {
-            // Create tab buttons
-            const tabsHtml = Object.entries(enhancedViewer.viewModes).map(([key, config]) => `
-                <button class="response-tab ${key === 'raw' ? 'active' : ''}" data-view="${key}">
-                    <span class="tab-icon">${config.icon}</span>
-                    <span class="tab-label">${config.name}</span>
-                </button>
-            `).join('');
-            
-            tabsContainer.innerHTML = tabsHtml;
-            
-            // Add click event listeners to tabs
-            tabsContainer.querySelectorAll('.response-tab').forEach(tab => {
-                tab.addEventListener('click', () => {
-                    const viewMode = tab.getAttribute('data-view');
-                    
-                    // Update active tab
-                    tabsContainer.querySelectorAll('.response-tab').forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    
-                    // Switch view mode
-                    if (enhancedViewer) {
-                        enhancedViewer.setViewMode(viewMode);
-                    }
-                });
+    }
+    if (tabsContainer && enhancedViewer) {
+        // Enhanced tab order: Raw, Formatted, Table, Tree, Schema, Search, Stats
+        const tabOrder = [
+            { key: 'raw', name: 'Raw JSON', icon: '📝' },
+            { key: 'formatted', name: 'Formatted', icon: '🎨' },
+            { key: 'table', name: 'Table', icon: '📊' },
+            { key: 'tree', name: 'Tree', icon: '🌳' },
+            { key: 'schema', name: 'Schema', icon: '📐' },
+            { key: 'search', name: 'Search', icon: '🔍' },
+            { key: 'stats', name: 'Stats', icon: '📈' }
+        ];
+        const tabsHtml = tabOrder.map(tab =>
+            `<button class="response-tab${tab.key === 'raw' ? ' active' : ''}" data-view="${tab.key}" title="${tab.name}">
+                <span class="tab-icon">${tab.icon}</span>
+                <span class="tab-label">${tab.name}</span>
+            </button>`
+        ).join('');
+        tabsContainer.innerHTML = tabsHtml;
+        tabsContainer.querySelectorAll('.response-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                e.preventDefault();
+                const viewMode = tab.getAttribute('data-view');
+                tabsContainer.querySelectorAll('.response-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                if (enhancedViewer) enhancedViewer.setViewMode(viewMode);
             });
-        }
+        });
+        tabsContainer.style.display = 'flex';
     }
 }
 
@@ -250,16 +249,32 @@ export function displayResponseData(data, metadata = {}) {
     // Display the data
     enhancedViewer.displayResponse(data);
     
-    // Ensure tabs are created and visible - add a small delay to ensure DOM is ready
+    // Ensure tabs are created and visible
+    createViewModeTabs();
+    
+    // Show the tabs container
+    const tabsContainer = document.querySelector('.response-tabs');
+    if (tabsContainer) {
+        tabsContainer.style.display = 'flex';
+    }
+    
+    // Set default tab to Raw JSON
     setTimeout(() => {
-        createViewModeTabs();
-        
-        // Update active tab to show we have data
         const tabs = document.querySelectorAll('.response-tab');
         if (tabs.length > 0) {
-            tabs[0].classList.add('active'); // Make first tab active
+            tabs.forEach(tab => tab.classList.remove('active'));
+            const rawTab = document.querySelector('.response-tab[data-view="raw"]');
+            if (rawTab) {
+                rawTab.classList.add('active');
+                enhancedViewer.setViewMode('raw');
+            } else {
+                // Fallback to first tab
+                tabs[0].classList.add('active');
+                const firstView = tabs[0].getAttribute('data-view');
+                enhancedViewer.setViewMode(firstView);
+            }
         }
-    }, 50);
+    }, 100);
     
     // Update UI state
     updateResponseInfo(data, metadata);
@@ -350,3 +365,142 @@ function formatFileSize(bytes) {
 export function getViewer() {
     return enhancedViewer;
 }
+
+// Helper function to create properly styled buttons
+function createStyledButton(text, icon, onclick, type = 'outline') {
+    return `<button class="btn btn-${type}" onclick="${onclick}">
+        <i data-feather="${icon}"></i>
+        ${text}
+    </button>`;
+}
+
+// When creating action buttons, ensure they have the correct classes
+function createActionButton(text, icon, onclick, type = 'outline') {
+    return `<button class="btn btn-${type}" onclick="${onclick}">
+        <i data-feather="${icon}"></i>
+        ${text}
+    </button>`;
+}
+
+// In stats view, make sure buttons use the classes
+function createStatsView(data) {
+    // ...existing code...
+    
+    const actionsHtml = `
+        <div class="stats-actions">
+            ${createStyledButton('Export CSV', 'download', 'responseViewer.exportData("csv")', 'outline')}
+            ${createStyledButton('Export JSON', 'file-text', 'responseViewer.exportData("json")', 'outline')}
+            ${createStyledButton('Copy Stats', 'copy', 'responseViewer.copyStats()', 'outline')}
+        </div>
+    `;
+    
+    // ...existing code...
+}
+
+// In table view, ensure buttons have classes
+function createTableView(data) {
+    // ...existing code...
+    
+    const actionsHtml = `
+        <div class="table-actions">
+            ${createStyledButton('Export CSV', 'download', 'responseViewer.exportTableData("csv")', 'outline')}
+            ${createStyledButton('Export JSON', 'file-text', 'responseViewer.exportTableData("json")', 'outline')}
+            ${createStyledButton('Expand All', 'maximize-2', 'responseViewer.expandAllCells()', 'outline')}
+            ${createStyledButton('Collapse All', 'minimize-2', 'responseViewer.collapseAllCells()', 'outline')}
+        </div>
+    `;
+    
+    // ...existing code...
+}
+
+// In tree view, ensure buttons have classes
+function createTreeView(data) {
+    // ...existing code...
+    
+    const actionsHtml = `
+        <div class="response-actions">
+            ${createStyledButton('Expand All', 'chevrons-down', 'responseViewer.expandAllNodes()', 'outline')}
+            ${createStyledButton('Collapse All', 'chevrons-up', 'responseViewer.collapseAllNodes()', 'outline')}
+            ${createStyledButton('Export', 'download', 'responseViewer.exportTreeData()', 'outline')}
+        </div>
+    `;
+    
+    // ...existing code...
+}
+
+// Replace all button creation patterns with properly styled buttons
+// Look for patterns like: `<button class="copy-formatted-btn">📋 Copy</button>`
+// Replace with the createStyledButton helper function
+
+// Update any hardcoded button HTML to use proper classes
+// Example: Change from:
+// `<button class="copy-formatted-btn">📋 Copy</button>`
+// To:
+// `${createStyledButton('Copy', 'copy', 'responseViewer.copyFormatted()', 'outline')}`
+
+// Find and replace all instances of buttons without .btn classes
+// Common patterns to replace:
+// - copy-formatted-btn -> btn btn-outline
+// - export-btn -> btn btn-outline  
+// - expand-all-btn -> btn btn-outline
+// - collapse-all-btn -> btn btn-outline
+// - Any other custom button classes
+
+// Example replacements throughout the file:
+function updateButtonCreation() {
+    // Replace hardcoded buttons with styled versions
+    // This is a placeholder - the actual implementation would scan
+    // and replace all button creation code
+    
+    // Stats view buttons
+    const statsButtons = `
+        <div class="stats-actions">
+            ${createStyledButton('Export CSV', 'download', 'responseViewer.exportData("csv")', 'outline')}
+            ${createStyledButton('Export JSON', 'file-text', 'responseViewer.exportData("json")', 'outline')}
+            ${createStyledButton('Copy Stats', 'copy', 'responseViewer.copyStats()', 'outline')}
+        </div>
+    `;
+    
+    // Table view buttons  
+    const tableButtons = `
+        <div class="table-actions">
+            ${createStyledButton('Export CSV', 'download', 'responseViewer.exportTableData("csv")', 'outline')}
+            ${createStyledButton('Export JSON', 'file-text', 'responseViewer.exportTableData("json")', 'outline')}
+            ${createStyledButton('Expand All', 'maximize-2', 'responseViewer.expandAllCells()', 'outline')}
+            ${createStyledButton('Collapse All', 'minimize-2', 'responseViewer.collapseAllCells()', 'outline')}
+        </div>
+    `;
+    
+    // Tree view buttons
+    const treeButtons = `
+        <div class="response-actions">
+            ${createStyledButton('Expand All', 'chevrons-down', 'responseViewer.expandAllNodes()', 'outline')}
+            ${createStyledButton('Collapse All', 'chevrons-up', 'responseViewer.collapseAllNodes()', 'outline')}
+            ${createStyledButton('Export', 'download', 'responseViewer.exportTreeData()', 'outline')}
+        </div>
+    `;
+    
+    // Raw/Formatted JSON view buttons
+    const jsonButtons = `
+        <div class="response-actions">
+            ${createStyledButton('Copy', 'copy', 'responseViewer.copyFormatted()', 'outline')}
+            ${createStyledButton('Download', 'download', 'responseViewer.downloadJSON()', 'outline')}
+            ${createStyledButton('Validate', 'check-circle', 'responseViewer.validateJSON()', 'outline')}
+        </div>
+    `;
+}
+
+// Apply the button class fix globally by scanning for old button patterns
+// and replacing them with the new styled button helper
+document.addEventListener('DOMContentLoaded', () => {
+    // Fix any existing buttons that don't have proper classes
+    setTimeout(() => {
+        const oldButtons = document.querySelectorAll('button:not(.btn)');
+        oldButtons.forEach(button => {
+            if (button.closest('.response-viewer-optimized, .stats-container, .table-container')) {
+                // Add btn classes to existing buttons
+                button.classList.add('btn', 'btn-outline');
+            }
+        });
+    }, 500);
+});

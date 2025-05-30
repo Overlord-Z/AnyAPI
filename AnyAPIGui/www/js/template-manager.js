@@ -366,50 +366,125 @@ class TemplateManager {
         }
         
         return candidateName;
-    }
-
-    /**
-     * Fill profile form with template data
+    }    /**
+     * Fill profile form with template data - ENHANCED WITH COORDINATED SYSTEM
      */
     fillProfileFormFromTemplate(template, profileName) {
-    // Basic fields
-    profileManager.setFormValue('profile-name', profileName);
-    profileManager.setFormValue('profile-baseurl', template.baseUrl);
-    profileManager.setFormValue('profile-authtype', template.authType);
-    profileManager.setFormValue('profile-pagination', template.paginationType || 'Auto');
-    profileManager.setFormValue('profile-description', template.description || '');
-    
-    // Set headers if available
-    if (template.headers) {
-        profileManager.setFormValue('profile-headers', JSON.stringify(template.headers, null, 2));
-    }
-    
-    // Update auth fields to show the correct form sections
-    profileManager.updateAuthFields();
-    
-    // Wait for auth fields to render, then apply template-specific auth configuration
-    setTimeout(() => {
-        if (template.authFieldMapping && template.requiredSecrets) {
-            profileManager.applyTemplateCredentials(template);
-        }
+        console.log('🎯 Template Manager: Filling form with enhanced coordination');
         
-        // Handle custom auth script
-        if (template.authType === 'CustomScript' && template.customAuthScript) {
-            const scriptElement = document.getElementById('auth-script');
-            if (scriptElement) {
-                scriptElement.value = template.customAuthScript;
+        // Set the profile name first
+        profileManager.setFormValue('profile-name', profileName);
+        
+        // Create a temporary template select to trigger the coordinated system
+        const existingSelect = document.getElementById('profile-template');
+        if (existingSelect) {
+            // Find matching template in profile manager's templates
+            const templateKey = Object.keys(profileManager.templates).find(key => 
+                profileManager.templates[key].name === template.name ||
+                profileManager.templates[key].baseUrl === template.baseUrl
+            );
+            
+            if (templateKey) {
+                console.log('🔗 Found matching profile template:', templateKey);
+                existingSelect.value = templateKey;
+                
+                // Use the enhanced coordinated template application system
+                profileManager.applyTemplate();
+                
+                // Override name with custom profile name
+                setTimeout(() => {
+                    profileManager.setFormValue('profile-name', profileName);
+                }, 250);
+                
+                return; // Exit early since coordinated system handles everything
             }
         }
         
-        // Handle pagination details
-        if (template.paginationDetails) {
-            const paginationDetailsField = document.getElementById('profile-pagination-details');
-            if (paginationDetailsField) {
-                paginationDetailsField.value = JSON.stringify(template.paginationDetails, null, 2);
-            }
-        }
-    }, 200);
+        // Fallback to manual application if no coordinated template found
+        console.log('⚠️ No coordinated template found, using manual application');
+        this.fillProfileFormManually(template, profileName);
 }
+
+    /**
+     * Manual template application fallback - ENHANCED INTEGRATION
+     */
+    fillProfileFormManually(template, profileName) {
+        console.log('🔧 Manual template application for:', template.name);
+        
+        // Basic fields
+        profileManager.setFormValue('profile-name', profileName);
+        profileManager.setFormValue('profile-baseurl', template.baseUrl);
+        profileManager.setFormValue('profile-authtype', template.authType);
+        profileManager.setFormValue('profile-pagination', template.paginationType || 'Auto');
+        profileManager.setFormValue('profile-description', template.description || '');
+        
+        // Set headers if available
+        if (template.headers) {
+            profileManager.setFormValue('profile-headers', JSON.stringify(template.headers, null, 2));
+        }
+        
+        // ENHANCED: Use coordinated auth field update
+        if (profileManager.toggleAuthFields) {
+            profileManager.toggleAuthFields();
+        } else {
+            // Fallback to old method
+            profileManager.updateAuthFields();
+        }
+        
+        // ENHANCED: Apply coordinated credentials after auth fields render
+        setTimeout(() => {
+            if (profileManager.applyTemplateCredentials && 
+                (template.authFieldMapping || template.requiredSecrets)) {
+                console.log('🎯 Using enhanced credential coordination');
+                profileManager.applyTemplateCredentials(template);
+            } else if (template.authFieldMapping && template.requiredSecrets) {
+                console.log('⚠️ Falling back to basic credential application');
+                // Basic fallback for older systems
+                template.requiredSecrets.forEach(secret => {
+                    const mapping = template.authFieldMapping[secret];
+                    if (mapping) {
+                        console.log(`Adding credential: ${secret} (${mapping.label})`);
+                    }
+                });
+            }
+            
+            // Handle custom auth script
+            if (template.authType === 'CustomScript' && template.customAuthScript) {
+                const scriptElement = document.getElementById('auth-script');
+                if (scriptElement) {
+                    scriptElement.value = template.customAuthScript;
+                    console.log('✅ Custom auth script applied');
+                }
+            }
+            
+            // Handle pagination details
+            if (template.paginationDetails) {
+                const paginationDetailsField = document.getElementById('profile-pagination-details');
+                if (paginationDetailsField) {
+                    paginationDetailsField.value = JSON.stringify(template.paginationDetails, null, 2);
+                    console.log('✅ Pagination details applied');
+                }
+            }
+            
+            // ENHANCED: Handle custom settings if present
+            if (template.customSettings && typeof template.customSettings === 'object') {
+                const customSettingsContainer = document.getElementById('profile-customsettings-list');
+                if (customSettingsContainer && profileManager.addCustomSettingRow) {
+                    // Clear existing
+                    customSettingsContainer.innerHTML = '';
+                    
+                    // Add template settings
+                    Object.entries(template.customSettings).forEach(([key, value]) => {
+                        profileManager.addCustomSettingRow(customSettingsContainer, key, value);
+                    });
+                    
+                    // Add empty row
+                    profileManager.addCustomSettingRow(customSettingsContainer, '', '');
+                    console.log('✅ Custom settings applied via coordination');
+                }
+            }
+        }, 250); // Longer delay for manual application
+    }
 
     /**
      * Refresh templates from backend

@@ -1,11 +1,11 @@
 // Utility functions (formatJson, escapeHtml, isValidJson, formatDuration, etc.)
-// Export all utility functions here
+// All utility functions defined globally
 
-export function formatJson(data) {
+function formatJson(data) {
     return JSON.stringify(data, null, 2);
 }
 
-export function escapeHtml(str) {
+function escapeHtml(str) {
     if (typeof str !== 'string') return str;
     return str.replace(/[&<>'"]/g, function (tag) {
         const charsToReplace = {
@@ -19,7 +19,7 @@ export function escapeHtml(str) {
     });
 }
 
-export function isValidJson(str) {
+function isValidJson(str) {
     try {
         JSON.parse(str);
         return true;
@@ -28,7 +28,7 @@ export function isValidJson(str) {
     }
 }
 
-export function formatDuration(ms) {
+function formatDuration(ms) {
     if (ms < 1000) return ms + ' ms';
     return (ms / 1000).toFixed(2) + ' s';
 }
@@ -42,7 +42,7 @@ export function formatDuration(ms) {
  * @param {HTMLElement} element - The element to animate
  * @param {Object} options - Animation options
  */
-export function enableBreathingAnimation(element, options = {}) {
+function enableBreathingAnimation(element, options = {}) {
     if (!element) return;
     
     const defaults = {
@@ -89,7 +89,7 @@ export function enableBreathingAnimation(element, options = {}) {
  * Disable breathing animation on an element
  * @param {HTMLElement} element - The element to stop animating
  */
-export function disableBreathingAnimation(element) {
+function disableBreathingAnimation(element) {
     if (!element) return;
     element.style.animation = '';
 }
@@ -100,7 +100,7 @@ export function disableBreathingAnimation(element) {
  * @param {string} color - The pulse color
  * @param {number} duration - Pulse duration in ms
  */
-export function createPulseEffect(element, color = 'var(--color-secondary)', duration = 600) {
+function createPulseEffect(element, color = 'var(--color-secondary)', duration = 600) {
     if (!element) return;
     
     const originalBoxShadow = element.style.boxShadow;
@@ -123,7 +123,7 @@ export function createPulseEffect(element, color = 'var(--color-secondary)', dur
  * @param {HTMLElement} element - The element to animate
  * @param {Object} options - Animation options
  */
-export function animateAppearance(element, options = {}) {
+function animateAppearance(element, options = {}) {
     if (!element) return;
     
     const defaults = {
@@ -163,7 +163,7 @@ export function animateAppearance(element, options = {}) {
  * Create a shimmer loading effect
  * @param {HTMLElement} element - The element to add shimmer to
  */
-export function addShimmerEffect(element) {
+function addShimmerEffect(element) {
     if (!element) return;
     
     element.classList.add('shimmer-loading');
@@ -195,7 +195,111 @@ export function addShimmerEffect(element) {
  * Remove shimmer loading effect
  * @param {HTMLElement} element - The element to remove shimmer from
  */
-export function removeShimmerEffect(element) {
+function removeShimmerEffect(element) {
     if (!element) return;
     element.classList.remove('shimmer-loading');
+}
+
+/**
+ * Check if API client is ready
+ * @returns {boolean} True if API client is ready
+ */
+function isApiClientReady() {
+    return window.apiClient && 
+           typeof window.apiClient.testEndpoint === 'function' &&
+           typeof window.apiClient.checkConnection === 'function' &&
+           window.apiClient.isConnected === true;
+}
+
+/**
+ * Wait for API client to be ready
+ * @param {number} timeout - Timeout in milliseconds
+ * @returns {Promise<boolean>} True if ready, false if timeout
+ */
+async function waitForApiClient(timeout = 10000) {
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < timeout) {
+        if (isApiClientReady()) {
+            console.log('✅ API client is ready for requests');
+            return true;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    console.warn('⚠️ API client readiness timeout');
+    return false;
+}
+
+/**
+ * Make API request - Consolidated function for all API calls
+ * @param {Object} requestData - Request configuration
+ * @returns {Promise} Response from API
+ */
+async function makeRequest(requestData) {
+    console.log('🚀 Making API request with data:', requestData);
+    
+    // Check if API client is available
+    if (!window.apiClient) {
+        throw new Error('API Client not initialized. Please refresh the page and try again.');
+    }
+    
+    if (typeof window.apiClient.testEndpoint !== 'function') {
+        throw new Error('API Client testEndpoint function not available. Please refresh the page and try again.');
+    }
+    
+    // Check if connected (but don't fail if not - let the backend handle it)
+    if (!window.apiClient.isConnected) {
+        console.warn('⚠️ API client not connected, attempting request anyway...');
+    }
+    
+    // Use the API client's testEndpoint method
+    return await window.apiClient.testEndpoint(requestData);
+}
+
+/**
+ * Simple global notification function - bypasses module issues
+ * @param {string} message - The message to display
+ * @param {string} type - The type of notification (success, error, info, warning)
+ * @param {number} duration - Duration in milliseconds
+ */
+function showNotification(message, type = 'info', duration = 3000) {
+    const container = document.getElementById('notifications') || createNotificationsContainer();
+    
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerHTML = `<span class="notification-message">${escapeHtml(message)}</span>`;
+    
+    // Set initial hidden state
+    notification.style.opacity = '0';
+    notification.style.transform = 'translateY(10px)';
+    
+    container.appendChild(notification);
+    
+    // Force reflow and show
+    notification.offsetHeight;
+    notification.style.transition = 'all 0.2s ease-out';
+    notification.style.opacity = '0.95';
+    notification.style.transform = 'translateY(0)';
+    
+    // Remove after duration
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateY(-10px)';
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 200);
+        }
+    }, duration);
+}
+
+function createNotificationsContainer() {
+    const container = document.createElement('div');
+    container.id = 'notifications';
+    container.className = 'notifications';
+    document.body.appendChild(container);
+    return container;
 }

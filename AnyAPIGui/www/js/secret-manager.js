@@ -100,9 +100,8 @@ class SecretManager {
         if (modal) {
             modal.style.display = 'block';
             modal.classList.add('show');
-            
-            // Focus on password input
-            const passwordInput = document.getElementById('secret-password');
+              // Focus on password input
+            const passwordInput = document.getElementById('secret-store-password');
             if (passwordInput) {
                 setTimeout(() => passwordInput.focus(), 100);
                 
@@ -128,11 +127,21 @@ class SecretManager {
     }
 
     /**
-     * Attempt to unlock SecretStore with provided password
+     * Close SecretStore password modal (alias for hidePasswordModal)
      */
-    async unlockSecretStore() {
-        const passwordInput = document.getElementById('secret-password');
-        if (!passwordInput) return;
+    closePasswordModal() {
+        this.hidePasswordModal();
+    }
+
+    /**
+     * Attempt to unlock SecretStore with provided password
+     */    async unlockSecretStore() {
+        const passwordInput = document.getElementById('secret-store-password');
+        if (!passwordInput) {
+            console.error('Password input field not found');
+            showNotification('Password input field not found', 'error');
+            return;
+        }
 
         const password = passwordInput.value.trim();
         if (!password) {

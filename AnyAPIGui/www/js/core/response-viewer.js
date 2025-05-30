@@ -251,7 +251,7 @@ class EnhancedResponseViewer {
                     <button class="export-raw-btn">💾 Export</button>
                 </div>
             </div>
-            <pre class="raw-json">${escapeHtml(rawContent)}</pre>
+            <pre class="raw-json modern-scrollbar">${escapeHtml(rawContent)}</pre>
         `;
             
             // Add event listeners
@@ -280,7 +280,7 @@ class EnhancedResponseViewer {
                         <button class="export-formatted-btn">💾 Export</button>
                     </div>
                 </div>
-                <div class="formatted-json">${syntaxHighlightedContent}</div>
+                <div class="formatted-json modern-scrollbar">${syntaxHighlightedContent}</div>
             `;
             
             // Add event listeners
@@ -336,7 +336,7 @@ class EnhancedResponseViewer {
                     ${showBack ? '<button class="table-back-btn">⬅️ Back</button>' : ''}
                 </div>
             </div>
-            <div class="table-container">
+            <div class="table-container modern-scrollbar">
                 <table class="enhanced-table">
                     <thead>
                         <tr>                            ${headers.map(header => `
@@ -772,7 +772,7 @@ class EnhancedResponseViewer {
                     <button class="export-tree-btn">💾 Export</button>
                 </div>
             </div>
-            <div class="tree-view enhanced">
+            <div class="tree-view enhanced modern-scrollbar">
                 ${this.renderTreeNode(this.currentData, [], 'root', 0)}
             </div>
         `;

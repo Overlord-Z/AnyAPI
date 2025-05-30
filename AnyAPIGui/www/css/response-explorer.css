@@ -73,7 +73,7 @@ button, .btn {
     background: var(--bg-primary);
     border-radius: 8px;
     border: 1px solid var(--border-color);
-    overflow: hidden;
+    overflow: hidden; /* Restore: only inner content scrolls */
     height: 100%;
     box-shadow: var(--shadow-sm);
 }
@@ -207,104 +207,124 @@ button, .btn {
 
 /* Content */
 .response-content-enhanced {
-    flex: 1;
-    overflow: hidden;
+    flex: 1 1 auto;
     display: flex;
     flex-direction: column;
-    background: var(--bg-primary);
+    overflow: hidden;
+    min-height: 0;
+    min-width: 0;
+}
+
+/* The area above the table (header, row count, actions) must not shrink */
+.table-header-area {
+    flex-shrink: 0;
+    min-height: 84px; /* Adjust if your header+actions area is taller/shorter */
+    box-sizing: border-box;
+    z-index: 3;
+}
+
+.response-header-enhanced,
+.response-tabs,
+.response-search-container {
+    flex-shrink: 0;
+    min-height: 36px;
+    box-sizing: border-box;
+    overflow: visible !important;
 }
 
 .response-viewer {
     flex: 1;
-    overflow-y: auto;
+    overflow: hidden; /* Changed from overflow-y: auto to hidden to prevent parent scrollbars */
     padding: 0.75rem 1rem;
     font-size: 0.95rem;
     background: var(--bg-primary);
+    display: flex; /* Make it a flex container */
+    flex-direction: column; /* Stack children vertically */
 }
 
-/* Raw JSON */
-.raw-json {
-    margin: 0;
-    padding: 0.75rem 1rem;
-    background: var(--bg-tertiary);
-    border: none;
-    font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
-    font-size: 0.95rem;
-    line-height: 1.5;
-    color: var(--text-primary);
-    overflow: auto;
-    max-height: 70vh;
-    border-radius: 6px;
-    white-space: pre;
-}
-
-/* Formatted JSON */
-.formatted-json {
-    margin: 0;
-    padding: 0.75rem 1rem;
-    background: var(--bg-tertiary);
-    border: none;
-    font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
-    font-size: 0.95rem;
-    line-height: 1.5;
-    color: var(--text-primary);
-    overflow: auto;
-    max-height: 70vh;
-    border-radius: 6px;
-    white-space: pre-wrap;
-}
-
-/* Table View */
+/* === TABLE VIEW FULL-WIDTH, NO PADDING, STICKY HEADER === */
 .table-container {
-    max-height: 70vh;
+    max-height: 100%;
+    min-height: 0;
     overflow: auto;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    margin: 1rem 0;
+    border: 1.5px solid var(--border-color-strong, #444);
+    border-radius: var(--border-radius-lg, 10px);
+    margin: 0;
     background: var(--bg-primary);
-    padding: 1.25rem 1rem 1.5rem 1rem;
+    padding: 0;
+    box-shadow: 0 2px 16px 0 rgba(0,0,0,0.07);
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: block;    /* Modern scrollbar styling */
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-primary) var(--bg-tertiary);
+}
+
+.table-container.modern-scrollbar {
+    flex: 1 1 0%;
+    min-height: 0;
+    min-width: 0;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--background-color);
 }
 
 .enhanced-table {
     width: 100%;
-    border-collapse: collapse;
-    font-size: 0.95rem;
+    min-width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.93rem;
     background: var(--bg-primary);
+    box-shadow: none;
+    border-radius: 0;
+    overflow: visible;
+    table-layout: auto;
+    margin: 0;
+    max-height: none;
 }
 
 .enhanced-table th {
     background: var(--bg-secondary);
-    padding: 0.5rem 0.75rem;
-    text-align: left;
-    font-weight: 600;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.92em;
+    font-weight: 700;
     color: var(--text-primary);
-    border-bottom: 2px solid var(--border-color-strong);
+    border-bottom: 2.5px solid var(--color-primary, #007acc);
     position: sticky;
     top: 0;
+    z-index: 2;
     cursor: pointer;
     user-select: none;
+    box-shadow: 0 2px 8px 0 rgba(0,0,0,0.06);
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    border-right: 1px solid var(--border-color);
+    background-clip: padding-box;
 }
 
-.enhanced-table th:hover { background: var(--color-gray-200); }
-[data-theme="dark"] .enhanced-table th:hover { background: var(--color-gray-700); }
-
-.enhanced-table th .sort-indicator {
-    float: right;
-    color: var(--text-tertiary);
-    font-size: 0.75rem;
+.enhanced-table th:last-child {
+    padding-right: 18px; /* Reserve space for vertical scrollbar */
+    border-right: none;
 }
 
 .enhanced-table td {
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--border-color);
-    vertical-align: middle;
-    text-align: left;
-    max-width: 300px;
-    word-wrap: break-word;
+    font-size: 0.93em;
+    padding: 0.45rem 0.7rem;
+    word-break: break-word;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.enhanced-table tr:hover { background: var(--color-gray-50); }
-[data-theme="dark"] .enhanced-table tr:hover { background: var(--color-gray-800); }
+.table-container, .enhanced-table, .enhanced-table th, .enhanced-table td {
+    background-clip: padding-box;
+    background-origin: border-box;
+}
 
 /* Table Cell Types */
 .cell-null { color: var(--text-tertiary); font-style: italic; }
@@ -353,16 +373,6 @@ button, .btn {
     font-size: 0.9rem;
 }
 .table-pagination button:hover { background: var(--color-primary-dark); }
-
-/* Tree View */
-.tree-view.enhanced {
-    padding: 0.75rem;
-    max-height: 70vh;
-    overflow: auto;
-    font-family: var(--font-mono);
-    font-size: 0.95rem;
-    line-height: 1.4;
-}
 
 .tree-node { margin-left: 1rem; position: relative; }
 .tree-node.expanded > .tree-children { display: block; }
@@ -610,7 +620,7 @@ button, .btn {
 .response-viewer-optimized .stats-actions .btn,
 .response-viewer-optimized .table-actions .btn,
 .response-viewer-optimized .response-toolbar .btn,
-.response-viewer-optimized .response-actions .btn,
+.response_viewer_optimized .response-actions .btn,
 .stats-container .stats-actions .btn,
 .table-container .table-actions .btn {
     display: inline-flex !important;
@@ -773,7 +783,69 @@ button, .btn {
     margin-bottom: 1.5rem;
 }
 
-/* Responsive */
+/* --- Table View Layout Fixes --- */
+.response-content-enhanced {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+    min-width: 0;
+}
+
+/* The area above the table (header, row count, actions) must not shrink */
+.table-header-area {
+    flex-shrink: 0;
+    min-height: 84px; /* Adjust if your header+actions area is taller/shorter */
+    box-sizing: border-box;
+    z-index: 3;
+}
+
+.table-container.modern-scrollbar {
+    flex: 1 1 0%;
+    min-height: 0;
+    min-width: 0;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Prevent table scrollbar from overlapping sticky header */
+.enhanced-table th {
+    background: var(--bg-secondary);
+    box-shadow: 0 2px 8px 0 rgba(0,0,0,0.06);
+    z-index: 2;
+}
+.enhanced-table th:last-child {
+    padding-right: 18px; /* Reserve space for vertical scrollbar */
+    border-right: none;
+}
+
+/* Hide scrollbar behind sticky header (Webkit browsers) */
+.table-container.modern-scrollbar::-webkit-scrollbar {
+    width: 10px;
+}
+.table-container.modern-scrollbar::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 5px;
+    margin: 36px 0 0 0; /* Push track down to not overlap sticky header */
+    border: 1px solid var(--border-color);
+}
+.table-container.modern-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--color-primary-light), var(--color-primary));
+    border-radius: 5px;
+    border: 2px solid var(--bg-tertiary);
+}
+.table-container.modern-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, var(--color-primary), var(--color-primary-dark));
+}
+
+/* Responsive: adjust .table-header-area min-height if needed */
+@media (max-width: 600px) {
+    .table-header-area {
+        min-height: 110px;
+    }
+}
+
 @media (max-width: 768px) {
     .response-header-enhanced,
     .response-tabs,

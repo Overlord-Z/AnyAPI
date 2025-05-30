@@ -7,7 +7,8 @@ class EndpointTester {
     constructor() {
         this.requestHistory = [];
         this.maxHistoryItems = 50;
-        this.currentProfile = null;
+        // Always use the global profile as source of truth
+        this.currentProfile = window.profileManager?.currentProfile?.name || document.getElementById('global-profile-selector')?.value || null;
         this.currentMethod = 'GET';
         this.historyManager = new HistoryManager(this.maxHistoryItems);
         
@@ -31,17 +32,20 @@ class EndpointTester {
         
         this.loadRequestHistory();
         
-        // Listen for profile changes from other components
+        // Listen for global profile changes
         window.addEventListener('profileChanged', (e) => {
-            if (e.detail?.source !== 'endpointTester') {
-                this.onProfileChange(e.detail?.profileName);
+            if (e.detail?.profileName) {
+                this.onProfileChange(e.detail.profileName);
             }
         });
         
-        // Restore saved profile
-        const savedProfile = localStorage.getItem('anyapi_current_profile');
-        if (savedProfile) {
-            this.currentProfile = savedProfile;
+        // Set currentProfile from global selector or profileManager
+        const globalProfile = document.getElementById('global-profile-selector')?.value;
+        if (globalProfile) {
+            this.currentProfile = globalProfile;
+            this.updateProfileContext();
+        } else if (window.profileManager?.currentProfile?.name) {
+            this.currentProfile = window.profileManager.currentProfile.name;
             this.updateProfileContext();
         }
         
@@ -81,9 +85,7 @@ class EndpointTester {
         } catch (error) {
             console.error('Failed to save request history:', error);
         }
-    }
-
-    /**
+    }    /**
      * Add request to history
      */
     addToHistory(historyItem) {
@@ -93,6 +95,11 @@ class EndpointTester {
             this.requestHistory = this.requestHistory.slice(0, this.maxHistoryItems);
         }
         this.saveRequestHistory();
+        
+        // Also add to HistoryManager if available
+        if (typeof window.historyManager !== 'undefined') {
+            window.historyManager.add(historyItem);
+        }
     }
 
     /**
@@ -120,20 +127,18 @@ class EndpointTester {
     validateEndpoint() {
         const endpointInput = document.getElementById('endpoint-url');
         const feedbackElement = document.getElementById('endpoint-validation-feedback');
-        // Use global profile selector
-        const profileSelect = document.getElementById('global-profile-selector');
+        // Use global profile selector only
+        const profileName = document.getElementById('global-profile-selector')?.value || window.profileManager?.currentProfile?.name;
         
         if (!endpointInput || !feedbackElement) return;
         
         const endpoint = endpointInput.value.trim();
-        const profileName = profileSelect?.value;
         
         if (!endpoint) {
             feedbackElement.style.display = 'none';
             return;
         }
         
-        // Check if this looks like a GitHub API profile
         const profile = window.profileManager?.getProfile(profileName);
         const isGitHubAPI = profile && 
             (profile.baseUrl?.includes('api.github.com') || 
@@ -243,8 +248,8 @@ class EndpointTester {
      * Validate current request - returns boolean for UI compatibility
      */
     validateRequest() {
-        // Use global profile selector
-        const profile = document.getElementById('global-profile-selector')?.value;
+        // Use global profile selector only
+        const profile = document.getElementById('global-profile-selector')?.value || window.profileManager?.currentProfile?.name;
         const endpoint = document.getElementById('endpoint-url')?.value?.trim();
         
         if (!profile) {
@@ -270,10 +275,9 @@ class EndpointTester {
     buildRequestData() {
         const endpointInput = document.getElementById('endpoint-url');
         const endpoint = endpointInput ? endpointInput.value.trim() : '';
-        
+        const profileName = document.getElementById('global-profile-selector')?.value || window.profileManager?.currentProfile?.name;
         const data = {
-            // Use global profile selector
-            profileName: document.getElementById('global-profile-selector')?.value || this.currentProfile,
+            profileName: profileName,
             method: this.currentMethod,
             endpoint: endpoint,
             queryParameters: this.collectKeyValuePairs('query-params'),
@@ -705,12 +709,8 @@ class EndpointTester {
         // Update base URL preview if element exists
         const baseUrlPreview = document.getElementById('base-url-preview');
         const compactPreview = document.querySelector('.base-url-preview-compact');
-        // Use global profile selector
-        const profileSelect = document.getElementById('global-profile-selector');
-        let profileName = this.currentProfile;
-        if (profileSelect && profileSelect.value) {
-            profileName = profileSelect.value;
-        }
+        // Use global profile selector only
+        const profileName = document.getElementById('global-profile-selector')?.value || this.currentProfile;
         
         if (profileName) {
             const profile = window.profileManager?.getProfile(profileName);

@@ -56,14 +56,6 @@ async function initializeApp() {
         } else {
             console.warn('⚠️ EndpointTester initialization function not available');
         }
-          // Initialize UI modules (if available)
-        console.log('🎨 Initializing UI modules...');
-        if (typeof initEndpointUI === 'function') {
-            initEndpointUI();
-            console.log('✅ Endpoint UI initialized');
-        } else {
-            console.log('⚠️ initEndpointUI not available');
-        }
         
         if (typeof initResponseUI === 'function') {
             initResponseUI();

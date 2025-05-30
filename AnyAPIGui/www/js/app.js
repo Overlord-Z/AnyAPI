@@ -383,9 +383,24 @@ updateDarkModeToggle() {
                 }).catch(error => {
                     console.warn('⚠️ TemplateManager initialization failed:', error);
                 })
+            );        } else {
+            console.warn('⚠️ TemplateManager not available');
+        }
+        
+        // Initialize HistoryManager
+        if (typeof window.HistoryManager !== 'undefined') {
+            console.log('📋 Initializing HistoryManager...');
+            initPromises.push(
+                Promise.resolve().then(() => {
+                    // Create global HistoryManager instance
+                    window.historyManager = new window.HistoryManager();
+                    console.log('✅ HistoryManager initialized');
+                }).catch(error => {
+                    console.warn('⚠️ HistoryManager initialization failed:', error);
+                })
             );
         } else {
-            console.warn('⚠️ TemplateManager not available');
+            console.warn('⚠️ HistoryManager not available');
         }
           // Initialize EndpointTester
         if (typeof window.initializeEndpointTester === 'function') {
@@ -687,7 +702,9 @@ updateDarkModeToggle() {
                 break;            case 'history':
                 console.log('📚 Activating History section');
                 // Update history display
-                if (typeof window.endpointTester !== 'undefined' && window.endpointTester.updateHistoryDisplay) {
+                if (typeof window.historyManager !== 'undefined' && window.historyManager.render) {
+                    window.historyManager.render();
+                } else if (typeof window.endpointTester !== 'undefined' && window.endpointTester.updateHistoryDisplay) {
                     window.endpointTester.updateHistoryDisplay();
                 } else if (typeof window.initializeEndpointTester === 'function') {
                     // Initialize if not already done

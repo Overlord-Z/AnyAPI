@@ -343,7 +343,7 @@ $RequestContext.Headers["Accept"] = "application/json"`
             // Batch DOM updates
             this.batchDOMUpdates(() => {
                 this.renderProfileList();
-                // Removed: this.updateTestProfileDropdown();
+                this.updateTestProfileDropdown();
                 this.updateGlobalProfileSelector();
                 this.initializeSharedProfileManagement();
             });

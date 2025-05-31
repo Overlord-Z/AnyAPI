@@ -231,20 +231,37 @@ async testSecretAccess() {
         window.dispatchEvent(new CustomEvent('connectionStatusChanged', {
             detail: { connected }
         }));
-    }
-
-    /**
+    }    /**
      * Set SecretStore password for authenticated requests
+     * WARNING: This creates a security vulnerability by storing password in plain text
+     * TODO: Implement secure session-based authentication tokens
      */
     setSecretStorePassword(password) {
+        // SECURITY ISSUE: Storing password in plain text
+        console.warn('🔓 SECURITY WARNING: Storing SecretStore password in plain text (temporary)');
         this.secretStorePassword = password;
+        
         // --- Also update sessionStorage for consistency ---
+        // SECURITY ISSUE: Browser storage contains plain text password
         if (typeof sessionStorage !== 'undefined') {
             if (password) {
+                console.warn('🔓 SECURITY WARNING: Storing password in sessionStorage (plain text)');
                 sessionStorage.setItem('anyapi_secretstore_password', password);
             } else {
                 sessionStorage.removeItem('anyapi_secretstore_password');
             }
+        }
+    }
+
+    /**
+     * Clear password cache (security improvement)
+     */
+    clearPasswordCache() {
+        console.log('🔒 Clearing password cache for security');
+        this.secretStorePassword = null;
+        
+        if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.removeItem('anyapi_secretstore_password');
         }
     }
 
@@ -256,8 +273,16 @@ async testSecretAccess() {
             'Content-Type': 'application/json'
         };
 
-        // Add SecretStore password if available
+        // Try to use secure session headers first
+        if (window.secureSession && window.secureSession.isAuthenticated) {
+            const authHeaders = window.secureSession.getAuthHeaders();
+            Object.assign(headers, authHeaders);
+            return headers;
+        }
+
+        // SECURITY ISSUE: Transmitting password in plain text header
         if (this.secretStorePassword) {
+            console.warn('🔓 SECURITY WARNING: Transmitting password in X-SecretStore-Password header (plain text)');
             headers['X-SecretStore-Password'] = this.secretStorePassword;
         }
 
@@ -306,9 +331,35 @@ async testSecretAccess() {
                     data = await response.json();
                 } else {
                     data = await response.text();
-                }
-
-                if (!response.ok) {
+                }                if (!response.ok) {
+                    // Handle authentication errors (401/403) - likely due to server restart or session expiry
+                    if (response.status === 401 || response.status === 403) {
+                        console.warn(`🔐 Authentication error (${response.status}): Session may be invalid due to server restart`);
+                        
+                        // Check if we have secure session and clear it
+                        if (window.secureSession) {
+                            console.log('🧹 Clearing invalid session data');
+                            window.secureSession.clearSession();
+                        }
+                        
+                        // Clear any cached password
+                        this.clearPasswordCache();
+                        
+                        // For SecretStore-related endpoints, trigger re-authentication
+                        if (endpoint.includes('/api/secrets') || endpoint.includes('/api/test') || endpoint.includes('/api/profiles')) {
+                            console.log('🔓 SecretStore access denied - triggering re-authentication');
+                            
+                            // Emit event to trigger unlock dialog
+                            window.dispatchEvent(new CustomEvent('secretStoreAuthRequired', {
+                                detail: { 
+                                    reason: 'Server restart detected - session invalid',
+                                    originalEndpoint: endpoint,
+                                    status: response.status
+                                }
+                            }));
+                        }
+                    }
+                    
                     // --- Add detailed logging for debugging 500 errors ---
                     console.error(`API fetch error: ${url}`, {
                         status: response.status,
@@ -431,9 +482,37 @@ async testSecretAccess() {
     async getSecretInfo() {
         return await this.fetch('/api/secrets/info');
     }    /**
-     * Unlock SecretStore with password
+     * Unlock SecretStore with password using secure session authentication
      */
     async unlockSecretStore(password) {
+        try {
+            // Use the new secure session system if available
+            if (window.secureSession) {
+                console.log('🔐 Using secure session authentication');
+                const result = await window.secureSession.authenticate(password);
+                
+                if (result.success) {
+                    // Don't store the password - use session token instead
+                    this.clearPasswordCache();
+                    console.log('✅ Secure authentication successful');
+                }
+                
+                return result;
+            }
+            
+            // Fallback to existing encryption attempt
+            return await this.legacyUnlockSecretStore(password);
+            
+        } catch (error) {
+            console.error('🔓 SecretStore unlock failed:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Legacy unlock method (with encryption attempt and fallback)
+     */
+    async legacyUnlockSecretStore(password) {
         // Check if Web Crypto API is available
         if (!CryptoUtils.isCryptoAvailable()) {
             console.warn('🔓 Web Crypto API not available, sending password in plain text (insecure)');

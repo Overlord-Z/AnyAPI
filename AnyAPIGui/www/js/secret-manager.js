@@ -3,20 +3,38 @@
  * Handles secret storage, SecretStore password management, and secure value operations
  */
 
-class SecretManager {
-    constructor() {
+class SecretManager {    constructor() {
         this.isSecretStoreUnlocked = false;
         this.secretStoreInfo = null;
         this.passwordAttempts = 0;
         this.maxPasswordAttempts = 3;
         this.initialized = false;
         
-        // --- Add: Try to load cached password from sessionStorage ---
-        this.cachedPassword = sessionStorage.getItem('anyapi_secretstore_password') || null;
+        // --- SECURITY FIX: Don't cache passwords, use secure session tokens ---
+        this.cachedPassword = null; // Deprecated - will be removed
+        
+        // Clean up any old password caches for security (but don't assume session state)
+        this.cleanupOldPasswordCaches();
         
         // Don't auto-initialize - let the main app do it
         // this.init();
-    }    /**
+    }
+
+    /**
+     * Clean up old password caches for security
+     */
+    cleanupOldPasswordCaches() {
+        // Clear any old password caches for security
+        if (typeof sessionStorage !== 'undefined') {
+            const oldPassword = sessionStorage.getItem('anyapi_secretstore_password');
+            if (oldPassword) {
+                console.warn('🔓 SECURITY: Removing cached password from sessionStorage');
+                sessionStorage.removeItem('anyapi_secretstore_password');
+            }
+        }
+        
+        // Don't assume session token validity - let init() check against backend
+    }/**
      * Initialize secret manager
      */
     async init() {
@@ -27,17 +45,39 @@ class SecretManager {
         
         try {
             console.log('🔧 Initializing SecretManager...');
+            
+            // STEP 1: Load backend storage info first (source of truth)
             await this.loadSecretInfo();
-            // --- Try auto-unlock if password is cached ---
-            if (this.cachedPassword) {
-                await this.tryAutoUnlock();
+            
+            // STEP 2: Check if we have valid session authentication that matches backend state
+            const hasValidSession = window.secureSession && 
+                                  window.secureSession.isAuthenticated && 
+                                  !window.secureSession.isTokenExpired() &&
+                                  this.isSecretStoreUnlocked; // Backend must also confirm unlocked
+            
+            if (hasValidSession) {
+                console.log('✅ Valid secure session confirmed by backend');
             } else {
+                // Backend says locked OR session is invalid - check if we should prompt
+                if (window.secureSession && window.secureSession.isAuthenticated) {
+                    console.warn('🔒 Session token exists but backend reports vault is locked - session invalid');
+                    window.secureSession.clearSession();
+                }
+                
+                // Check if we should auto-prompt for unlock
                 await this.checkSecretStoreStatus();
             }
             
+            // Add event listener for authentication requirements
+            window.addEventListener('secretStoreAuthRequired', (event) => {
+                console.log('🔐 Authentication required event received:', event.detail);
+                this.handleAuthRequired(event.detail);
+            });
+            
             this.initialized = true;
             console.log('✅ SecretManager initialization complete');
-              // Update status indicator after initialization
+            
+            // Update status indicator after initialization
             console.log('🔧 SecretManager init complete, updating status indicator');
             if (typeof window.updateSecretStoreStatusIndicator === 'function') {
                 window.updateSecretStoreStatusIndicator();
@@ -50,26 +90,12 @@ class SecretManager {
         }
     }
 
-    // --- Add: Try to unlock SecretStore using cached password ---
+    // --- DEPRECATED: Remove cached password auto-unlock ---
     async tryAutoUnlock() {
-        try {
-            const response = await apiClient.unlockSecretStore(this.cachedPassword);
-            if (response.success) {
-                this.isSecretStoreUnlocked = true;
-                this.passwordAttempts = 0;
-                showNotification('SecretStore auto-unlocked from session', 'success');
-                window.dispatchEvent(new CustomEvent('secretStoreUnlocked'));
-            } else {
-                // If unlock fails, clear cached password and prompt
-                this.cachedPassword = null;
-                sessionStorage.removeItem('anyapi_secretstore_password');
-                await this.checkSecretStoreStatus();
-            }
-        } catch (error) {
-            this.cachedPassword = null;
-            sessionStorage.removeItem('anyapi_secretstore_password');
-            await this.checkSecretStoreStatus();
-        }
+        console.warn('🔓 DEPRECATED: tryAutoUnlock() - Use secure session instead');
+        // This method is deprecated and should not be used
+        // Secure sessions handle authentication automatically
+        return false;
     }    /**
      * Load secret storage information from backend
      */
@@ -79,7 +105,35 @@ class SecretManager {
             if (response.success) {
                 this.secretStoreInfo = response.storageInfo;
                 console.log('Secret storage info loaded:', this.secretStoreInfo);
-                  // Dispatch event to update UI indicators
+                
+                // CRITICAL: Backend is the source of truth for vault status
+                // If backend says vault is locked, any existing session tokens are invalid
+                const backendUnlockStatus = this.secretStoreInfo.isSecretStoreUnlocked === true || 
+                                          this.secretStoreInfo.isSecretStoreUnlocked === 'true';
+                
+                if (!backendUnlockStatus && this.isSecretStoreUnlocked) {
+                    console.warn('🔒 Backend reports vault is locked but frontend thinks it\'s unlocked - clearing invalid session');
+                    
+                    // Clear invalid session data
+                    if (window.secureSession) {
+                        window.secureSession.clearSession();
+                    }
+                    
+                    // Clear any cached passwords
+                    if (typeof sessionStorage !== 'undefined') {
+                        sessionStorage.removeItem('anyapi_secretstore_password');
+                    }
+                }
+                
+                // Update our internal unlock status based on backend response (backend is source of truth)
+                const wasUnlocked = this.isSecretStoreUnlocked;
+                this.isSecretStoreUnlocked = backendUnlockStatus;
+                
+                if (wasUnlocked !== this.isSecretStoreUnlocked) {
+                    console.log(`🔄 SecretStore unlock status changed: ${wasUnlocked} → ${this.isSecretStoreUnlocked}`);
+                }
+                
+                // Dispatch event to update UI indicators
                 window.dispatchEvent(new CustomEvent('secretStoreInfoUpdated', { 
                     detail: this.secretStoreInfo 
                 }));
@@ -93,9 +147,7 @@ class SecretManager {
             console.error('Failed to load secret info:', error);
             throw error;
         }
-    }
-
-    /**
+    }/**
      * Check if SecretStore is available and needs unlocking
      */
     async checkSecretStoreStatus() {
@@ -108,10 +160,37 @@ class SecretManager {
             this.secretStoreInfo.isSecretStoreAvailable && 
             !this.isSecretStoreUnlocked) {
             
-            // Try to detect if SecretStore is locked by attempting to create a test profile
-            // This will be handled gracefully by the backend
+            console.log('🔒 SecretStore is available but locked - prompting for authentication');
+            
+            // Auto-prompt for authentication when page loads and vault is locked
             this.promptForSecretStorePassword();
         }
+    }
+
+    /**
+     * Handle authentication required event from API client
+     */
+    handleAuthRequired(details) {
+        console.log('🔐 Handling authentication requirement:', details);
+        
+        // Update our unlock status
+        this.isSecretStoreUnlocked = false;
+        
+        // Update status indicators
+        if (typeof window.updateSecretStoreStatusIndicator === 'function') {
+            window.updateSecretStoreStatusIndicator();
+        }
+        
+        // Show notification about the issue
+        let message = 'Authentication required';
+        if (details.reason) {
+            message = details.reason;
+        }
+        
+        showNotification(message, 'warning', 8000);
+        
+        // Prompt for re-authentication
+        this.promptForSecretStorePassword();
     }
 
     /**
@@ -153,9 +232,7 @@ class SecretManager {
      */
     closePasswordModal() {
         this.hidePasswordModal();
-    }
-
-    /**
+    }    /**
      * Attempt to unlock SecretStore with provided password
      */    async unlockSecretStore() {
         const passwordInput = document.getElementById('secret-store-password');
@@ -179,6 +256,7 @@ class SecretManager {
                 unlockBtn.innerHTML = 'Unlocking...';
             }
 
+            // --- SECURITY FIX: Use secure session authentication ---
             const response = await apiClient.unlockSecretStore(password);
 
             if (response.success) {
@@ -186,11 +264,11 @@ class SecretManager {
                 this.passwordAttempts = 0;
                 this.hidePasswordModal();
                 showNotification('SecretStore unlocked successfully', 'success');
-                // --- Cache password in sessionStorage for this browser session ---
-                this.cachedPassword = password;
-                sessionStorage.setItem('anyapi_secretstore_password', password);
                 
-                // Clear password input
+                // --- SECURITY FIX: Don't cache password, session token is handled automatically ---
+                console.log('✅ SecretStore unlocked with secure authentication');
+                
+                // Clear password input for security
                 passwordInput.value = '';
                   // Emit event for other components
                 window.dispatchEvent(new CustomEvent('secretStoreUnlocked'));
@@ -205,9 +283,7 @@ class SecretManager {
             }
         } catch (error) {
             this.passwordAttempts++;
-            // --- Clear cached password on failure ---
-            this.cachedPassword = null;
-            sessionStorage.removeItem('anyapi_secretstore_password');
+            
             console.error('Failed to unlock SecretStore:', error);
             
             let message = `Failed to unlock SecretStore: ${error.message}`;
@@ -228,16 +304,16 @@ class SecretManager {
                 unlockBtn.innerHTML = 'Unlock';
             }
         }
-    }
-
-    /**
+    }    /**
      * Skip SecretStore and continue without persistent secret storage
      */
     skipSecretStore() {
         this.hidePasswordModal();
-        // --- Clear cached password on skip ---
-        this.cachedPassword = null;
-        sessionStorage.removeItem('anyapi_secretstore_password');
+        // --- SECURITY FIX: Clear any cached authentication data ---
+        console.log('🔒 Clearing cached authentication data');
+        if (window.secureSession) {
+            window.secureSession.clearSession();
+        }
         showNotification('Continuing without SecretStore - secrets will be session-only', 'info');
         
         // Emit event for other components

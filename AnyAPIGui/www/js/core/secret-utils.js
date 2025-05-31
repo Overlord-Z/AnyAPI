@@ -110,7 +110,9 @@ function updateSecretStoreStatusIndicator() {
     if (!statusDiv || !icon || !text) {
         console.log('❌ Status indicator elements not found');
         return;
-    }    // If SecretManager is not yet initialized, show checking status
+    }
+    
+    // If SecretManager is not yet initialized, show checking status
     if (window.secretManager && !window.secretManager.initialized) {
         console.log('⏳ SecretManager not yet initialized, showing checking status');
         icon.setAttribute('data-feather', 'clock');
@@ -132,7 +134,8 @@ function updateSecretStoreStatusIndicator() {
     
     let available = false;
     let unlocked = false;
-      // Primary source: secretManager (which has the actual data from the API)
+    
+    // Primary source: secretManager (which has the actual data from the API)
     if (window.secretManager && window.secretManager.secretStoreInfo && window.secretManager.initialized) {
         const info = window.secretManager.secretStoreInfo;
         console.log('🔍 SecretManager info found:', info);
@@ -154,7 +157,9 @@ function updateSecretStoreStatusIndicator() {
                        (typeof info.isSecretStoreUnlocked === 'string' && info.isSecretStoreUnlocked.toLowerCase() === 'true');
             console.log(`🔍 From window.info - available: ${available}, unlocked: ${unlocked}`);
         }
-    }    if (!available) {
+    }
+    
+    if (!available) {
         console.log('🔒 Setting status to N/A');
         icon.setAttribute('data-feather', 'slash');
         text.textContent = 'SecretStore N/A';
@@ -168,7 +173,9 @@ function updateSecretStoreStatusIndicator() {
         console.log('🔒 Setting status to Locked');
         icon.setAttribute('data-feather', 'lock');
         text.textContent = 'SecretStore Locked';
-        statusDiv.style.color = '#e74c3c';    }
+        statusDiv.style.color = '#e74c3c';
+    }
+    
     if (window.feather) window.feather.replace();
 }
 

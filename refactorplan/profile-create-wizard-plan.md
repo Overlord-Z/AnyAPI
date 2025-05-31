@@ -71,6 +71,7 @@ The goal is to build a modern, intuitive Profile Create Wizard for AnyAPI, makin
 - Accepts minimal profile data from wizard
 - Normalizes and builds full profile object:
   - Handles `AuthenticationDetails`, `DefaultHeaders`, etc.
+  - **All secrets (API keys, tokens, passwords) must be transmitted from the frontend to the backend using end-to-end encryption (AES-GCM with PBKDF2), and never sent or stored in plain text. This is a required part of the refactor and must be validated in all profile creation and editing flows.**
   - Stores secrets securely (using AnyAPI’s secret management)
   - Generates custom script for complex auth if needed
 - Returns success/error and the created profile

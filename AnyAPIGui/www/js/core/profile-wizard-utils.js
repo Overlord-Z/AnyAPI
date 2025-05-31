@@ -51,53 +51,47 @@ export function validateProfileFields(fields) {
 }
 
 export function buildProfileObject(fields) {
-    // Normalize and build the profile object for backend
+    // Build the profile object for backend - matching Handle-CreateProfile expectations
     const profile = {
-        ProfileName: fields.name,
-        BaseUrl: fields.baseUrl,
-        AuthenticationDetails: {},
-        DefaultHeaders: fields.defaultHeaders || {},
-        PaginationDetails: fields.pagination || {},
-        CustomSettings: fields.customSettings || {},
-        IsSessionOnly: !!fields.isSessionOnly,
-        Description: fields.description || '',
+        name: fields.name,
+        baseUrl: fields.baseUrl,
+        authType: fields.authType || "None",
+        credentials: {},
+        headers: fields.defaultHeaders || {},
+        paginationDetails: fields.pagination || {},
+        customSettings: fields.customSettings || {},
+        isSessionOnly: !!fields.isSessionOnly,
+        description: fields.description || '',
     };
-    // Auth details
+    
+    // Map auth details to credentials object
     switch (fields.authType) {
         case AUTH_TYPES.API_KEY:
-            profile.AuthenticationDetails = {
-                AuthType: 'ApiKey',
-                ApiKeyHeader: fields.apiKeyHeader || 'X-API-Key',
-                ApiKeyValue: fields.apiKeyValue,
-            };
+            profile.credentials.apiKey = fields.apiKeyValue;
+            profile.credentials.headerName = fields.apiKeyHeader || 'X-API-Key';
             break;
         case AUTH_TYPES.BEARER:
-            profile.AuthenticationDetails = {
-                AuthType: 'BearerToken',
-                TokenValue: fields.tokenValue,
-            };
+            profile.credentials.token = fields.tokenValue;
+            break;
+        case AUTH_TYPES.BASIC:
+            profile.credentials.username = fields.username;
+            profile.credentials.password = fields.password;
             break;
         case AUTH_TYPES.CUSTOM_SCRIPT:
-            profile.AuthenticationDetails = {
-                AuthType: 'CustomScript',
-                ScriptBlock: fields.customScript,
-            };
+            profile.customAuthScript = fields.customScript;
+            // Add any other credentials that might be needed for custom script
             break;
         case AUTH_TYPES.MERAKI:
             // Use selected Meraki style
             if (fields.merakiStyle === 'bearer') {
-                profile.AuthenticationDetails = {
-                    AuthType: 'BearerToken',
-                    TokenValue: fields.apiKeyValue,
-                };
-                profile.DefaultHeaders = HEADER_TEMPLATES.MerakiBearer;
+                profile.authType = 'Bearer';
+                profile.credentials.token = fields.apiKeyValue;
+                profile.headers = { ...profile.headers, ...HEADER_TEMPLATES.MerakiBearer };
             } else {
-                profile.AuthenticationDetails = {
-                    AuthType: 'ApiKey',
-                    ApiKeyHeader: 'X-Cisco-Meraki-API-Key',
-                    ApiKeyValue: fields.apiKeyValue,
-                };
-                profile.DefaultHeaders = HEADER_TEMPLATES.MerakiApiKey;
+                profile.authType = 'ApiKey';
+                profile.credentials.apiKey = fields.apiKeyValue;
+                profile.credentials.headerName = 'X-Cisco-Meraki-API-Key';
+                profile.headers = { ...profile.headers, ...HEADER_TEMPLATES.MerakiApiKey };
             }
             break;
         default:

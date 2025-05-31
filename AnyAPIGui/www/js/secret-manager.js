@@ -191,9 +191,7 @@ class SecretManager {    constructor() {
         
         // Prompt for re-authentication
         this.promptForSecretStorePassword();
-    }
-
-    /**
+    }    /**
      * Show SecretStore password prompt
      */
     promptForSecretStorePassword() {
@@ -206,12 +204,8 @@ class SecretManager {    constructor() {
             if (passwordInput) {
                 setTimeout(() => passwordInput.focus(), 100);
                 
-                // Handle Enter key
-                passwordInput.onkeydown = (e) => {
-                    if (e.key === 'Enter') {
-                        this.unlockSecretStore();
-                    }
-                };
+                // Note: Enter key handling is now handled by the form submission
+                // No need for separate Enter key handler to avoid double submission
             }
         }
     }

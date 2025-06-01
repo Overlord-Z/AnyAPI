@@ -1424,3 +1424,4 @@ if (!document.getElementById('template-styles')) {
 
 // Initialize global template manager
 const templateManager = new TemplateManager();
+window.templateManager = templateManager;

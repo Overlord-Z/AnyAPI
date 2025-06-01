@@ -38,22 +38,14 @@
       "description": "ConnectWise API client identifier",
       "placeholder": "your-client-id",
       "isRequired": true
-    }
-  ],
-  "customSettings": {
-    "Company": {
+    },
+     {  "Key":"Company",
       "displayName": "Company ID",
       "description": "Your ConnectWise company identifier",
       "placeholder": "your-company-id",
-      "defaultValue": "your-company-id",
       "isRequired": true
-    },
-    "BaseUrlPlaceholder": {
-      "displayName": "Domain",
-      "description": "Replace 'your-domain.com' in the base URL with your actual ConnectWise domain",
-      "placeholder": "mycompany.connectwisehosting.com"
     }
-  },
+  ],
   "sampleEndpoints": [
     {
       "method": "GET",

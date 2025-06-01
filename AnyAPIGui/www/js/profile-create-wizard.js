@@ -92,17 +92,24 @@ class ProfileCreateWizard {
                             <label>Base URL</label>
                             <input type="url" id="wizard-profile-baseurl" class="form-control" value="${fields.baseUrl}" placeholder="https://api.example.com" />
                             ${errors.baseUrl ? `<div class="form-error">${errors.baseUrl}</div>` : ''}
-                        </div>
-                        <div class="form-group">
+                        </div>                        <div class="form-group">
                             <label>Authentication Type</label>
                             <select id="wizard-profile-authtype" class="form-control">
                                 <option value="">Select...</option>
+                                <option value="None">None (No Authentication)</option>
                                 <option value="ApiKey">API Key</option>
                                 <option value="BearerToken">Bearer Token</option>
                                 <option value="CustomScript">Custom Script</option>
                                 <option value="Meraki">Meraki (API Key or Bearer)</option>
                             </select>
                             ${errors.authType ? `<div class="form-error">${errors.authType}</div>` : ''}
+                        </div>
+                        <div class="form-group">
+                            <label style="font-weight: normal; color: var(--text-secondary);">Or start from a template:</label>
+                            <button type="button" id="wizard-select-template-btn" class="btn btn-outline" style="width: 100%;">
+                                📋 Browse Templates
+                            </button>
+                            <small class="form-help">Choose from predefined API configurations</small>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -127,10 +134,10 @@ class ProfileCreateWizard {
                         <h3>Step 2: Authentication & Headers</h3>
                         <button class="modal-close" onclick="window.profileCreateWizard.close()">&times;</button>
                     </div>
-                    <div class="modal-body">
-                        <div class="form-group">
+                    <div class="modal-body">                        <div class="form-group">
                             <label>Authentication Type</label>
                             <select id="wizard-auth-type" class="form-control">
+                                <option value="None" ${fields.authType === 'None' ? 'selected' : ''}>None (No Authentication)</option>
                                 <option value="ApiKey" ${fields.authType === 'ApiKey' ? 'selected' : ''}>API Key</option>
                                 <option value="BearerToken" ${fields.authType === 'BearerToken' ? 'selected' : ''}>Bearer Token</option>
                                 <option value="CustomScript" ${fields.authType === 'CustomScript' ? 'selected' : ''}>Custom Script</option>
@@ -249,13 +256,18 @@ class ProfileCreateWizard {
         };
         // Add errorHtml to the top of the modal
         return errorHtml + content;
-    }
-
-    // Render dynamic auth fields for step 2
+    }    // Render dynamic auth fields for step 2
     renderAuthFields() {
         const { authType, apiKeyValue, apiKeyHeader, tokenValue, customScript, merakiStyle } = this.state.fields;
         // Help text and dynamic fields per auth type
         switch (authType) {
+            case 'None':
+                return `
+                    <div class="auth-help">
+                        <strong>No Authentication</strong><br>
+                        This API does not require authentication. Requests will be sent without authentication headers.
+                    </div>
+                `;
             case 'ApiKey':
                 // Ensure apiKeyHeader is set in state if empty
                 if (!this.state.fields.apiKeyHeader) {
@@ -327,13 +339,14 @@ class ProfileCreateWizard {
             default:
                 return `<div class="auth-help">Select an authentication type above.</div>`;
         }
-    }
-
-    // Render live header preview for step 2
+    }    // Render live header preview for step 2
     renderHeaderPreview() {
         const { authType, apiKeyValue, apiKeyHeader, tokenValue, merakiStyle } = this.state.fields;
         let headers = {};
         switch (authType) {
+            case 'None':
+                // No authentication headers
+                break;
             case 'ApiKey':
                 if (apiKeyHeader && apiKeyValue) headers[apiKeyHeader] = maskSecret(apiKeyValue);
                 break;
@@ -353,14 +366,15 @@ class ProfileCreateWizard {
                 break;
         }
         return Object.keys(headers).length ? JSON.stringify(headers, null, 2) : '// No auth headers yet';
-    }
-
-    // Utility: Merge default headers and auth headers for preview (step 4)
+    }    // Utility: Merge default headers and auth headers for preview (step 4)
     getMergedHeadersPreview() {
         // Build auth headers (same logic as renderHeaderPreview, but unmasked for backend, masked for UI)
         const { authType, apiKeyValue, apiKeyHeader, tokenValue, merakiStyle, defaultHeaders } = this.state.fields;
         let authHeaders = {};
         switch (authType) {
+            case 'None':
+                // No authentication headers
+                break;
             case 'ApiKey':
                 if (apiKeyHeader && apiKeyValue) authHeaders[apiKeyHeader] = maskSecret(apiKeyValue);
                 break;
@@ -390,8 +404,7 @@ class ProfileCreateWizard {
     }
 
     attachEvents() {
-        const { step } = this.state;
-        if (step === 1) {
+        const { step } = this.state;        if (step === 1) {
             document.getElementById('wizard-next-btn').onclick = () => this.handleNext();
             document.getElementById('wizard-profile-name').oninput = (e) => {
                 this.state.fields.name = e.target.value;
@@ -402,7 +415,10 @@ class ProfileCreateWizard {
             document.getElementById('wizard-profile-authtype').onchange = (e) => {
                 this.state.fields.authType = e.target.value;
             };
-        } else if (step === 2) {
+            // Template selection button handler
+            document.getElementById('wizard-select-template-btn').onclick = () => {
+                this.showTemplateSelection();
+            };        } else if (step === 2) {
             document.getElementById('wizard-back-btn').onclick = () => {
                 this.state.step = 1;
                 this.renderModal();
@@ -476,12 +492,12 @@ class ProfileCreateWizard {
                 };
             }
             // Always update header preview on initial render
-            this.updateHeaderPreview();
-        } else if (step === 3) {
+            this.updateHeaderPreview();        } else if (step === 3) {
             // Step 3: Headers & Advanced Config
             setTimeout(() => this.renderCustomSettingsList(), 0);
             document.getElementById('wizard-back-btn').onclick = () => {
-                this.state.step = 2;
+                // Go back to step 1 if authType is "None", otherwise step 2
+                this.state.step = this.state.fields.authType === 'None' ? 1 : 2;
                 this.renderModal();
             };
             document.getElementById('wizard-next-btn').onclick = () => this.handleStep3Next();
@@ -579,9 +595,7 @@ class ProfileCreateWizard {
         // Proceed to review step
         this.state.step = 4;
         this.renderModal();
-    }
-
-    handleNext() {
+    }    handleNext() {
         const { step } = this.state;
         if (step === 1) {
             // Validate step 1 fields
@@ -591,15 +605,19 @@ class ProfileCreateWizard {
                 this.renderModal();
                 return;
             }
-            // Proceed to step 2
-            this.state.step = 2;
+            // Skip authentication step if authType is "None"
+            if (this.state.fields.authType === 'None') {
+                this.state.step = 3; // Skip to Step 3: Headers & Advanced
+            } else {
+                this.state.step = 2; // Go to Step 2: Authentication
+            }
             this.renderModal();
         } else if (step === 2) {
             this.handleStep2Next();
         } else if (step === 3) {
             this.handleStep3Next();
         }
-    }    validateStep() {
+    }validateStep() {
         // Use global SecretStore state from secretManager
         if (this.state.step === 2 && !this.state.fields.isSessionOnly && !this.isSecretStoreUnlockedGlobally()) {
             this.state.errors.secretStore = 'SecretStore must be unlocked for persistent profiles.';
@@ -617,13 +635,14 @@ class ProfileCreateWizard {
         }
         // Fallback to global function if indicator not available
         return window.isSecretStoreUnlocked ? window.isSecretStoreUnlocked() : false;
-    }
-
-    handleStep2Next() {
+    }    handleStep2Next() {
         const { fields } = this.state;
         // Validate auth fields based on auth type
         let authErrors = {};
         switch (fields.authType) {
+            case 'None':
+                // No validation needed for None authentication
+                break;
             case 'ApiKey':
                 if (!fields.apiKeyValue) authErrors.apiKeyValue = 'API Key is required.';
                 if (!fields.apiKeyHeader) authErrors.apiKeyHeader = 'Header name is required.';
@@ -719,9 +738,7 @@ class ProfileCreateWizard {
             defaultHeaders: template.defaultHeaders || {},
             customSettings: template.customSettings || {},
             pagination: template.paginationDetails || {},
-        };
-
-        // Handle auth-specific fields based on template and secrets
+        };        // Handle auth-specific fields based on template and secrets
         if (template.authType === 'BearerToken') {
             // Look for token in secrets - try common keys
             const tokenKeys = ['token', 'bearerToken', 'access_token', 'auth_token'];
@@ -754,6 +771,9 @@ class ProfileCreateWizard {
             fields.customScript = template.customAuthScript || '';
             // Store all secrets for custom script access
             fields.templateSecrets = secrets;
+        } else if (template.authType === 'None') {
+            // No authentication setup needed
+            fields.authType = 'None';
         }
 
         // Add UI customization from template
@@ -776,12 +796,159 @@ class ProfileCreateWizard {
         }
 
         return profileData;
-    }
-
-    close() {
+    }    close() {
         if (this.modal) {
             this.modal.remove();
             this.modal = null;
+        }
+    }    // Show template selection modal
+    showTemplateSelection() {
+        // Ensure template manager and modal are available
+        const templateManagerInstance = window.templateManager || (typeof templateManager !== 'undefined' ? templateManager : null);
+        
+        if (!templateManagerInstance) {
+            console.error('[ProfileWizard] TemplateManager not available');
+            alert('Template management is not available');
+            return;
+        }
+
+        // Initialize template modal if needed
+        if (!window.templateModal) {
+            if (templateManagerInstance.initializeModal) {
+                templateManagerInstance.initializeModal();
+            }
+        }
+
+        if (!window.templateModal) {
+            console.error('[ProfileWizard] TemplateModal not available');
+            alert('Template modal is not available');
+            return;
+        }
+
+        // Show a compact template picker modal
+        this.showCompactTemplatePicker(templateManagerInstance);
+    }    // Show compact template picker that leverages existing TemplateModal
+    showCompactTemplatePicker(templateManagerInstance) {
+        const templates = templateManagerInstance.templates || [];
+        
+        if (templates.length === 0) {
+            alert('No templates available');
+            return;
+        }
+
+        // Remove any existing modals
+        const existingModal = document.querySelector('.modal-overlay');
+        if (existingModal) existingModal.remove();
+
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-dialog" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h3>Select Template</h3>
+                    <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="template-picker-search" style="margin-bottom: 1rem;">
+                        <input type="text" id="template-picker-search" placeholder="Search templates..." 
+                               style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;">
+                    </div>
+                    <div class="template-picker-list" style="max-height: 400px; overflow-y: auto;">
+                        ${templates.map(template => `
+                            <div class="template-picker-item" data-template-id="${template.id}" 
+                                 style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 0.5rem; cursor: pointer; transition: all 0.2s ease;"
+                                 onmouseover="this.style.backgroundColor='var(--bg-hover)'" 
+                                 onmouseout="this.style.backgroundColor=''"
+                                 onclick="window.profileCreateWizard.useTemplateFromPicker('${template.id}')">
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <div style="font-size: 1.5rem;">${template.icon || '📦'}</div>
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">${template.name}</div>
+                                        <div style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.3;">${template.description || 'No description available'}</div>
+                                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                            ${template.authType ? `Auth: ${template.authType}` : 'No Auth'} • 
+                                            ${template.category || 'Uncategorized'}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Add search functionality
+        const searchInput = modal.querySelector('#template-picker-search');
+        searchInput.addEventListener('input', (e) => {
+            this.filterCompactTemplateList(e.target.value);
+        });        // Focus search input
+        setTimeout(() => searchInput.focus(), 100);
+    }
+
+    // Filter compact template list based on search query
+    filterCompactTemplateList(query) {
+        const items = document.querySelectorAll('.template-picker-item');
+        const searchQuery = query.toLowerCase();
+
+        items.forEach(item => {
+            const name = item.querySelector('div[style*="font-weight: 600"]')?.textContent?.toLowerCase() || '';
+            const description = item.querySelector('div[style*="font-size: 0.85rem"]')?.textContent?.toLowerCase() || '';
+            const category = item.querySelector('div[style*="font-size: 0.75rem"]')?.textContent?.toLowerCase() || '';
+            
+            const matches = name.includes(searchQuery) || 
+                           description.includes(searchQuery) || 
+                           category.includes(searchQuery);
+            
+            item.style.display = matches ? 'block' : 'none';
+        });
+    }
+
+    // Use template from compact picker - connects to existing TemplateModal
+    useTemplateFromPicker(templateId) {
+        // Close the compact picker modal first
+        const pickerModal = document.querySelector('.modal-overlay');
+        if (pickerModal) pickerModal.remove();
+
+        // Get the template
+        const templateManagerInstance = window.templateManager || (typeof templateManager !== 'undefined' ? templateManager : null);
+        if (!templateManagerInstance) {
+            console.error('[ProfileWizard] TemplateManager not available');
+            alert('Template management is not available');
+            return;
+        }
+
+        const template = templateManagerInstance.templates.find(t => t.id === templateId);
+        if (!template) {
+            console.error('[ProfileWizard] Template not found:', templateId);
+            alert('Template not found');
+            return;
+        }
+
+        // Use the existing TemplateModal's "Use Template" functionality
+        if (window.templateModal) {
+            // The TemplateModal's 'use' mode will handle profile creation
+            window.templateModal.show({ 
+                template: template, 
+                mode: 'use',
+                onSave: (profileData) => {
+                    console.log('[ProfileWizard] Template modal completed profile creation:', profileData);
+                    // The template modal handles the profile creation, so we just close our wizard
+                    this.close();
+                    // Refresh profiles if needed
+                    if (window.profileManager && typeof window.profileManager.loadProfiles === 'function') {
+                        window.profileManager.loadProfiles();
+                    }
+                }
+            });
+        } else {
+            console.error('[ProfileWizard] TemplateModal not available');
+            alert('Template modal is not available');
         }
     }
 }

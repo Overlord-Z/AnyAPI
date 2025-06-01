@@ -40,13 +40,35 @@ export function maskSecret(value) {
     return '•'.repeat(Math.max(8, value.length));
 }
 
-export function validateProfileFields(fields) {
+export function validateProfileFields(fields, step = 1) {
     // Basic validation for required fields
     const errors = {};
-    if (!fields.name || !fields.name.trim()) errors.name = 'Profile name is required.';
-    if (!fields.baseUrl || !/^https?:\/\//.test(fields.baseUrl)) errors.baseUrl = 'Valid Base URL required.';
-    if (!fields.authType) errors.authType = 'Authentication type required.';
-    // Add more as needed
+    
+    if (step === 1) {
+        if (!fields.name || !fields.name.trim()) errors.name = 'Profile name is required.';
+        if (!fields.baseUrl || !/^https?:\/\//.test(fields.baseUrl)) errors.baseUrl = 'Valid Base URL required.';
+        if (!fields.authType) errors.authType = 'Authentication type required.';
+    }
+    
+    if (step === 2 && fields.authType !== 'None') {
+        // Auth-specific validation only if not "None"
+        switch (fields.authType) {
+            case 'ApiKey':
+                if (!fields.apiKeyValue) errors.apiKeyValue = 'API Key is required.';
+                if (!fields.apiKeyHeader) errors.apiKeyHeader = 'Header name is required.';
+                break;
+            case 'BearerToken':
+                if (!fields.tokenValue) errors.tokenValue = 'Bearer token is required.';
+                break;
+            case 'CustomScript':
+                if (!fields.customScript) errors.customScript = 'Custom script is required.';
+                break;
+            case 'Meraki':
+                if (!fields.apiKeyValue) errors.apiKeyValue = 'API Key is required.';
+                break;
+        }
+    }
+    
     return errors;
 }
 

@@ -1251,6 +1251,35 @@ updateDarkModeToggle() {
         };
         return text.replace(/[&<>"']/g, (m) => map[m]);
     }
+
+    /**
+     * Initialize application - NEW METHOD FOR BETTER COORDINATION
+     */
+    async initializeApp() {
+        try {
+            console.log('[App] Initializing application...');
+            
+            // Initialize core components first
+            await this.initializeApiClient();
+            
+            // Initialize managers in the right order
+            await this.initializeSecretManager();
+            await this.initializeProfileManager();
+            
+            // Initialize template manager after modal class is available
+            if (window.templateManager) {
+                await window.templateManager.init();
+            }
+            
+            // Initialize UI components
+            this.initializeUI();
+            
+            console.log('[App] Application initialized successfully');
+        } catch (error) {
+            console.error('[App] Failed to initialize application:', error);
+            this.showError('Failed to initialize application');
+        }
+    }
 }
 
 // Additional CSS for modals and UI elements

@@ -79,12 +79,15 @@ export function buildProfileObject(fields) {
             break;
         case AUTH_TYPES.CUSTOM_SCRIPT:
             profile.customAuthScript = fields.customScript;
-            // Add any other credentials that might be needed for custom script
+            // Add any template secrets that might be needed for custom script
+            if (fields.templateSecrets) {
+                profile.templateSecrets = fields.templateSecrets;
+            }
             break;
         case AUTH_TYPES.MERAKI:
             // Use selected Meraki style
             if (fields.merakiStyle === 'bearer') {
-                profile.authType = 'Bearer';
+                profile.authType = 'BearerToken';
                 profile.credentials.token = fields.apiKeyValue;
                 profile.headers = { ...profile.headers, ...HEADER_TEMPLATES.MerakiBearer };
             } else {
@@ -97,5 +100,17 @@ export function buildProfileObject(fields) {
         default:
             break;
     }
+
+    // Add UI customization if provided (from template)
+    if (fields.ui) {
+        profile.ui = fields.ui;
+    }
+
+    // Add template reference if provided
+    if (fields.templateId) {
+        profile.templateId = fields.templateId;
+        profile.templateVersion = fields.templateVersion;
+    }
+
     return profile;
 }

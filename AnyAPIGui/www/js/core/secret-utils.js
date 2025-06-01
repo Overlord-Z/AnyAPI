@@ -104,83 +104,113 @@ function showSecretStorePasswordPrompt() {
  */
 function updateSecretStoreStatusIndicator() {
     console.log('🔧 updateSecretStoreStatusIndicator called');
-    const statusDiv = document.getElementById('secretstore-status');
-    const icon = document.getElementById('secretstore-status-icon');
-    const text = document.getElementById('secretstore-status-text');
-    if (!statusDiv || !icon || !text) {
-        console.log('❌ Status indicator elements not found');
+    
+    const statusEl = document.getElementById('secretstore-status');
+    const iconEl = document.getElementById('secretstore-status-icon');
+    
+    if (!statusEl || !iconEl) {
+        console.warn('⚠️ Secret store status elements not found');
         return;
     }
     
-    // If SecretManager is not yet initialized, show checking status
-    if (window.secretManager && !window.secretManager.initialized) {
-        console.log('⏳ SecretManager not yet initialized, showing checking status');
-        icon.setAttribute('data-feather', 'clock');
-        text.textContent = 'SecretStore Checking...';
-        statusDiv.style.color = '#ffa500';
-        if (window.feather) window.feather.replace();
-        return;
-    }
+    // Remove all status classes and click handlers
+    statusEl.classList.remove('unlocked', 'locked', 'checking', 'clickable');
+    statusEl.style.cursor = 'default';
+    statusEl.onclick = null;
     
-    // If SecretManager doesn't exist at all, show N/A
-    if (!window.secretManager) {
-        console.log('❌ SecretManager not available, showing N/A');
-        icon.setAttribute('data-feather', 'slash');
-        text.textContent = 'SecretStore N/A';
-        statusDiv.style.color = '#aaa';
-        if (window.feather) window.feather.replace();
-        return;
-    }
-    
-    let available = false;
-    let unlocked = false;
-    
-    // Primary source: secretManager (which has the actual data from the API)
-    if (window.secretManager && window.secretManager.secretStoreInfo && window.secretManager.initialized) {
-        const info = window.secretManager.secretStoreInfo;
-        console.log('🔍 SecretManager info found:', info);
-        available = info.isSecretStoreAvailable === true || info.isSecretStoreAvailable === 'true';
-        unlocked = window.secretManager.isSecretStoreUnlocked === true;
-        console.log(`🔍 From SecretManager - available: ${available}, unlocked: ${unlocked}`);
-    } else {
-        console.log('❌ SecretManager not initialized or secretStoreInfo not available');
-    }
-    
-    // Fallback: check window.info if secretManager not available
-    if (!available) {
-        const info = window.info && window.info.storageInfo ? window.info.storageInfo : null;
-        console.log('🔍 Fallback to window.info:', info);
-        if (info) {
-            available = info.isSecretStoreAvailable === true || info.isSecretStoreAvailable === 'true';
-            // Accept both boolean and string true
-            unlocked = (typeof info.isSecretStoreUnlocked === 'boolean' && info.isSecretStoreUnlocked) ||
-                       (typeof info.isSecretStoreUnlocked === 'string' && info.isSecretStoreUnlocked.toLowerCase() === 'true');
-            console.log(`🔍 From window.info - available: ${available}, unlocked: ${unlocked}`);
+    // Check if SecretManager exists and is unlocked
+    if (window.secretManager) {
+        if (window.secretManager.isUnlocked || window.secretManager.unlocked || window.secretManager.isSecretStoreUnlocked) {
+            statusEl.classList.add('unlocked');
+            iconEl.setAttribute('data-feather', 'unlock');
+            statusEl.title = 'SecretStore Unlocked';
+            console.log('✅ SecretStore status updated: unlocked');
+        } else if (!window.secretManager.initialized) {
+            statusEl.classList.add('checking');
+            iconEl.setAttribute('data-feather', 'loader');
+            statusEl.title = 'Checking SecretStore...';
+            console.log('✅ SecretStore status updated: checking');
+        } else {
+            // SecretStore is locked - make it clickable
+            statusEl.classList.add('locked', 'clickable');
+            iconEl.setAttribute('data-feather', 'lock');
+            statusEl.title = 'SecretStore Locked - Click to unlock';
+            statusEl.style.cursor = 'pointer';
+            statusEl.onclick = handleSecretStoreUnlock;
+            console.log('✅ SecretStore status updated: locked (clickable)');
         }
-    }
-    
-    if (!available) {
-        console.log('🔒 Setting status to N/A');
-        icon.setAttribute('data-feather', 'slash');
-        text.textContent = 'SecretStore N/A';
-        statusDiv.style.color = '#aaa';
-    } else if (unlocked) {
-        console.log('🔓 Setting status to Unlocked');
-        icon.setAttribute('data-feather', 'unlock');
-        text.textContent = 'SecretStore Unlocked';
-        statusDiv.style.color = '#27d645';
     } else {
-        console.log('🔒 Setting status to Locked');
-        icon.setAttribute('data-feather', 'lock');
-        text.textContent = 'SecretStore Locked';
-        statusDiv.style.color = '#e74c3c';
+        statusEl.classList.add('checking');
+        iconEl.setAttribute('data-feather', 'loader');
+        statusEl.title = 'Checking SecretStore...';
+        console.log('✅ SecretStore status updated: checking (no SecretManager)');
     }
     
-    if (window.feather) window.feather.replace();
+    if (window.feather) {
+        window.feather.replace({ width: 18, height: 18, 'stroke-width': 2 });
+    }
 }
 
-// Make functions globally available
+/**
+ * Handle clicking on the locked SecretStore status to unlock it
+ */
+function handleSecretStoreUnlock() {
+    console.log('🔐 SecretStore unlock clicked');
+    
+    // First try to use the existing SecretManager modal
+    if (window.secretManager && typeof window.secretManager.promptForSecretStorePassword === 'function') {
+        console.log('✅ Using existing SecretManager password modal');
+        window.secretManager.promptForSecretStorePassword();
+        return;
+    }
+    
+    // Second option: Use the existing modal in the HTML
+    const existingModal = document.getElementById('secret-password-modal');
+    if (existingModal) {
+        console.log('✅ Using existing HTML password modal');
+        existingModal.classList.add('show');
+        existingModal.style.display = 'flex';
+        
+        // Focus the password input
+        const passwordInput = document.getElementById('secret-store-password');
+        if (passwordInput) {
+            setTimeout(() => passwordInput.focus(), 100);
+        }
+        return;
+    }
+    
+    // Last resort: Use the utility function
+    console.log('⚠️ Falling back to utility password prompt');
+    showSecretStorePasswordPrompt().then(password => {
+        if (password) {
+            unlockSecretStoreAndRefresh(password).then(result => {
+                if (result && result.success) {
+                    if (window.showNotification) {
+                        window.showNotification('SecretStore unlocked successfully!', 'success');
+                    }
+                    updateSecretStoreStatusIndicator();
+                } else {
+                    if (window.showNotification) {
+                        window.showNotification('Failed to unlock SecretStore', 'error');
+                    }
+                }
+            }).catch(error => {
+                console.error('SecretStore unlock error:', error);
+                if (window.showNotification) {
+                    window.showNotification('Error unlocking SecretStore', 'error');
+                }
+            });
+        }
+    });
+}
+
+// Make functions globally available immediately when this script loads
 window.isSecretStoreUnlocked = isSecretStoreUnlocked;
 window.unlockSecretStoreAndRefresh = unlockSecretStoreAndRefresh;
 window.showSecretStorePasswordPrompt = showSecretStorePasswordPrompt;
 window.updateSecretStoreStatusIndicator = updateSecretStoreStatusIndicator;
+window.handleSecretStoreUnlock = handleSecretStoreUnlock;
+
+// Mark that secret-utils is loaded
+window.secretUtilsLoaded = true;
+console.log('✅ Secret utilities loaded and functions made globally available');

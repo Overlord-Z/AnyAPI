@@ -79,11 +79,7 @@ class SecretManager {    constructor() {
             
             // Update status indicator after initialization
             console.log('🔧 SecretManager init complete, updating status indicator');
-            if (typeof window.updateSecretStoreStatusIndicator === 'function') {
-                window.updateSecretStoreStatusIndicator();
-            } else {
-                console.warn('updateSecretStoreStatusIndicator not available globally');
-            }
+            this.safeUpdateStatusIndicator();
         } catch (error) {
             console.warn('Failed to initialize secret manager:', error);
             showNotification('Secret storage initialization failed', 'warning');
@@ -139,9 +135,7 @@ class SecretManager {    constructor() {
                 }));
                 
                 // Update status indicator immediately
-                if (typeof window.updateSecretStoreStatusIndicator === 'function') {
-                    window.updateSecretStoreStatusIndicator();
-                }
+                this.safeUpdateStatusIndicator();
             }
         } catch (error) {
             console.error('Failed to load secret info:', error);
@@ -177,9 +171,7 @@ class SecretManager {    constructor() {
         this.isSecretStoreUnlocked = false;
         
         // Update status indicators
-        if (typeof window.updateSecretStoreStatusIndicator === 'function') {
-            window.updateSecretStoreStatusIndicator();
-        }
+        this.safeUpdateStatusIndicator();
         
         // Show notification about the issue
         let message = 'Authentication required';
@@ -268,9 +260,7 @@ class SecretManager {    constructor() {
                 window.dispatchEvent(new CustomEvent('secretStoreUnlocked'));
                 
                 // Update status indicator immediately
-                if (typeof window.updateSecretStoreStatusIndicator === 'function') {
-                    window.updateSecretStoreStatusIndicator();
-                }
+                this.safeUpdateStatusIndicator();
                 
             } else {
                 throw new Error(response.error || 'Failed to unlock SecretStore');
@@ -312,6 +302,9 @@ class SecretManager {    constructor() {
         
         // Emit event for other components
         window.dispatchEvent(new CustomEvent('secretStoreSkipped'));
+        
+        // Update status indicator safely
+        this.safeUpdateStatusIndicator();
     }
 
     /**
@@ -845,6 +838,33 @@ class SecretManager {    constructor() {
             }
         } catch (error) {
             showNotification('Failed to delete secret: ' + error.message, 'error');
+        }
+    }
+
+    /**
+     * Safely update the status indicator (handles case where function isn't loaded yet)
+     */
+    safeUpdateStatusIndicator() {
+        // Check if secret-utils.js has loaded
+        if (window.secretUtilsLoaded && typeof window.updateSecretStoreStatusIndicator === 'function') {
+            window.updateSecretStoreStatusIndicator();
+        } else {
+            // Function not loaded yet, try again after delays
+            let attempts = 0;
+            const maxAttempts = 20; // 20 attempts = 2 seconds total
+            
+            const tryUpdate = () => {
+                attempts++;
+                if (window.secretUtilsLoaded && typeof window.updateSecretStoreStatusIndicator === 'function') {
+                    window.updateSecretStoreStatusIndicator();
+                } else if (attempts < maxAttempts) {
+                    setTimeout(tryUpdate, 100);
+                } else {
+                    console.warn('⚠️ updateSecretStoreStatusIndicator not available after 2 seconds - secret-utils.js may not be loaded');
+                }
+            };
+            
+            setTimeout(tryUpdate, 100);
         }
     }
 }

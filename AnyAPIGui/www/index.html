@@ -127,15 +127,17 @@
     </div>
 
     <!-- Secret Store Password Modal -->
-    <div id="secret-password-modal" class="modal">
-        <div class="modal-content">
+    <div id="secret-password-modal" class="modal" style="z-index: 99999 !important;">
+        <div class="modal-content" style="z-index: 100000 !important; position: relative;">
             <div class="modal-header">
                 <h3>SecretStore Password</h3>
                 <button class="modal-close" onclick="secretManager.closePasswordModal()">
                     <i data-feather="x"></i>
                 </button>
-            </div>            <div class="modal-body">
-                <p>Enter your SecretStore password to unlock secure credential storage:</p>                <form id="secret-store-form" onsubmit="event.preventDefault(); secretManager.unlockSecretStore();">
+            </div>
+            <div class="modal-body">
+                <p>Enter your SecretStore password to unlock secure credential storage:</p>
+                <form id="secret-store-form" onsubmit="event.preventDefault(); secretManager.unlockSecretStore();">
                     <input type="password" id="secret-store-password" class="form-control" placeholder="SecretStore Password" autocomplete="new-password">
                 </form>
                 <div class="form-note">
@@ -187,13 +189,11 @@
                         <i data-feather="help-circle"></i>
                         Help
                     </button>
-                    <div class="connection-status connected" id="connection-status">
+                    <div class="connection-status connected" id="connection-status" title="Connection Status">
                         <i data-feather="wifi"></i>
-                        <span>Connected</span>
                     </div>
-                    <div class="secretstore-status" id="secretstore-status" style="display:inline-flex;align-items:center;margin-left:1em;">
+                    <div class="secretstore-status" id="secretstore-status" style="display:inline-flex;align-items:center;margin-left:1em;" title="SecretStore Status">
                         <i data-feather="lock" id="secretstore-status-icon"></i>
-                        <span id="secretstore-status-text" style="margin-left:0.3em;">Checking...</span>
                     </div>
                 </div>
             </div>
@@ -713,14 +713,45 @@
             if (connected) {
                 el.classList.add('connected');
                 el.classList.remove('disconnected', 'connecting');
-                el.innerHTML = '<i data-feather="wifi"></i> <span>Connected</span>';
+                el.innerHTML = '<i data-feather="wifi"></i>';
             } else {
                 el.classList.remove('connected');
                 el.classList.add('disconnected');
-                el.innerHTML = '<i data-feather="wifi-off"></i> <span>Disconnected</span>';
+                el.innerHTML = '<i data-feather="wifi-off"></i>';
             }
             feather.replace({ width: 18, height: 18, 'stroke-width': 2 });
         }
+
+        // Listen for secret store status changes and use the centralized function
+        window.addEventListener('secretStoreUnlocked', () => {
+            if (window.secretManager && typeof window.secretManager.safeUpdateStatusIndicator === 'function') {
+                window.secretManager.safeUpdateStatusIndicator();
+            }
+        });
+
+        window.addEventListener('secretStoreLocked', () => {
+            if (window.secretManager && typeof window.secretManager.safeUpdateStatusIndicator === 'function') {
+                window.secretManager.safeUpdateStatusIndicator();
+            }
+        });
+
+        window.addEventListener('secretStoreChecking', () => {
+            if (window.secretManager && typeof window.secretManager.safeUpdateStatusIndicator === 'function') {
+                window.secretManager.safeUpdateStatusIndicator();
+            }
+        });
+
+        window.addEventListener('info-updated', () => {
+            if (window.secretManager && typeof window.secretManager.safeUpdateStatusIndicator === 'function') {
+                window.secretManager.safeUpdateStatusIndicator();
+            }
+        });
+
+        window.addEventListener('secretStoreInfoUpdated', () => {
+            if (window.secretManager && typeof window.secretManager.safeUpdateStatusIndicator === 'function') {
+                window.secretManager.safeUpdateStatusIndicator();
+            }
+        });
 
         // Listen for connection status changes
         window.addEventListener('connectionStatusChanged', (e) => {

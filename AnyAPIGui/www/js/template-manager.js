@@ -16,19 +16,30 @@ class TemplateManager {    constructor() {
      * Initialize template manager
      */
     async init() {
-        try {
-            await this.loadTemplates();
-            this.setupEventListeners();
-            
-            // Initialize template modal after manager is ready
-            if (typeof TemplateModal !== 'undefined') {
-                this.templateModal = new TemplateModal(this);
-                window.templateModal = this.templateModal;
-            }
-        } catch (error) {
-            console.error('Failed to initialize template manager:', error);
-            showNotification('Failed to load templates', 'error');
+        console.log('[TemplateManager] Initializing...');
+        
+        // Initialize the TemplateModal first before loading templates
+        this.initializeModal();
+        
+        await this.loadTemplates();
+        this.setupEventListeners();
+        
+        console.log('[TemplateManager] Initialized successfully');
+    }
+
+    // Initialize the modal instance
+    initializeModal() {
+        // Ensure TemplateModal class is available
+        if (typeof TemplateModal === 'undefined') {
+            console.error('[TemplateManager] TemplateModal class not found. Make sure template-modal.js is loaded first.');
+            return;
         }
+        
+        // Create the modal instance and make it globally available
+        this.templateModal = new TemplateModal(this);
+        window.templateModal = this.templateModal;
+        
+        console.log('[TemplateManager] TemplateModal initialized');
     }
 
     /**
@@ -149,28 +160,18 @@ class TemplateManager {    constructor() {
         const endpointCount = template.sampleEndpoints ? template.sampleEndpoints.length : 0;
         const secretCount = template.requiredSecrets ? template.requiredSecrets.length : 0;
 
-        // Determine template type
-        let templateType = 'custom';
-        let templateTypeLabel = 'Custom';
-        if (template.isBuiltIn) {
-            templateType = isEnhanced ? 'enhanced' : 'built-in';
-            templateTypeLabel = isEnhanced ? 'Enhanced' : 'Built-in';
-        }
-
-        // Build CSS custom properties for enhanced templates (border/accent only, not background)
+        // Build CSS custom properties for enhanced templates
         let customStyles = '';
         if (isEnhanced && template.ui) {
             const ui = template.ui;
             customStyles = `style="
-                ${ui.brandColor ? `--card-border-color: ${ui.brandColor}; --card-accent-color: ${ui.brandColor};` : ''}
+                ${ui.brandColor ? `--card-border-color: ${ui.brandColor}; --card-accent-color: ${ui.brandColor}; --category-color: ${ui.brandColor};` : ''}
                 ${ui.accentColor ? `--accent-gradient-start: ${ui.brandColor}; --accent-gradient-end: ${ui.accentColor};` : ''}
                 ${ui.textColor ? `--card-text-color: ${ui.textColor};` : ''}
             "`;
-        }        // Inline style for custom category color
-        let customCategoryStyle = '';
-        if (template.categoryColor) {
-            customCategoryStyle = `style=\"background: ${template.categoryColor}; color: #fff; border-color: ${template.categoryColor};\"`;
-        }        return `
+        }
+
+        return `
             <div class="template-card ${isEnhanced ? 'enhanced' : ''}" 
                  data-brand="${brand}" 
                  ${customStyles}
@@ -183,26 +184,26 @@ class TemplateManager {    constructor() {
                         }
                     </div>
                     
+                    <div class="template-category-badge">${this.getCategoryDisplayName(template)}</div>
+                    
                     <h3 class="template-title">${escapeHtml(template.name)}</h3>
                     <p class="template-description">${escapeHtml(template.description)}</p>
                 </div>
                 <div class="template-card-body">
-                    <div class="template-category-corner ${this.getCategoryClass(template)}" data-category="${this.categorizeTemplate(template)}" ${customCategoryStyle}>${this.getCategoryDisplayName(template)}</div>
-                    
                     <div class="template-content">
+                        ${template.tags && template.tags.length > 0 ? `
+                            <div class="template-tags">
+                                ${template.tags.slice(0, 3).map(tag => `
+                                    <span class="template-tag">${escapeHtml(tag)}</span>
+                                `).join('')}
+                                ${template.tags.length > 3 ? `<span class="template-tag">+${template.tags.length - 3}</span>` : ''}
+                            </div>
+                        ` : ''}
+                        
                         <div class="template-auth-info">
                             <span class="auth-label">Auth:</span>
                             <span class="auth-value">${escapeHtml(template.authType)}</span>
                         </div>
-                        
-                        ${template.tags && template.tags.length > 0 ? `
-                            <div class="template-tags">
-                                ${template.tags.slice(0, 2).map(tag => `
-                                    <span class="template-tag">${escapeHtml(tag)}</span>
-                                `).join('')}
-                                ${template.tags.length > 2 ? `<span class="template-tag">+${template.tags.length - 2}</span>` : ''}
-                            </div>
-                        ` : ''}
                     </div>
                     
                     <div class="template-stats">
@@ -268,27 +269,35 @@ class TemplateManager {    constructor() {
      * Apply template to create new profile
      */
     async applyTemplate(templateId) {
+        console.log(`[TemplateManager] Applying template: ${templateId}`);
         const template = this.templates.find(t => t.id === templateId);
-        if (!template) return;
+        if (!template) {
+            console.error(`Template ${templateId} not found`);
+            if (window.showNotification) {
+                window.showNotification(`Template not found: ${templateId}`, 'error');
+            }
+            return;
+        }
 
         try {
-            // Check SecretStore access if needed
-            await secretManager.ensureSecretStoreAccess();
-
-            // Generate unique profile name
-            const profileName = await this.generateUniqueProfileName(template.name);
+            // Ensure modal is initialized
+            if (!this.templateModal || !window.templateModal) {
+                console.warn('[TemplateManager] Modal not initialized, creating now...');
+                this.initializeModal();
+            }
             
-            // Pre-fill profile form
-            this.fillProfileFormFromTemplate(template, profileName);
+            // Use the template modal to show the use template form
+            this.templateModal.show({
+                template: template,
+                mode: 'use',
+                onSave: null // The modal handles save internally
+            });
             
-            // Switch to profiles section and show modal
-            app.showSection('profiles');
-            profileManager.showCreateModal();
-            
-            showNotification(`Template "${template.name}" applied to new profile`, 'success');
         } catch (error) {
-            console.error('Failed to apply template:', error);
-            showNotification(`Failed to apply template: ${error.message}`, 'error');
+            console.error('[TemplateManager] Failed to apply template:', error);
+            if (window.showNotification) {
+                window.showNotification(`Failed to apply template: ${error.message}`, 'error');
+            }
         }
     }
 
@@ -310,126 +319,6 @@ class TemplateManager {    constructor() {
         
         return candidateName;
     }    /**
-     * Fill profile form with template data - ENHANCED WITH COORDINATED SYSTEM
-     */
-    fillProfileFormFromTemplate(template, profileName) {
-        console.log('🎯 Template Manager: Filling form with enhanced coordination');
-        
-        // Set the profile name first
-        profileManager.setFormValue('profile-name', profileName);
-        
-        // Create a temporary template select to trigger the coordinated system
-        const existingSelect = document.getElementById('profile-template');
-        if (existingSelect) {
-            // Find matching template in profile manager's templates
-            const templateKey = Object.keys(profileManager.templates).find(key => 
-                profileManager.templates[key].name === template.name ||
-                profileManager.templates[key].baseUrl === template.baseUrl
-            );
-            
-            if (templateKey) {
-                console.log('🔗 Found matching profile template:', templateKey);
-                existingSelect.value = templateKey;
-                
-                // Use the enhanced coordinated template application system
-                profileManager.applyTemplate();
-                
-                // Override name with custom profile name
-                setTimeout(() => {
-                    profileManager.setFormValue('profile-name', profileName);
-                }, 250);
-                
-                return; // Exit early since coordinated system handles everything
-            }
-        }
-        
-        // Fallback to manual application if no coordinated template found
-        console.log('⚠️ No coordinated template found, using manual application');
-        this.fillProfileFormManually(template, profileName);
-}
-
-    /**
-     * Manual template application fallback - ENHANCED INTEGRATION
-     */
-    fillProfileFormManually(template, profileName) {
-        console.log('🔧 Manual template application for:', template.name);
-        
-        // Basic fields
-        profileManager.setFormValue('profile-name', profileName);
-        profileManager.setFormValue('profile-baseurl', template.baseUrl);
-        profileManager.setFormValue('profile-authtype', template.authType);
-        profileManager.setFormValue('profile-pagination', template.paginationType || 'Auto');
-        profileManager.setFormValue('profile-description', template.description || '');
-        
-        // Set headers if available
-        if (template.headers) {
-            profileManager.setFormValue('profile-headers', JSON.stringify(template.headers, null, 2));
-        }
-        
-        // ENHANCED: Use coordinated auth field update
-        if (profileManager.toggleAuthFields) {
-            profileManager.toggleAuthFields();
-        } else {
-            // Fallback to old method
-            profileManager.updateAuthFields();
-        }
-        
-        // ENHANCED: Apply coordinated credentials after auth fields render
-        setTimeout(() => {
-            if (profileManager.applyTemplateCredentials && 
-                (template.authFieldMapping || template.requiredSecrets)) {
-                console.log('🎯 Using enhanced credential coordination');
-                profileManager.applyTemplateCredentials(template);
-            } else if (template.authFieldMapping && template.requiredSecrets) {
-                console.log('⚠️ Falling back to basic credential application');
-                // Basic fallback for older systems
-                template.requiredSecrets.forEach(secret => {
-                    const mapping = template.authFieldMapping[secret];
-                    if (mapping) {
-                        console.log(`Adding credential: ${secret} (${mapping.label})`);
-                    }
-                });
-            }
-            
-            // Handle custom auth script
-            if (template.authType === 'CustomScript' && template.customAuthScript) {
-                const scriptElement = document.getElementById('auth-script');
-                if (scriptElement) {
-                    scriptElement.value = template.customAuthScript;
-                    console.log('✅ Custom auth script applied');
-                }
-            }
-            
-            // Handle pagination details
-            if (template.paginationDetails) {
-                const paginationDetailsField = document.getElementById('profile-pagination-details');
-                if (paginationDetailsField) {
-                    paginationDetailsField.value = JSON.stringify(template.paginationDetails, null, 2);
-                    console.log('✅ Pagination details applied');
-                }
-            }
-            
-            // ENHANCED: Handle custom settings if present
-            if (template.customSettings && typeof template.customSettings === 'object') {
-                const customSettingsContainer = document.getElementById('profile-customsettings-list');
-                if (customSettingsContainer && profileManager.addCustomSettingRow) {
-                    // Clear existing
-                    customSettingsContainer.innerHTML = '';
-                    
-                    // Add template settings
-                    Object.entries(template.customSettings).forEach(([key, value]) => {
-                        profileManager.addCustomSettingRow(customSettingsContainer, key, value);
-                    });
-                    
-                    // Add empty row
-                    profileManager.addCustomSettingRow(customSettingsContainer, '', '');
-                    console.log('✅ Custom settings applied via coordination');
-                }
-            }
-        }, 250); // Longer delay for manual application
-    }
-
-    /**
      * Refresh templates from backend
      */
     async refreshTemplates() {
@@ -1234,29 +1123,23 @@ class TemplateManager {    constructor() {
 
         return 'default';
     }    /**
-     * Get category class name for CSS styling
+     * Get category class name for CSS styling - simplified
      */
     getCategoryClass(template) {
-        // If template.categoryColor is present, use a special override class
-        if (template.categoryColor) {
-            return 'category-customcolor';
-        }
-        const category = this.categorizeTemplate(template);
-        return `category-${category}`;
+        return 'template-category-badge';
     }
 
     /**
      * Get display name for category
      */
     getCategoryDisplayName(template) {
-        const category = this.categorizeTemplate(template);
-        
-        // If template has a specific category name, use it (formatted nicely)
+        // If template has a specific category name, use it
         if (template.category) {
             return template.category;
         }
         
-        // Otherwise use the dynamic category name with proper capitalization
+        // Otherwise use dynamic categorization
+        const category = this.categorizeTemplate(template);
         const categoryNames = {
             development: 'Development',
             business: 'Business',
@@ -1270,6 +1153,9 @@ class TemplateManager {    constructor() {
             media: 'Media',
             analytics: 'Analytics',
             gaming: 'Gaming',
+            versioncontrol: 'Version Control',
+            microsoft: 'Microsoft',
+            crm: 'CRM',
             default: 'General'
         };
         

@@ -12,7 +12,7 @@
   "ui": {
     "brandColor": "#008744",
     "accentColor": "#00A651",
-    "logo": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjQ1IiBmaWxsPSIjMDA4NzQ0Ii8+CjxwYXRoIGZpbGw9IiNmZmZmZmYiIGQ9Ik0zNSAzNWgzMHYzMEgzNXptMTAgMTBoMTB2MTBINDV6Ii8+CjwvY2lyY2xlPgo8L3N2Zz4=",
+    "logo": "https://duo.com/assets/img/duoLogo-web.png",
     "gradient": "linear-gradient(135deg, #008744 0%, #00A651 100%)",
     "textColor": "#ffffff"
   },

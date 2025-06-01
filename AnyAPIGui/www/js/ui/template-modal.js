@@ -55,7 +55,7 @@ class TemplateModal {
             case 'use':
                 title = 'Use Template';
                 content = this.renderUseTemplate();
-                saveText = 'Use Template';
+                saveText = 'Create Profile';
                 break;
             case 'create':
                 title = 'Create New Template';
@@ -72,7 +72,6 @@ class TemplateModal {
             <div class="modal-dialog">
                 <div class="modal-header">
                     <h3>${title}</h3>
-                    <span class="modal-debug">TMJS-DEBUG-2025-05-31</span>
                     <button class="modal-close" onclick="window.templateModal.closeModal()">&times;</button>
                 </div>
                 <div class="modal-body">${content}</div>
@@ -82,7 +81,9 @@ class TemplateModal {
                 </div>
             </div>
         `;
-    }    // Render view template details
+    }
+
+    // Render view template details
     renderViewTemplate() {
         if (!this.currentTemplate) return '<div>No template selected.</div>';
         const template = this.currentTemplate;
@@ -115,23 +116,24 @@ class TemplateModal {
                 <!-- Configuration Section -->
                 <div class="template-section">
                     <h4>Configuration</h4>
-                    <div class="config-grid">
-                        <div class="config-item">
-                            <div class="config-label">Base URL</div>
-                            <div class="config-value">${template.baseUrl || 'Not specified'}</div>
+                    <div class="config-list">
+                        <div class="config-row" data-type="url">
+                            <span class="config-label">Base URL:</span>
+                            <span class="config-value">${template.baseUrl || 'Not specified'}</span>
                         </div>
-                        <div class="config-item">
-                            <div class="config-label">Authentication</div>
-                            <div class="config-value">${template.authType || 'None'}</div>
+                        <div class="config-row" data-type="auth">
+                            <span class="config-label">Authentication:</span>
+                            <span class="config-value">${template.authType || 'None'}</span>
                         </div>
                         ${(template.paginationType || template.paginationDetails?.type) ? `
-                        <div class="config-item">
-                            <div class="config-label">Pagination</div>
-                            <div class="config-value">${template.paginationType || template.paginationDetails?.type || 'Not specified'}</div>
+                        <div class="config-row" data-type="pagination">
+                            <span class="config-label">Pagination:</span>
+                            <span class="config-value">${template.paginationType || template.paginationDetails?.type || 'Not specified'}</span>
                         </div>
                         ` : ''}
                     </div>
-                </div>                <!-- Required Secrets Section -->
+                </div>
+        <!-- Required Secrets Section -->
                 ${(Array.isArray(template.requiredSecrets) && template.requiredSecrets.length > 0) ? `
                 <div class="template-section">
                     <h4>Required Secrets</h4>
@@ -209,9 +211,102 @@ class TemplateModal {
         return colors[method] || '#6c757d';
     }
 
-    // Render use template form (could be a profile creation form pre-filled from template)
+    // Render use template form (profile creation form pre-filled from template)
     renderUseTemplate() {
-        return this.renderViewTemplate(); // For now, same as view
+        if (!this.currentTemplate) return '<div>No template selected.</div>';
+        
+        const template = this.currentTemplate;
+        const brandColor = template.ui?.brandColor || '#007acc';
+        const accentColor = template.ui?.accentColor || brandColor;
+        
+        return `
+            <div class="template-use-form">
+                <div class="template-header" style="--brand-color: ${brandColor}; --accent-color: ${accentColor}; margin-bottom: 1.5rem;">
+                    <div class="template-icon">${template.icon || '📦'}</div>
+                    <div class="template-info">
+                        <h3>${template.name}</h3>
+                        <p>${template.description}</p>
+                    </div>
+                </div>
+
+                <form id="template-use-form" style="display: flex; flex-direction: column; gap: 1rem;">
+                    <!-- Profile Name -->
+                    <div class="form-group">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">Profile Name *</label>
+                        <input type="text" id="use-profile-name" 
+                               value="${template.name} Profile" 
+                               style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.9rem;" 
+                               required>
+                        <small style="color: var(--text-muted); font-size: 0.8rem;">Name for your new profile</small>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="form-group">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">Description</label>
+                        <textarea id="use-profile-description" 
+                                  style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.9rem; resize: vertical; min-height: 60px;">${template.description}</textarea>
+                    </div>
+
+                    <!-- Base URL (if not fixed in template) -->
+                    <div class="form-group">
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">Base URL *</label>
+                        <input type="url" id="use-base-url" 
+                               value="${template.baseUrl || ''}" 
+                               style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.9rem;" 
+                               required>
+                    </div>
+
+                    <!-- Required Secrets -->
+                    ${(Array.isArray(template.requiredSecrets) && template.requiredSecrets.length > 0) ? `
+                    <div class="form-section">
+                        <h4 style="margin: 0 0 1rem 0; color: var(--text-primary); font-size: 1.1rem; font-weight: 600; border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem;">Required Credentials</h4>
+                        ${template.requiredSecrets.map(secret => {
+                            const secretKey = typeof secret === 'object' ? secret.key || secret.name : secret;
+                            const secretDisplayName = typeof secret === 'object' ? secret.displayName || secret.name || secretKey : secret;
+                            const secretDescription = typeof secret === 'object' && secret.description ? secret.description : 'Required for API authentication';
+                            const placeholder = typeof secret === 'object' && secret.placeholder ? secret.placeholder : `your-${secretKey.toLowerCase()}`;
+                            const isRequired = typeof secret === 'object' ? secret.isRequired !== false : true;
+                            
+                            return `
+                            <div class="form-group" style="margin-bottom: 1rem;">
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">
+                                    ${secretDisplayName} ${isRequired ? '*' : ''}
+                                </label>
+                                <input type="password" 
+                                       class="template-secret-input" 
+                                       data-secret-key="${secretKey}"
+                                       placeholder="${placeholder}"
+                                       ${isRequired ? 'required' : ''}
+                                       style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.9rem;">
+                                <small style="color: var(--text-muted); font-size: 0.8rem;">${secretDescription}</small>
+                            </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    ` : ''}
+
+                    <!-- Session Only Option -->
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: 600; color: var(--text-primary); cursor: pointer;">
+                            <input type="checkbox" id="use-session-only" style="margin: 0;">
+                            Session Only (don't save credentials permanently)
+                        </label>
+                        <small style="color: var(--text-muted); font-size: 0.8rem;">Check this if you don't want credentials stored on disk</small>
+                    </div>
+
+                    <!-- Template Info -->
+                    <div style="background: var(--bg-secondary); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color); margin-top: 1rem;">
+                        <h5 style="margin: 0 0 0.5rem 0; color: var(--text-primary);">What will be configured:</h5>
+                        <ul style="margin: 0; padding-left: 1.5rem; color: var(--text-muted); font-size: 0.9rem;">
+                            <li>Authentication: ${template.authType || 'None'}</li>
+                            ${template.paginationType || template.paginationDetails?.type ? `<li>Pagination: ${template.paginationType || template.paginationDetails?.type}</li>` : ''}
+                            ${template.sampleEndpoints && template.sampleEndpoints.length > 0 ? `<li>${template.sampleEndpoints.length} sample endpoints for testing</li>` : ''}
+                            ${template.ui ? `<li>Custom UI theme (${template.ui.brandColor})</li>` : ''}
+                        </ul>
+                    </div>
+                </form>
+            </div>
+        `;
     }    // Render create template form
     renderCreateTemplate() {
         return `
@@ -448,7 +543,9 @@ class TemplateModal {
                 });
             }
         }
-    }// Save handler
+    }
+
+    // Save handler
     modalSave() {
         if (this.mode === 'create') {
             const templateData = this.collectFormData();
@@ -458,11 +555,114 @@ class TemplateModal {
                 }
                 this.closeModal();
             }
+        } else if (this.mode === 'edit') {
+            const templateData = this.collectFormData();
+            if (templateData && this.validateTemplateData(templateData)) {
+                if (typeof this.modalSaveHandler === 'function') {
+                    this.modalSaveHandler(templateData);
+                }
+                this.closeModal();
+            }
+        } else if (this.mode === 'use') {
+            this.handleUseTemplate();
+        } else if (this.mode === 'view') {
+            // From view mode, "Use Template" button should switch to use mode
+            this.mode = 'use';
+            this.renderModal();
         } else {
             if (typeof this.modalSaveHandler === 'function') {
                 this.modalSaveHandler(this.currentTemplate);
             }
             this.closeModal();
+        }
+    }
+
+    // Handle using a template to create a profile
+    async handleUseTemplate() {
+        if (!this.currentTemplate) {
+            alert('No template selected');
+            return;
+        }
+
+        // Collect form data
+        const profileName = document.getElementById('use-profile-name')?.value.trim();
+        const description = document.getElementById('use-profile-description')?.value.trim();
+        const baseUrl = document.getElementById('use-base-url')?.value.trim();
+        const isSessionOnly = document.getElementById('use-session-only')?.checked || false;
+
+        // Validate required fields
+        if (!profileName) {
+            alert('Profile name is required');
+            return;
+        }
+        if (!baseUrl) {
+            alert('Base URL is required');
+            return;
+        }
+
+        // Collect secrets
+        const secrets = {};
+        const secretInputs = document.querySelectorAll('.template-secret-input');
+        let hasRequiredSecrets = true;
+        
+        secretInputs.forEach(input => {
+            const secretKey = input.dataset.secretKey;
+            const value = input.value.trim();
+            const isRequired = input.hasAttribute('required');
+            
+            if (isRequired && !value) {
+                hasRequiredSecrets = false;
+                input.style.borderColor = 'var(--danger-color, #dc3545)';
+            } else {
+                input.style.borderColor = '';
+                if (value) {
+                    secrets[secretKey] = value;
+                }
+            }
+        });
+
+        if (!hasRequiredSecrets) {
+            alert('Please fill in all required credentials');
+            return;
+        }
+
+        // Check SecretStore if not session only - use existing global function
+        if (!isSessionOnly && window.isSecretStoreUnlocked && !window.isSecretStoreUnlocked()) {
+            alert('SecretStore must be unlocked for persistent profiles. Please unlock it or choose "Session Only".');
+            return;
+        }
+
+        try {
+            // Use the static method from ProfileCreateWizard to maintain DRY principle
+            const profileData = await window.ProfileCreateWizard.createProfileFromTemplate(this.currentTemplate, {
+                name: profileName,
+                description: description,
+                baseUrl: baseUrl,
+                isSessionOnly: isSessionOnly,
+                secrets: secrets
+            });
+
+            console.log('[TemplateModal] Creating profile from template:', profileData);
+
+            // Create the profile using the API
+            const response = await window.apiClient.createProfile(profileData);
+            
+            if (response && response.success) {
+                if (window.showNotification) {
+                    window.showNotification(`Profile "${profileName}" created successfully from template`, 'success');
+                }
+                this.closeModal();
+                
+                // Reload profiles if possible
+                if (window.profileManager && typeof window.profileManager.loadProfiles === 'function') {
+                    window.profileManager.loadProfiles();
+                }
+            } else {
+                throw new Error(response?.error || 'Failed to create profile');
+            }
+        } catch (error) {
+            console.error('[TemplateModal] Error creating profile from template:', error);
+            alert(`Failed to create profile: ${error.message}`);
         }
     }
 
@@ -658,5 +858,7 @@ class TemplateModal {
     }
 }
 
-// TemplateModal will be initialized by TemplateManager
-// window.templateModal will be set when the manager is ready
+// Export for use in template manager
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = TemplateModal;
+}

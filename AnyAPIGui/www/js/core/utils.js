@@ -306,3 +306,24 @@ function createNotificationsContainer() {
 
 // Make showNotification globally available
 window.showNotification = showNotification;
+
+/**
+ * Safe wrapper for updating secret store status indicator
+ * This provides a fallback if secret-utils.js isn't loaded yet
+ */
+function safeUpdateSecretStoreStatus() {
+    if (typeof window.updateSecretStoreStatusIndicator === 'function') {
+        window.updateSecretStoreStatusIndicator();
+    } else {
+        console.warn('updateSecretStoreStatusIndicator not available yet');
+        // Try again after a short delay
+        setTimeout(() => {
+            if (typeof window.updateSecretStoreStatusIndicator === 'function') {
+                window.updateSecretStoreStatusIndicator();
+            }
+        }, 200);
+    }
+}
+
+// Make it globally available
+window.safeUpdateSecretStoreStatus = safeUpdateSecretStoreStatus;

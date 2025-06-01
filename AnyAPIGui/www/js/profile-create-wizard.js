@@ -692,7 +692,93 @@ class ProfileCreateWizard {
             this.state.errors.create = err && err.message ? err.message : 'Failed to create profile.';
             this.renderModal();
         }
-    }    close() {
+    }
+
+    // Static method to create profile from template (DRY principle)
+    static async createProfileFromTemplate(template, userInput) {
+        const { name, description, baseUrl, isSessionOnly, secrets } = userInput;
+        
+        // Validate using existing utility
+        const errors = validateProfileFields({
+            name: name,
+            baseUrl: baseUrl,
+            authType: template.authType
+        }, 1);
+        
+        if (Object.keys(errors).length > 0) {
+            throw new Error(Object.values(errors)[0]);
+        }
+
+        // Build profile using existing utility with template data
+        const fields = {
+            name: name,
+            description: description || template.description,
+            baseUrl: baseUrl,
+            authType: template.authType || 'None',
+            isSessionOnly: isSessionOnly,
+            defaultHeaders: template.defaultHeaders || {},
+            customSettings: template.customSettings || {},
+            pagination: template.paginationDetails || {},
+        };
+
+        // Handle auth-specific fields based on template and secrets
+        if (template.authType === 'BearerToken') {
+            // Look for token in secrets - try common keys
+            const tokenKeys = ['token', 'bearerToken', 'access_token', 'auth_token'];
+            const tokenKey = tokenKeys.find(key => secrets[key]) || Object.keys(secrets)[0];
+            if (tokenKey && secrets[tokenKey]) {
+                fields.tokenValue = secrets[tokenKey];
+            }
+        } else if (template.authType === 'ApiKey') {
+            // Look for API key in secrets - try common keys
+            const apiKeyKeys = ['apiKey', 'api_key', 'key', 'token'];
+            const apiKeyKey = apiKeyKeys.find(key => secrets[key]) || Object.keys(secrets)[0];
+            if (apiKeyKey && secrets[apiKeyKey]) {
+                fields.apiKeyValue = secrets[apiKeyKey];
+                // Use template's preferred header or default
+                fields.apiKeyHeader = template.apiKeyHeader || template.credentials?.headerName || 'X-API-Key';
+            }
+        } else if (template.authType === 'Meraki') {
+            // For Meraki, use the API key from secrets
+            const apiKeyKeys = ['apiKey', 'api_key', 'key', 'token'];
+            const apiKeyKey = apiKeyKeys.find(key => secrets[key]) || Object.keys(secrets)[0];
+            if (apiKeyKey && secrets[apiKeyKey]) {
+                fields.apiKeyValue = secrets[apiKeyKey];
+                fields.merakiStyle = template.merakiStyle || 'apiKey';
+                fields.authType = 'Meraki'; // Keep Meraki as auth type for proper handling
+            }
+        } else if (template.authType === 'BasicAuth') {
+            fields.username = secrets.username || secrets.user || '';
+            fields.password = secrets.password || secrets.pass || '';
+        } else if (template.authType === 'CustomScript') {
+            fields.customScript = template.customAuthScript || '';
+            // Store all secrets for custom script access
+            fields.templateSecrets = secrets;
+        }
+
+        // Add UI customization from template
+        if (template.ui) {
+            fields.ui = template.ui;
+        }
+
+        console.log('[ProfileCreateWizard] Template fields mapped:', fields);
+
+        // Use existing buildProfileObject utility
+        const profileData = buildProfileObject(fields);
+        
+        // Add template reference for tracking
+        profileData.templateId = template.id;
+        profileData.templateVersion = template.version;
+
+        // If template has custom headers, merge them
+        if (template.headers) {
+            profileData.headers = { ...profileData.headers, ...template.headers };
+        }
+
+        return profileData;
+    }
+
+    close() {
         if (this.modal) {
             this.modal.remove();
             this.modal = null;
@@ -702,3 +788,6 @@ class ProfileCreateWizard {
 
 // Auto-instantiate wizard for convenience
 window.profileCreateWizard = new ProfileCreateWizard();
+
+// Make the class available globally for static methods
+window.ProfileCreateWizard = ProfileCreateWizard;

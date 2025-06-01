@@ -372,7 +372,7 @@ class TemplateModal {
                         </div>
                         <div class="form-group">
                             <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">Auth Type</label>
-                            <select id="template-authtype" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.9rem;">
+                            <select id="template-authtype" onchange="window.templateModal.toggleCustomAuthScript()" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.9rem;">
                                 <option value="">None</option>
                                 <option value="BearerToken">Bearer Token</option>
                                 <option value="ApiKey">API Key</option>
@@ -403,15 +403,61 @@ class TemplateModal {
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <!-- Required Secrets -->
+                </div>                <!-- Required Secrets & Authentication -->
                 <div class="form-section">
-                    <h4 style="margin: 0 0 1rem 0; color: var(--text-primary); font-size: 1.1rem; font-weight: 600; border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem;">Required Secrets</h4>
+                    <h4 style="margin: 0 0 1rem 0; color: var(--text-primary); font-size: 1.1rem; font-weight: 600; border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem;">Required Secrets & Authentication</h4>
                     <div id="secrets-container">
                         <!-- Secrets will be added dynamically -->
                     </div>
                     <button type="button" onclick="window.templateModal.addSecret()" style="background: var(--accent-color, #007acc); color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; margin-top: 0.5rem;">+ Add Secret</button>
+                </div>
+
+                <!-- Default Headers -->
+                <div class="form-section">
+                    <h4 style="margin: 0 0 1rem 0; color: var(--text-primary); font-size: 1.1rem; font-weight: 600; border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem;">Default Headers</h4>
+                    <div id="headers-container">
+                        <!-- Headers will be added dynamically -->
+                    </div>
+                    <button type="button" onclick="window.templateModal.addHeader()" style="background: var(--accent-color, #007acc); color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; margin-top: 0.5rem;">+ Add Header</button>
+                    <small style="display: block; margin-top: 0.5rem; color: var(--text-muted); font-size: 0.8rem;">Headers that will be automatically included with every request</small>
+                </div>
+
+                <!-- Pagination Configuration -->
+                <div class="form-section">
+                    <h4 style="margin: 0 0 1rem 0; color: var(--text-primary); font-size: 1.1rem; font-weight: 600; border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem;">Pagination Configuration</h4>
+                    <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">Pagination Type</label>
+                            <select id="template-pagination-type" onchange="window.templateModal.updatePaginationFields()" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.9rem;">
+                                <option value="">None</option>
+                                <option value="PageBased" data-page-param="page" data-size-param="pageSize" data-default-size="25">Page-based (page/pageSize)</option>
+                                <option value="OffsetLimit" data-page-param="offset" data-size-param="limit" data-default-size="50">Offset/Limit</option>
+                                <option value="CursorBased" data-page-param="cursor" data-size-param="limit" data-default-size="100">Cursor-based</option>
+                                <option value="LinkHeader" data-page-param="page" data-size-param="per_page" data-default-size="30">Link Header</option>
+                                <option value="Custom" data-page-param="page" data-size-param="size" data-default-size="25">Custom</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">Default Page Size</label>
+                            <input type="number" id="template-pagination-default-size" placeholder="25" min="1" max="1000" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.9rem;">
+                        </div>
+                    </div>
+                    <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">Page Parameter</label>
+                            <input type="text" id="template-pagination-page-param" placeholder="page" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.9rem;">
+                            <small style="color: var(--text-muted); font-size: 0.8rem;">Query parameter name</small>
+                        </div>
+                        <div class="form-group">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">Page Size Parameter</label>
+                            <input type="text" id="template-pagination-size-param" placeholder="pageSize" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.9rem;">
+                            <small style="color: var(--text-muted); font-size: 0.8rem;">Query parameter name</small>
+                        </div>
+                        <div class="form-group">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">Max Page Size</label>
+                            <input type="number" id="template-pagination-max-size" placeholder="1000" min="1" style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.9rem;">
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Sample Endpoints -->
@@ -494,6 +540,21 @@ class TemplateModal {
         setFieldValue('template-baseurl', template.baseUrl);
         setFieldValue('template-authtype', template.authType);
         
+        // Toggle custom auth script visibility
+        this.toggleCustomAuthScript();
+        
+        // Custom auth script
+        setFieldValue('template-custom-auth-script', template.customAuthScript);
+        
+        // Pagination details
+        if (template.paginationDetails) {
+            setFieldValue('template-pagination-type', template.paginationDetails.type);
+            setFieldValue('template-pagination-default-size', template.paginationDetails.defaultPageSize);
+            setFieldValue('template-pagination-page-param', template.paginationDetails.pageParameter);
+            setFieldValue('template-pagination-size-param', template.paginationDetails.pageSizeParameter);
+            setFieldValue('template-pagination-max-size', template.paginationDetails.maxPageSize);
+        }
+        
         // UI colors
         if (template.ui) {
             setFieldValue('template-brandcolor', template.ui.brandColor);
@@ -507,8 +568,7 @@ class TemplateModal {
             setFieldValue('template-docs-url', template.documentation.url);
             setFieldValue('template-quickstart-url', template.documentation.quickStart);
         }
-        
-        // Populate secrets
+          // Populate secrets with authentication configuration
         if (template.requiredSecrets && template.requiredSecrets.length > 0) {
             const secretsContainer = document.getElementById('secrets-container');
             if (secretsContainer) {
@@ -521,6 +581,50 @@ class TemplateModal {
                         lastSecret.querySelector('.secret-display-name').value = secret.displayName || '';
                         lastSecret.querySelector('.secret-description').value = secret.description || '';
                         lastSecret.querySelector('.secret-required').checked = secret.isRequired || false;
+                        
+                        // Check if this secret is used for authentication
+                        if (template.authFieldMapping) {
+                            const authMapping = this.findAuthMappingForSecret(secret.key, template.authFieldMapping);
+                            if (authMapping) {
+                                // Enable authentication for this secret
+                                const authEnabledCheckbox = lastSecret.querySelector('.auth-enabled');
+                                if (authEnabledCheckbox) {
+                                    authEnabledCheckbox.checked = true;
+                                    authEnabledCheckbox.dispatchEvent(new Event('change'));
+                                }
+                                
+                                // Set auth method and header name
+                                const authMethodSelect = lastSecret.querySelector('.auth-method');
+                                const headerNameInput = lastSecret.querySelector('.auth-header-name');
+                                
+                                if (authMethodSelect) {
+                                    authMethodSelect.value = authMapping.method;
+                                    authMethodSelect.dispatchEvent(new Event('change'));
+                                }
+                                
+                                if (headerNameInput && authMapping.header) {
+                                    headerNameInput.value = authMapping.header;
+                                }
+                            }
+                        }
+                    }
+                });
+            }        }
+        
+        // Auth field mappings are now integrated into secrets configuration above
+        // Old auth field mappings section removed - authentication is now configured per secret
+        
+        // Populate default headers
+        if (template.defaultHeaders) {
+            const headersContainer = document.getElementById('headers-container');
+            if (headersContainer) {
+                headersContainer.innerHTML = '';
+                Object.entries(template.defaultHeaders).forEach(([name, value]) => {
+                    this.addHeader();
+                    const lastHeader = headersContainer.lastElementChild;
+                    if (lastHeader) {
+                        lastHeader.querySelector('.header-name').value = name;
+                        lastHeader.querySelector('.header-value').value = value;
                     }
                 });
             }
@@ -681,13 +785,16 @@ class TemplateModal {
             icon: document.getElementById('template-icon')?.value.trim() || '📦',
             baseUrl: document.getElementById('template-baseurl')?.value.trim(),
             authType: document.getElementById('template-authtype')?.value.trim(),
+            customAuthScript: document.getElementById('template-custom-auth-script')?.value.trim(),            requiredSecrets: this.collectSecrets(),
+            authFieldMapping: this.generateAuthFieldMappingFromSecrets(),
+            defaultHeaders: this.collectHeaders(),
+            paginationDetails: this.collectPaginationDetails(),
             ui: {
                 brandColor: document.getElementById('template-brandcolor-text')?.value.trim() || '#007acc',
                 accentColor: document.getElementById('template-accentcolor-text')?.value.trim() || '#0066cc',
                 gradient: `linear-gradient(135deg, ${document.getElementById('template-brandcolor-text')?.value.trim() || '#007acc'} 0%, ${document.getElementById('template-accentcolor-text')?.value.trim() || '#0066cc'} 100%)`,
                 textColor: '#ffffff'
             },
-            requiredSecrets: this.collectSecrets(),
             sampleEndpoints: this.collectEndpoints(),
             documentation: {
                 url: document.getElementById('template-docs-url')?.value.trim(),
@@ -695,10 +802,12 @@ class TemplateModal {
             }
         };
 
-        // Remove empty documentation if no URLs provided
-        if (!data.documentation.url && !data.documentation.quickStart) {
-            delete data.documentation;
-        }
+        // Remove empty fields
+        if (!data.customAuthScript) delete data.customAuthScript;
+        if (!data.authFieldMapping || Object.keys(data.authFieldMapping).length === 0) delete data.authFieldMapping;
+        if (!data.defaultHeaders || Object.keys(data.defaultHeaders).length === 0) delete data.defaultHeaders;
+        if (!data.paginationDetails || !data.paginationDetails.type) delete data.paginationDetails;
+        if (!data.documentation.url && !data.documentation.quickStart) delete data.documentation;
 
         return data;
     }
@@ -729,31 +838,84 @@ class TemplateModal {
         }
 
         return true;
-    }
-
-    // Collect secrets from the form
+    }    // Collect secrets from the form
     collectSecrets() {
         const secrets = [];
         const secretContainers = document.querySelectorAll('.secret-form-item');
-        
         secretContainers.forEach(container => {
             const key = container.querySelector('.secret-key')?.value.trim();
             const displayName = container.querySelector('.secret-display-name')?.value.trim();
             const description = container.querySelector('.secret-description')?.value.trim();
             const isRequired = container.querySelector('.secret-required')?.checked;
-            
+            const addToHeaders = container.querySelector('.add-to-headers-checkbox')?.checked;
+            let headerName = undefined;
+            if (addToHeaders) {
+                headerName = container.querySelector('.header-name-input')?.value.trim();
+            }
             if (key && displayName) {
-                secrets.push({
+                const secretObj = {
                     key,
                     displayName,
                     description: description || displayName,
                     isRequired: isRequired || false,
                     placeholder: `your-${key.toLowerCase().replace(/[^a-z0-9]/g, '-')}`
-                });
+                };
+                if (addToHeaders && headerName) {
+                    secretObj.headerName = headerName;
+                }
+                secrets.push(secretObj);
             }
         });
-        
         return secrets;
+    }
+
+    // Generate auth field mapping from secrets with authentication enabled
+    generateAuthFieldMappingFromSecrets() {
+        const authFieldMapping = {};
+        const secretContainers = document.querySelectorAll('.secret-form-item');
+        
+        secretContainers.forEach(container => {
+            const authEnabled = container.querySelector('.auth-enabled')?.checked;
+            if (!authEnabled) return;
+            
+            const key = container.querySelector('.secret-key')?.value.trim();
+            const authMethod = container.querySelector('.auth-method')?.value.trim();
+            const headerName = container.querySelector('.auth-header-name')?.value.trim();
+            
+            if (key && authMethod) {
+                if (authMethod === 'BearerToken') {
+                    // Simple mapping for bearer tokens
+                    authFieldMapping[authMethod] = key;
+                } else if (authMethod === 'ApiKey' && headerName) {
+                    // Header mapping for API keys
+                    authFieldMapping[authMethod] = {
+                        header: headerName,
+                        value: key
+                    };
+                } else if (authMethod === 'BasicAuth') {
+                    // Simple mapping for basic auth
+                    authFieldMapping[authMethod] = key;
+                } else if (authMethod === 'OAuth2') {
+                    // Simple mapping for OAuth2
+                    authFieldMapping[authMethod] = key;
+                }
+            }
+        });
+          return Object.keys(authFieldMapping).length > 0 ? authFieldMapping : null;
+    }
+
+    // Helper method to find auth mapping for a specific secret
+    findAuthMappingForSecret(secretKey, authFieldMapping) {
+        for (const [method, mapping] of Object.entries(authFieldMapping)) {
+            if (typeof mapping === 'string' && mapping === secretKey) {
+                // Simple mapping like "BearerToken": "token"
+                return { method, header: null };
+            } else if (typeof mapping === 'object' && mapping.value === secretKey) {
+                // Complex mapping like "ApiKey": {"header": "X-API-Key", "value": "apiKey"}
+                return { method, header: mapping.header };
+            }
+        }
+        return null;
     }
 
     // Collect endpoints from the form
@@ -780,43 +942,147 @@ class TemplateModal {
         return endpoints;
     }
 
+    // Add a new auth field mapping
+    addAuthFieldMapping() {
+        const container = document.getElementById('auth-fields-container');
+        if (!container) {
+            console.error('[TemplateModal] Auth fields container not found');
+            return;
+        }
+
+        const fieldDiv = document.createElement('div');
+        fieldDiv.className = 'auth-field-mapping-item';
+        fieldDiv.style.cssText = 'background: var(--bg-secondary); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 0.75rem; position: relative;';
+        
+        fieldDiv.innerHTML = `
+            <button type="button" onclick="this.parentElement.remove()" style="position: absolute; top: 0.5rem; right: 0.5rem; background: var(--danger-color, #dc3545); color: white; border: none; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center;">&times;</button>
+            <div style="display: grid; grid-template-columns: 120px 100px 1fr 1fr auto; gap: 1rem; align-items: end;">
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Auth Method *</label>
+                    <select class="auth-method" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
+                        <option value="">Select...</option>
+                        <option value="ApiKey">API Key</option>
+                        <option value="BearerToken">Bearer Token</option>
+                        <option value="BasicAuth">Basic Auth</option>
+                        <option value="OAuth2">OAuth 2.0</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Type *</label>
+                    <select class="auth-mapping-type" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
+                        <option value="header">Header</option>
+                        <option value="query">Query Param</option>
+                        <option value="body">Body Field</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Key/Parameter *</label>
+                    <input type="text" class="auth-mapping-key" placeholder="Authorization" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Secret Reference *</label>
+                    <input type="text" class="auth-mapping-value" placeholder="apiKey" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
+                </div>
+                <div>
+                    <button type="button" onclick="window.templateModal.showSecretSelector(this)" style="background: var(--success-color, #28a745); color: white; border: none; padding: 0.5rem 0.75rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem; white-space: nowrap;">Quick Insert</button>
+                </div>
+            </div>
+            <small style="display: block; margin-top: 0.5rem; color: var(--text-muted); font-size: 0.8rem;">Map auth method to header/parameter. Secret Reference should match a secret key from above.</small>
+        `;
+        
+        container.appendChild(fieldDiv);
+    }
+
     // Add a new secret field
     addSecret() {
         const container = document.getElementById('secrets-container');
+        if (!container) {
+            console.error('[TemplateModal] Secrets container not found');
+            return;
+        }
+
         const secretDiv = document.createElement('div');
         secretDiv.className = 'secret-form-item';
         secretDiv.style.cssText = 'background: var(--bg-secondary); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 0.75rem; position: relative;';
         
         secretDiv.innerHTML = `
             <button type="button" onclick="this.parentElement.remove()" style="position: absolute; top: 0.5rem; right: 0.5rem; background: var(--danger-color, #dc3545); color: white; border: none; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center;">&times;</button>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                <div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">                <div>
                     <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Key *</label>
-                    <input type="text" class="secret-key" placeholder="token" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
+                    <input type="text" class="secret-key" placeholder="apiKey" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
+                </div><div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Name *</label>
+                    <input type="text" class="secret-display-name" placeholder="Authorization" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
                 </div>
-                <div>
-                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Display Name *</label>
-                    <input type="text" class="secret-display-name" placeholder="API Token" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
-                </div>
-            </div>
-            <div style="margin-bottom: 1rem;">
+            </div>            <div style="margin-bottom: 1rem;">
                 <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Description</label>
-                <input type="text" class="secret-description" placeholder="API authentication token" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
-            </div>
-            <div>
+                <input type="text" class="secret-description" placeholder="Bearer token for API authentication" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
+            </div>            <div style="margin-bottom: 1rem;">
                 <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem; cursor: pointer;">
                     <input type="checkbox" class="secret-required" checked style="margin: 0;">
                     Required
                 </label>
             </div>
-        `;
+            <div>
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem; cursor: pointer;">
+                    <input type="checkbox" class="add-to-headers-checkbox" style="margin: 0;">
+                    Add to Headers
+                </label>
+                <div class="header-name-section" style="margin-top: 0.5rem; display: none;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Header Name</label>
+                    <input type="text" class="header-name-input" placeholder="Authorization" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
+                </div>
+            </div>        `;
         
         container.appendChild(secretDiv);
+        
+        // Add event listener for the "Add to Headers" checkbox
+        const addToHeadersCheckbox = secretDiv.querySelector('.add-to-headers-checkbox');
+        const headerNameSection = secretDiv.querySelector('.header-name-section');
+        if (addToHeadersCheckbox && headerNameSection) {
+            addToHeadersCheckbox.addEventListener('change', function() {
+                headerNameSection.style.display = this.checked ? 'block' : 'none';
+            });
+        }
+    }
+
+    // Add a new header field
+    addHeader() {
+        const container = document.getElementById('headers-container');
+        if (!container) {
+            console.error('[TemplateModal] Headers container not found');
+            return;
+        }
+
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'header-form-item';
+        headerDiv.style.cssText = 'background: var(--bg-secondary); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 0.75rem; position: relative;';
+        
+        headerDiv.innerHTML = `
+            <button type="button" onclick="this.parentElement.remove()" style="position: absolute; top: 0.5rem; right: 0.5rem; background: var(--danger-color, #dc3545); color: white; border: none; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center;">&times;</button>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Header Name *</label>
+                    <input type="text" class="header-name" placeholder="Accept" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Header Value *</label>
+                    <input type="text" class="header-value" placeholder="application/json" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(headerDiv);
     }
 
     // Add a new endpoint field
     addEndpoint() {
         const container = document.getElementById('endpoints-container');
+        if (!container) {
+            console.error('[TemplateModal] Endpoints container not found');
+            return;
+        }
+
         const endpointDiv = document.createElement('div');
         endpointDiv.className = 'endpoint-form-item';
         endpointDiv.style.cssText = 'background: var(--bg-secondary); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 0.75rem; position: relative;';
@@ -850,6 +1116,348 @@ class TemplateModal {
         `;
         
         container.appendChild(endpointDiv);
+    }    // Toggle custom authentication script visibility and populate auth secrets
+    toggleCustomAuthScript() {
+        const authType = document.getElementById('template-authtype')?.value;
+        const customAuthSection = document.getElementById('custom-auth-section');
+        
+        // Handle custom auth script visibility
+        if (customAuthSection) {
+            if (authType === 'CustomScript') {
+                customAuthSection.style.display = 'block';
+            } else {
+                customAuthSection.style.display = 'none';
+            }
+        }
+        
+        // Auto-populate secrets based on auth type
+        this.populateAuthSecrets(authType);
+    }
+
+    // Populate authentication secrets based on auth type
+    populateAuthSecrets(authType) {
+        const secretsContainer = document.getElementById('secrets-container');
+        if (!secretsContainer) return;
+
+        // Clear existing auth-related secrets (only those marked with auth-secret class)
+        const authSecrets = secretsContainer.querySelectorAll('.secret-form-item.auth-secret');
+        authSecrets.forEach(secret => secret.remove());
+
+        // Add appropriate secret based on auth type
+        if (!authType || authType === '') return;
+
+        const authSecretConfig = this.getAuthSecretConfig(authType);
+        if (authSecretConfig) {
+            this.addAuthSecret(authSecretConfig);
+        }
+    }
+
+    // Get auth secret configuration for different auth types
+    getAuthSecretConfig(authType) {
+        const configs = {
+            'BearerToken': {
+                key: 'token',
+                name: 'Authorization',
+                description: 'Bearer token for API authentication',
+                authMethod: 'BearerToken'
+            },
+            'ApiKey': {
+                key: 'apiKey',
+                name: 'API Key',
+                description: 'API key for authentication',
+                authMethod: 'ApiKey',
+                headerName: 'X-API-Key'
+            },
+            'BasicAuth': {
+                key: 'credentials',
+                name: 'Basic Auth',
+                description: 'Username:Password for basic authentication',
+                authMethod: 'BasicAuth'
+            },
+            'OAuth2': {
+                key: 'accessToken',
+                name: 'Access Token',
+                description: 'OAuth 2.0 access token',
+                authMethod: 'OAuth2'
+            }
+        };
+
+        return configs[authType] || null;
+    }
+
+    // Add an auth secret with pre-configured settings
+    addAuthSecret(config) {
+        const container = document.getElementById('secrets-container');
+        if (!container) return;
+
+        const secretDiv = document.createElement('div');
+        secretDiv.className = 'secret-form-item auth-secret';
+        secretDiv.style.cssText = 'background: var(--bg-secondary); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 0.75rem; position: relative; border-left: 4px solid var(--accent-color, #007acc);';
+        
+        const headerField = config.headerName ? `
+            <div style="margin-top: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Header Name</label>
+                <input type="text" class="auth-header-name" value="${config.headerName}" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
+                <small style="color: var(--text-muted); font-size: 0.75rem;">Header name for API key authentication</small>
+            </div>
+        ` : '';
+
+        secretDiv.innerHTML = `
+            <div style="position: absolute; top: 0.5rem; right: 0.5rem; background: var(--accent-color, #007acc); color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">AUTH</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Key *</label>
+                    <input type="text" class="secret-key" value="${config.key}" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Name *</label>
+                    <input type="text" class="secret-display-name" value="${config.name}" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
+                </div>
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Description</label>
+                <input type="text" class="secret-description" value="${config.description}" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem; cursor: pointer;">
+                    <input type="checkbox" class="secret-required" checked style="margin: 0;">
+                    Required
+                </label>
+            </div>
+            ${headerField}
+            <input type="hidden" class="auth-method" value="${config.authMethod}">
+        `;
+        
+        container.appendChild(secretDiv);
+    }
+
+    // Update pagination fields based on selected type
+    updatePaginationFields() {
+        const paginationType = document.getElementById('template-pagination-type');
+        if (!paginationType) return;
+
+        const selectedOption = paginationType.options[paginationType.selectedIndex];
+        const pageParam = selectedOption.getAttribute('data-page-param');
+        const sizeParam = selectedOption.getAttribute('data-size-param');
+        const defaultSize = selectedOption.getAttribute('data-default-size');
+
+        // Update the input fields with the appropriate values
+        const pageParamField = document.getElementById('template-pagination-page-param');
+        const sizeParamField = document.getElementById('template-pagination-size-param');
+        const defaultSizeField = document.getElementById('template-pagination-default-size');
+
+        if (pageParam && pageParamField) {
+            pageParamField.value = pageParam;
+        }
+        if (sizeParam && sizeParamField) {
+            sizeParamField.value = sizeParam;
+        }
+        if (defaultSize && defaultSizeField && !defaultSizeField.value) {
+            defaultSizeField.value = defaultSize;
+        }
+    }
+
+    // Collect headers from the form
+    collectHeaders() {
+        const headers = {};
+        const headerContainers = document.querySelectorAll('.header-form-item');
+        
+        headerContainers.forEach(container => {
+            const name = container.querySelector('.header-name')?.value.trim();
+            const value = container.querySelector('.header-value')?.value.trim();
+            
+            if (name && value) {
+                headers[name] = value;
+            }
+        });
+        
+        return headers;
+    }
+
+    // Collect pagination details from the form
+    collectPaginationDetails() {
+        const type = document.getElementById('template-pagination-type')?.value.trim();
+        if (!type) return null;
+
+        const details = {
+            type: type,
+            defaultPageSize: parseInt(document.getElementById('template-pagination-default-size')?.value) || 25,
+            maxPageSize: parseInt(document.getElementById('template-pagination-max-size')?.value) || 1000
+        };
+
+        const pageParam = document.getElementById('template-pagination-page-param')?.value.trim();
+        const sizeParam = document.getElementById('template-pagination-size-param')?.value.trim();
+
+        if (pageParam) details.pageParameter = pageParam;
+        if (sizeParam) details.pageSizeParameter = sizeParam;
+
+        return details;
+    }
+
+    // Add a new auth field mapping
+    addAuthFieldMapping() {
+        const container = document.getElementById('auth-fields-container');
+        if (!container) {
+            console.error('[TemplateModal] Auth fields container not found');
+            return;
+        }
+
+        const fieldDiv = document.createElement('div');
+        fieldDiv.className = 'auth-field-mapping-item';
+        fieldDiv.style.cssText = 'background: var(--bg-secondary); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 0.75rem; position: relative;';
+        
+        fieldDiv.innerHTML = `
+            <button type="button" onclick="this.parentElement.remove()" style="position: absolute; top: 0.5rem; right: 0.5rem; background: var(--danger-color, #dc3545); color: white; border: none; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center;">&times;</button>
+            <div style="display: grid; grid-template-columns: 120px 100px 1fr 1fr auto; gap: 1rem; align-items: end;">
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Auth Method *</label>
+                    <select class="auth-method" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
+                        <option value="">Select...</option>
+                        <option value="ApiKey">API Key</option>
+                        <option value="BearerToken">Bearer Token</option>
+                        <option value="BasicAuth">Basic Auth</option>
+                        <option value="OAuth2">OAuth 2.0</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Type *</label>
+                    <select class="auth-mapping-type" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
+                        <option value="header">Header</option>
+                        <option value="query">Query Param</option>
+                        <option value="body">Body Field</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Key/Parameter *</label>
+                    <input type="text" class="auth-mapping-key" placeholder="Authorization" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Secret Reference *</label>
+                    <input type="text" class="auth-mapping-value" placeholder="apiKey" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-tertiary); color: var(--text-primary); font-size: 0.85rem;">
+                </div>
+                <div>
+                    <button type="button" onclick="window.templateModal.showSecretSelector(this)" style="background: var(--success-color, #28a745); color: white; border: none; padding: 0.5rem 0.75rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem; white-space: nowrap;">Quick Insert</button>
+                </div>
+            </div>
+            <small style="display: block; margin-top: 0.5rem; color: var(--text-muted); font-size: 0.8rem;">Map auth method to header/parameter. Secret Reference should match a secret key from above.</small>
+        `;
+        
+        container.appendChild(fieldDiv);
+    }
+
+    // Show secret selector for quick insert
+    showSecretSelector(button) {
+        const secretKeys = this.getAvailableSecretKeys();
+        if (secretKeys.length === 0) {
+            alert('No secrets defined yet. Please add secrets first.');
+            return;
+        }
+
+        // Create a quick dropdown
+        const existingDropdown = document.getElementById('secret-selector-dropdown');
+        if (existingDropdown) {
+            existingDropdown.remove();
+        }
+
+        const dropdown = document.createElement('div');
+        dropdown.id = 'secret-selector-dropdown';
+        dropdown.style.cssText = 'position: absolute; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; min-width: 150px; max-height: 200px; overflow-y: auto;';
+        
+        dropdown.innerHTML = `
+            <div style="padding: 0.5rem; border-bottom: 1px solid var(--border-color); font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">Select Secret:</div>
+            ${secretKeys.map(key => `
+                <div class="secret-option" data-key="${key}" style="padding: 0.5rem 0.75rem; cursor: pointer; color: var(--text-primary); font-size: 0.85rem; border-bottom: 1px solid var(--border-color-light);" 
+                     onmouseover="this.style.background='var(--bg-secondary)'" 
+                     onmouseout="this.style.background='transparent'"
+                     onclick="window.templateModal.selectSecret('${key}', this)">
+                    ${key}
+                </div>
+            `).join('')}
+        `;
+
+        // Position dropdown near the button
+        const rect = button.getBoundingClientRect();
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = (rect.bottom + 5) + 'px';
+        dropdown.style.left = rect.left + 'px';
+
+        // Store reference to the target input
+        dropdown.dataset.targetButton = button.closest('.auth-field-mapping-item').querySelector('.auth-mapping-value');
+
+        document.body.appendChild(dropdown);
+
+        // Close dropdown when clicking outside
+        setTimeout(() => {
+            document.addEventListener('click', function closeDropdown(e) {
+                if (!dropdown.contains(e.target) && e.target !== button) {
+                    dropdown.remove();
+                    document.removeEventListener('click', closeDropdown);
+                }
+            });
+        }, 100);
+    }
+
+    // Select a secret from the dropdown
+    selectSecret(secretKey, element) {
+        const dropdown = element.closest('#secret-selector-dropdown');
+        const targetInput = dropdown.dataset.targetButton;
+        
+        // Find the actual input element
+        const authMappingItem = document.querySelector('.auth-field-mapping-item:last-child');
+        const valueInput = authMappingItem?.querySelector('.auth-mapping-value');
+        
+        if (valueInput) {
+            valueInput.value = secretKey;
+        }
+        
+        dropdown.remove();
+    }
+
+    // Get available secret keys from the secrets section
+    getAvailableSecretKeys() {
+        const secretContainers = document.querySelectorAll('.secret-form-item');
+        const keys = [];
+        
+        secretContainers.forEach(container => {
+            const key = container.querySelector('.secret-key')?.value.trim();
+            if (key) {
+                keys.push(key);
+            }
+        });
+        
+        return keys;
+    }
+
+    // Collect auth field mappings from the form
+    collectAuthFieldMappings() {
+        const mappings = {};
+        const fieldContainers = document.querySelectorAll('.auth-field-mapping-item');
+        
+        fieldContainers.forEach(container => {
+            const authMethod = container.querySelector('.auth-method')?.value.trim();
+            const type = container.querySelector('.auth-mapping-type')?.value.trim();
+            const key = container.querySelector('.auth-mapping-key')?.value.trim();
+            const value = container.querySelector('.auth-mapping-value')?.value.trim();
+            
+            if (authMethod && type && key && value) {
+                if (!mappings[authMethod]) {
+                    mappings[authMethod] = {};
+                }
+                
+                // Store the mapping based on type
+                if (type === 'header') {
+                    mappings[authMethod].header = key;
+                } else if (type === 'query') {
+                    mappings[authMethod].queryParam = key;
+                } else if (type === 'body') {
+                    mappings[authMethod].bodyField = key;
+                }
+                
+                mappings[authMethod].value = value;
+            }
+        });
+        
+        return mappings;
     }
 
     // Close modal

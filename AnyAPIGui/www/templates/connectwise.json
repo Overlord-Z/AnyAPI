@@ -1,0 +1,107 @@
+{
+  "id": "connectwise",
+  "name": "ConnectWise Manage",
+  "description": "ConnectWise PSA REST API for business management and ticketing",
+  "version": "1.0",
+  "category": "Business Management",
+  "categoryColor": "#005A99",
+  "tags": ["psa", "tickets", "crm", "business"],
+  "icon": "🔧",
+  "baseUrl": "https://your-domain.com/v4_6_release/apis/3.0",
+  "authType": "CustomScript",
+  "ui": {
+    "brandColor": "#005A99",
+    "accentColor": "#0067AB",
+    "logo": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGZpbGw9IiNlMzE4MzciIGQ9Ik01MCA1YTQ1IDQ1IDAgMSAwIDQ1IDQ1QTQ1IDQ1IDAgMCAwIDUwIDV6Ii8+CjxwYXRoIGZpbGw9IiNmZmZmZmYiIGQ9Ik0zMCAyNWgyMHY1MEgzMHptMjUgMGgxNXY1MEg1NXoiLz4KPC9zdmc+",
+    "gradient": "linear-gradient(135deg, #005A99 0%, #0067AB 100%)",
+    "textColor": "#005A99"
+  },
+  "customAuthScript": "param($RequestContext, $Profile)\n\n# ConnectWise authentication\n$company = $Profile.CustomSettings.Company\n$publicKey = $RequestContext.GetPlainTextSecret.Invoke('PublicKey')\n$privateKey = $RequestContext.GetPlainTextSecret.Invoke('PrivateKey')\n$clientId = $RequestContext.GetPlainTextSecret.Invoke('ClientId')\n\nif (-not $company -or -not $publicKey -or -not $privateKey -or -not $clientId) {\n    throw \"Missing required ConnectWise credentials\"\n}\n\n$authString = \"$company+$publicKey`:$privateKey\"\n$encodedAuth = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($authString))\n\n$RequestContext.Headers[\"Authorization\"] = \"Basic $encodedAuth\"\n$RequestContext.Headers[\"clientId\"] = $clientId\n$RequestContext.Headers[\"Accept\"] = \"application/json\"",
+  "requiredSecrets": [
+    {
+      "key": "PublicKey",
+      "displayName": "Public Key",
+      "description": "ConnectWise API public key",
+      "placeholder": "your-public-key",
+      "isRequired": true
+    },
+    {
+      "key": "PrivateKey",
+      "displayName": "Private Key",
+      "description": "ConnectWise API private key",
+      "placeholder": "your-private-key",
+      "isRequired": true
+    },
+    {
+      "key": "ClientId",
+      "displayName": "Client ID",
+      "description": "ConnectWise API client identifier",
+      "placeholder": "your-client-id",
+      "isRequired": true
+    }
+  ],
+  "customSettings": {
+    "Company": {
+      "displayName": "Company ID",
+      "description": "Your ConnectWise company identifier",
+      "placeholder": "your-company-id",
+      "defaultValue": "your-company-id",
+      "isRequired": true
+    },
+    "BaseUrlPlaceholder": {
+      "displayName": "Domain",
+      "description": "Replace 'your-domain.com' in the base URL with your actual ConnectWise domain",
+      "placeholder": "mycompany.connectwisehosting.com"
+    }
+  },
+  "sampleEndpoints": [
+    {
+      "method": "GET",
+      "endpoint": "/system/info",
+      "description": "Get system information",
+      "category": "System"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/company/companies",
+      "description": "List companies",
+      "category": "Companies"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/service/tickets",
+      "description": "List service tickets",
+      "category": "Tickets"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/service/tickets/{id}",
+      "description": "Get a specific ticket",
+      "category": "Tickets",
+      "parameters": ["id"]
+    },
+    {
+      "method": "POST",
+      "endpoint": "/service/tickets",
+      "description": "Create a new ticket",
+      "category": "Tickets"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/time/entries",
+      "description": "List time entries",
+      "category": "Time Tracking"
+    }
+  ],
+  "paginationDetails": {
+    "type": "PageBased",
+    "pageParameter": "page",
+    "pageSizeParameter": "pageSize",
+    "defaultPageSize": 25,
+    "maxPageSize": 1000
+  },
+  "documentation": {
+    "url": "https://developer.connectwise.com/",
+    "quickStart": "https://developer.connectwise.com/getting_started"
+  }
+}

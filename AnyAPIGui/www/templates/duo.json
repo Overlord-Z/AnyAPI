@@ -1,0 +1,93 @@
+{
+  "id": "duo",
+  "name": "Duo Security API",
+  "description": "Duo Admin API for two-factor authentication management and user provisioning",
+  "version": "1.0",
+  "category": "Security",
+  "categoryColor": "#008744",
+  "tags": ["2fa", "mfa", "authentication", "security"],
+  "icon": "🔐",
+  "baseUrl": "https://api-{hostname}.duosecurity.com",
+  "authType": "CustomScript",
+  "ui": {
+    "brandColor": "#008744",
+    "accentColor": "#00A651",
+    "logo": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjQ1IiBmaWxsPSIjMDA4NzQ0Ii8+CjxwYXRoIGZpbGw9IiNmZmZmZmYiIGQ9Ik0zNSAzNWgzMHYzMEgzNXptMTAgMTBoMTB2MTBINDV6Ii8+CjwvY2lyY2xlPgo8L3N2Zz4=",
+    "gradient": "linear-gradient(135deg, #008744 0%, #00A651 100%)",
+    "textColor": "#ffffff"
+  },
+  "customAuthScript": "param($RequestContext, $Profile)\n\n# Duo Admin API authentication\n$integrationKey = $RequestContext.GetPlainTextSecret.Invoke('IntegrationKey')\n$secretKey = $RequestContext.GetPlainTextSecret.Invoke('SecretKey')\n$hostname = $Profile.CustomSettings.Hostname\n\nif (-not $integrationKey -or -not $secretKey -or -not $hostname) {\n    throw \"Missing required Duo credentials\"\n}\n\n# Replace hostname in base URL\n$RequestContext.BaseUrl = $RequestContext.BaseUrl -replace '{hostname}', $hostname\n\n# Create HTTP Basic auth header\n$authString = \"$integrationKey`:$secretKey\"\n$encodedAuth = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($authString))\n\n$RequestContext.Headers[\"Authorization\"] = \"Basic $encodedAuth\"\n$RequestContext.Headers[\"Content-Type\"] = \"application/x-www-form-urlencoded\"",
+  "requiredSecrets": [
+    {
+      "key": "IntegrationKey",
+      "displayName": "Integration Key",
+      "description": "Duo Admin API integration key",
+      "placeholder": "DIxxxxxxxxxxxxxxxxxxxx",
+      "isRequired": true
+    },
+    {
+      "key": "SecretKey",
+      "displayName": "Secret Key",
+      "description": "Duo Admin API secret key",
+      "placeholder": "your-secret-key",
+      "isRequired": true
+    }
+  ],
+  "customSettings": {
+    "Hostname": {
+      "displayName": "API Hostname",
+      "description": "Your Duo API hostname (e.g., api-12345678.duosecurity.com)",
+      "placeholder": "api-12345678.duosecurity.com",
+      "isRequired": true
+    }
+  },
+  "sampleEndpoints": [
+    {
+      "method": "GET",
+      "endpoint": "/admin/v1/info/summary",
+      "description": "Get account summary",
+      "category": "Account"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/admin/v1/users",
+      "description": "List users",
+      "category": "Users"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/admin/v1/users",
+      "description": "Create a new user",
+      "category": "Users"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/admin/v1/groups",
+      "description": "List groups",
+      "category": "Groups"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/admin/v1/phones",
+      "description": "List phones",
+      "category": "Devices"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/admin/v1/logs/authentication",
+      "description": "Get authentication logs",
+      "category": "Logs"
+    }
+  ],
+  "paginationDetails": {
+    "type": "OffsetBased",
+    "offsetParameter": "offset",
+    "limitParameter": "limit",
+    "defaultLimit": 100,
+    "maxLimit": 300
+  },
+  "documentation": {
+    "url": "https://duo.com/docs/adminapi",
+    "quickStart": "https://duo.com/docs/adminapi#first-steps"
+  }
+}

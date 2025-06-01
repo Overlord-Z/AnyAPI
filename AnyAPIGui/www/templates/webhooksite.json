@@ -1,0 +1,88 @@
+{
+  "id": "webhook-site",
+  "name": "Webhook.site API",
+  "description": "Webhook.site API for webhook testing, debugging, and automation",
+  "version": "1.0",
+  "category": "Testing",
+  "categoryColor": "#28A745",
+  "tags": ["webhooks", "testing", "debugging", "automation"],
+  "icon": "🪝",
+  "baseUrl": "https://webhook.site/api",
+  "authType": "BearerToken",
+  "ui": {
+    "brandColor": "#28A745",
+    "accentColor": "#34CE57",
+    "logo": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiByeD0iMTUiIGZpbGw9IiMyOEE3NDUiLz4KPHBhdGggZmlsbD0iI2ZmZmZmZiIgZD0iTTMwIDMwaDQwdjEwSDMwem0wIDIwaDMwdjEwSDMwem0wIDIwaDM1djEwSDMweiIvPgo8L3N2Zz4=",
+    "gradient": "linear-gradient(135deg, #28A745 0%, #34CE57 100%)",
+    "textColor": "#ffffff"
+  },
+  "defaultHeaders": {
+    "Accept": "application/json",
+    "Content-Type": "application/json"
+  },
+  "requiredSecrets": [
+    {
+      "key": "token",
+      "displayName": "API Token",
+      "description": "Webhook.site API token (optional for basic usage)",
+      "placeholder": "your-api-token",
+      "isRequired": false,
+      "helpUrl": "https://docs.webhook.site/"
+    }
+  ],
+  "authFieldMapping": {
+    "BearerToken": "token"
+  },
+  "customSettings": {},
+  "sampleEndpoints": [
+    {
+      "method": "POST",
+      "endpoint": "/token",
+      "description": "Create a new webhook URL",
+      "category": "Tokens"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/token/{uuid}",
+      "description": "Get token details",
+      "category": "Tokens",
+      "parameters": ["uuid"]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/token/{uuid}/requests",
+      "description": "Get webhook requests",
+      "category": "Requests",
+      "parameters": ["uuid"]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/token/{uuid}/request/{requestId}",
+      "description": "Get specific request",
+      "category": "Requests",
+      "parameters": ["uuid", "requestId"]
+    },
+    {
+      "method": "DELETE",
+      "endpoint": "/token/{uuid}",
+      "description": "Delete webhook token",
+      "category": "Tokens",
+      "parameters": ["uuid"]
+    },
+    {
+      "method": "PUT",
+      "endpoint": "/token/{uuid}",
+      "description": "Update webhook settings",
+      "category": "Tokens",
+      "parameters": ["uuid"]
+    }
+  ],
+  "paginationDetails": {
+    "type": "Simple",
+    "supportsPageSize": false
+  },
+  "documentation": {
+    "url": "https://docs.webhook.site/",
+    "quickStart": "https://docs.webhook.site/api.html"
+  }
+}

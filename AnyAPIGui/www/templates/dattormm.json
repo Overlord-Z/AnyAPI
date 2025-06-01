@@ -1,0 +1,97 @@
+{
+  "id": "datto-rmm",
+  "name": "Datto RMM API",
+  "description": "Datto RMM API for remote monitoring and management operations",
+  "version": "1.0",
+  "category": "RMM",
+  "categoryColor": "#FF6600",
+  "tags": ["rmm", "monitoring", "management", "endpoints"],
+  "icon": "🖥️",
+  "baseUrl": "https://{region}-api.centrastage.net/api",
+  "authType": "BearerToken",
+  "ui": {
+    "brandColor": "#FF6600",
+    "accentColor": "#FF8533",
+    "logo": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiByeD0iMTAiIGZpbGw9IiNGRjY2MDAiLz4KPHJlY3QgeD0iMjAiIHk9IjIwIiB3aWR0aD0iNjAiIGhlaWdodD0iNDAiIHJ4PSI1IiBmaWxsPSIjZmZmZmZmIi8+CjxyZWN0IHg9IjMwIiB5PSI3MCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjEwIiByeD0iNSIgZmlsbD0iI2ZmZmZmZiIvPgo8L3N2Zz4=",
+    "gradient": "linear-gradient(135deg, #FF6600 0%, #FF8533 100%)",
+    "textColor": "#ffffff"
+  },
+  "defaultHeaders": {
+    "Accept": "application/json",
+    "Content-Type": "application/json"
+  },
+  "requiredSecrets": [
+    {
+      "key": "token",
+      "displayName": "API Access Token",
+      "description": "Datto RMM API access token",
+      "placeholder": "your-api-token",
+      "isRequired": true,
+      "helpUrl": "https://help.datto.com/s/article/360004173894"
+    }
+  ],
+  "authFieldMapping": {
+    "BearerToken": "token"
+  },
+  "customSettings": {
+    "Region": {
+      "displayName": "Region",
+      "description": "Your Datto RMM region (us, eu, au, etc.)",
+      "placeholder": "us",
+      "defaultValue": "us",
+      "isRequired": true
+    }
+  },
+  "sampleEndpoints": [
+    {
+      "method": "GET",
+      "endpoint": "/account",
+      "description": "Get account information",
+      "category": "Account"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/sites",
+      "description": "List all sites",
+      "category": "Sites"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/sites/{siteId}/devices",
+      "description": "List devices for a site",
+      "category": "Devices",
+      "parameters": ["siteId"]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/device/{deviceId}",
+      "description": "Get device details",
+      "category": "Devices",
+      "parameters": ["deviceId"]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/alerts",
+      "description": "List alerts",
+      "category": "Alerts"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/device/{deviceId}/quick-job",
+      "description": "Create a quick job",
+      "category": "Jobs",
+      "parameters": ["deviceId"]
+    }
+  ],
+  "paginationDetails": {
+    "type": "PageBased",
+    "pageParameter": "page",
+    "pageSizeParameter": "pageSize",
+    "defaultPageSize": 100,
+    "maxPageSize": 500
+  },
+  "documentation": {
+    "url": "https://help.datto.com/s/article/360004173894",
+    "quickStart": "https://help.datto.com/s/article/360051952294"
+  }
+}

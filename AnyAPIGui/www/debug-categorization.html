@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Categorization</title>
+</head>
+<body>
+    <h1>Template Categorization Debug</h1>
+    <div id="output"></div>
+    
+    <script>
+        // Test templates
+        const testTemplates = [
+            {
+                id: "github",
+                name: "GitHub API",
+                description: "GitHub REST API v3 for repository management, issues, and user operations",
+                category: "Version Control",
+                tags: ["git", "repository", "issues", "development"]
+            },
+            {
+                id: "stripe",
+                name: "Stripe API", 
+                description: "Stripe Payment API for processing payments, managing customers, and handling subscriptions",
+                category: "Payments",
+                tags: ["payments", "billing", "subscriptions", "customers"]
+            },
+            {
+                id: "openai",
+                name: "OpenAI API",
+                description: "OpenAI GPT API for natural language processing and generation",
+                category: "AI/ML",
+                tags: ["ai", "gpt", "nlp", "machine learning"]
+            }
+        ];
+
+        function categorizeTemplate(template) {
+            if (!template.category && !template.name && !template.description) {
+                return 'default';
+            }
+
+            // Create a searchable text from template properties
+            const searchText = [
+                template.category || '',
+                template.name || '',
+                template.description || '',
+                ...(template.tags || [])
+            ].join(' ').toLowerCase();
+
+            // Category mapping with keyword patterns (most specific first)
+            const categoryMappings = {
+                ai: [
+                    'openai', 'ai', 'artificial intelligence', 'machine learning', 'ml', 'gpt',
+                    'neural', 'chatbot', 'language model', 'nlp', 'computer vision', 'deep learning'
+                ],
+                finance: [
+                    'stripe', 'payment', 'billing', 'finance', 'money', 'transaction', 'invoice',
+                    'subscription', 'checkout', 'banking', 'crypto', 'wallet', 'fintech'
+                ],
+                development: [
+                    'github', 'git', 'developer', 'development', 'code', 'repository', 'api', 'sdk',
+                    'programming', 'software', 'build', 'deploy', 'version control', 'ci/cd'
+                ],
+                business: [
+                    'connectwise', 'crm', 'customer', 'manage', 'business', 'client', 'ticket',
+                    'project management', 'workspace', 'enterprise', 'sales', 'support'
+                ]
+            };
+
+            // Find the first matching category
+            for (const [category, keywords] of Object.entries(categoryMappings)) {
+                if (keywords.some(keyword => searchText.includes(keyword))) {
+                    return category;
+                }
+            }
+
+            return 'default';
+        }
+
+        // Test each template
+        const output = document.getElementById('output');
+        testTemplates.forEach(template => {
+            const category = categorizeTemplate(template);
+            const div = document.createElement('div');
+            div.innerHTML = `<strong>${template.name}</strong>: ${category}<br>`;
+            output.appendChild(div);
+        });
+    </script>
+</body>
+</html>

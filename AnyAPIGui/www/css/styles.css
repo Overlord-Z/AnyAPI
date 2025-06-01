@@ -101,8 +101,40 @@
     --z-modal-backdrop: 400;
     --z-modal: 500;
     --z-popover: 600;
-    --z-tooltip: 700;
-    --z-notification: 800;
+    --z-tooltip: 700;    --z-notification: 800;
+}
+
+/* ===== GLOBAL MODERN SCROLLBAR STYLING ===== */
+/* Apply modern scrollbar to all scrollable elements */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-primary) var(--bg-tertiary);
+}
+
+*::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 5px;
+    margin: 4px 0;
+    border: 1px solid var(--border-color);
+}
+
+*::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--color-primary-light), var(--color-primary));
+    border-radius: 5px;
+    border: 2px solid var(--bg-tertiary);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, var(--color-primary), var(--color-primary-dark));
+}
+
+*::-webkit-scrollbar-corner {
+    background: var(--bg-tertiary);
 }
 
 /* ===== DARK MODE VARIABLES ===== */

@@ -1427,10 +1427,48 @@ $RequestContext.Headers["Accept"] = "application/json"
             )
         }
     )
-    
-    Send-JsonResponse -Response $Response -Data @{
+      Send-JsonResponse -Response $Response -Data @{
         success   = $true
         templates = $templates
+    }
+}
+
+function Handle-ListTemplateFiles {
+    param($Request, $Response)
+    
+    try {
+        $templatesPath = Join-Path $script:wwwRoot "templates"
+        
+        if (-not (Test-Path $templatesPath)) {
+            Send-JsonResponse -Response $Response -Data @{
+                success = $false
+                error = "Templates directory not found"
+                files = @()
+            } -StatusCode 404
+            return
+        }
+        
+        # Get all .json files in the templates directory
+        $templateFiles = Get-ChildItem -Path $templatesPath -Filter "*.json" -File | ForEach-Object {
+            @{
+                name = $_.Name
+                path = "templates/$($_.Name)"
+                lastModified = $_.LastWriteTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            }
+        }
+        
+        Send-JsonResponse -Response $Response -Data @{
+            success = $true
+            files = $templateFiles
+            count = $templateFiles.Count
+        }
+    }
+    catch {
+        Send-JsonResponse -Response $Response -Data @{
+            success = $false
+            error = $_.Exception.Message
+            files = @()
+        } -StatusCode 500
     }
 }
 
@@ -1529,9 +1567,12 @@ function Handle-Request {
                     Send-JsonResponse -Response $response -Data @{ error = "Method not allowed" } -StatusCode 405
                 }
             }
-            
-            "^/api/templates/?$" {
+              "^/api/templates/?$" {
                 Handle-GetTemplates -Request $request -Response $response
+            }
+            
+            "^/api/templates/list/?$" {
+                Handle-ListTemplateFiles -Request $request -Response $response
             }
             
             "^/api/export/?$" {
@@ -1578,9 +1619,8 @@ function Handle-Request {
                     timestamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ"
                 }
             }
-            
-            # Static file serving
-            "^/(js|css|img|fonts)/(.+)$" {
+              # Static file serving
+            "^/(js|css|img|fonts|templates)/(.+)$" {
                 $filePath = Join-Path $script:wwwRoot $url.Substring(1)
                 Send-File -Response $response -FilePath $filePath
             }

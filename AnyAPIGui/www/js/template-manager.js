@@ -3,23 +3,28 @@
  * Handles API templates, quick-start configurations, and template application
  */
 
-class TemplateManager {
-    constructor() {
+class TemplateManager {    constructor() {
         this.templates = [];
         this.selectedTemplate = null;
         this.customTemplates = JSON.parse(localStorage.getItem('anyapi_custom_templates') || '[]');
+        // Initialize template manager first, then attach TemplateModal
+        this.templateModal = null;
         
         // Initialize template manager
         this.init();
-    }
-
-    /**
+    }    /**
      * Initialize template manager
      */
     async init() {
         try {
             await this.loadTemplates();
             this.setupEventListeners();
+            
+            // Initialize template modal after manager is ready
+            if (typeof TemplateModal !== 'undefined') {
+                this.templateModal = new TemplateModal(this);
+                window.templateModal = this.templateModal;
+            }
         } catch (error) {
             console.error('Failed to initialize template manager:', error);
             showNotification('Failed to load templates', 'error');
@@ -36,38 +41,80 @@ class TemplateManager {
                 this.loadTemplates();
             }
         });
-    }
-
-    /**
+    }    /**
      * Load templates from backend and merge with custom templates
      */
     async loadTemplates() {
         try {
-            // Load built-in templates from backend
-            const builtInTemplates = await apiClient.getTemplates();
-            
-            // Merge with custom templates
-            this.templates = [
-                ...builtInTemplates.map(t => ({ ...t, isBuiltIn: true })),
+            // Load enhanced JSON templates dynamically from manifest
+            const jsonTemplates = await this.loadJsonTemplates();
+
+            // Merge with custom templates only
+            this.allTemplates = [
+                ...jsonTemplates.map(t => ({ ...t, isEnhanced: true })),
                 ...this.customTemplates.map(t => ({ ...t, isCustom: true }))
             ];
-            
+
+            // Initialize current filter state
+            this.currentSearchQuery = '';
+            this.currentFilter = 'all';
+            this.templates = [...this.allTemplates];
+
             this.renderTemplates();
-            console.log('Loaded templates:', this.templates.length);
+            this.initializeSearchAndFilters();
+
+            console.log('Loaded templates:', this.allTemplates.length);
         } catch (error) {
             console.error('Failed to load templates:', error);
-            
             // Fall back to custom templates only
-            this.templates = this.customTemplates.map(t => ({ ...t, isCustom: true }));
+            this.allTemplates = this.customTemplates.map(t => ({ ...t, isCustom: true }));
+            this.templates = [...this.allTemplates];
             this.renderTemplates();
-            
-            if (apiClient.isConnected) {
-                showNotification('Failed to load built-in templates', 'warning');
-            }
+            showNotification('Failed to load templates', 'error');
         }
     }
 
     /**
+     * Load enhanced JSON templates from templates directory using manifest
+     */    async loadJsonTemplates() {
+        const templates = [];
+        try {
+            // Use new backend endpoint to get list of template files
+            const listResponse = await fetch('/api/templates/list');
+            if (!listResponse.ok) {
+                console.warn('Could not load template list from backend');
+                return templates;
+            }
+            
+            const listData = await listResponse.json();
+            if (!listData.success || !listData.files) {
+                console.warn('Invalid response from template list endpoint');
+                return templates;
+            }
+            
+            console.log(`Found ${listData.count} template files`);
+            
+            // Load each template file
+            for (const fileInfo of listData.files) {
+                try {
+                    const response = await fetch(`./${fileInfo.path}`);
+                    if (response.ok) {
+                        const template = await response.json();
+                        templates.push(template);
+                    } else {
+                        console.warn(`Failed to load template: ${fileInfo.name}`);
+                    }
+                } catch (error) {
+                    console.warn(`Error loading template ${fileInfo.name}:`, error);
+                }
+            }
+        } catch (err) {
+            console.warn('Error loading templates from backend:', err);
+        }
+        
+        console.log('Loaded JSON templates:', templates.length);
+        return templates;
+    }/**
      * Render templates grid
      */
     renderTemplates() {
@@ -76,7 +123,7 @@ class TemplateManager {
 
         if (this.templates.length === 0) {
             container.innerHTML = `
-                <div class="empty-state" style="grid-column: 1 / -1;">
+                <div class="templates-empty-state">
                     <div class="empty-icon">📋</div>
                     <h3>No Templates Available</h3>
                     <p>Templates help you quickly set up common API configurations</p>
@@ -88,36 +135,105 @@ class TemplateManager {
             return;
         }
 
-        container.innerHTML = this.templates.map(template => `
-            <div class="template-card" onclick="templateManager.selectTemplate('${template.id}')">
-                <div class="template-icon">${template.icon || '🔧'}</div>
-                <div class="template-name">${escapeHtml(template.name)}</div>
-                <div class="template-description">${escapeHtml(template.description)}</div>
-                <div class="template-details">
-                    <div style="margin-top: 1rem;">
-                        <span class="badge ${template.isBuiltIn ? 'badge-primary' : 'badge-secondary'}">
-                            ${template.isBuiltIn ? 'Built-in' : 'Custom'}
-                        </span>
-                        <span class="badge badge-outline">${template.authType}</span>
+        container.innerHTML = this.templates.map(template => this.renderTemplateCard(template)).join('');
+    }
+
+    /**
+     * Render individual template card with enhanced styling
+     */
+    renderTemplateCard(template) {
+        const isEnhanced = template.ui && (template.ui.brandColor || template.ui.logo);
+        const brand = template.id.toLowerCase();
+
+        // Calculate statistics
+        const endpointCount = template.sampleEndpoints ? template.sampleEndpoints.length : 0;
+        const secretCount = template.requiredSecrets ? template.requiredSecrets.length : 0;
+
+        // Determine template type
+        let templateType = 'custom';
+        let templateTypeLabel = 'Custom';
+        if (template.isBuiltIn) {
+            templateType = isEnhanced ? 'enhanced' : 'built-in';
+            templateTypeLabel = isEnhanced ? 'Enhanced' : 'Built-in';
+        }
+
+        // Build CSS custom properties for enhanced templates (border/accent only, not background)
+        let customStyles = '';
+        if (isEnhanced && template.ui) {
+            const ui = template.ui;
+            customStyles = `style="
+                ${ui.brandColor ? `--card-border-color: ${ui.brandColor}; --card-accent-color: ${ui.brandColor};` : ''}
+                ${ui.accentColor ? `--accent-gradient-start: ${ui.brandColor}; --accent-gradient-end: ${ui.accentColor};` : ''}
+                ${ui.textColor ? `--card-text-color: ${ui.textColor};` : ''}
+            "`;
+        }        // Inline style for custom category color
+        let customCategoryStyle = '';
+        if (template.categoryColor) {
+            customCategoryStyle = `style=\"background: ${template.categoryColor}; color: #fff; border-color: ${template.categoryColor};\"`;
+        }        return `
+            <div class="template-card ${isEnhanced ? 'enhanced' : ''}" 
+                 data-brand="${brand}" 
+                 ${customStyles}
+                 onclick="templateManager.selectTemplate('${template.id}')">
+                <div class="template-card-header">
+                    <div class="template-logo">
+                        ${template.ui && template.ui.logo ? 
+                            `<img src="${template.ui.logo}" alt="${escapeHtml(template.name)} logo" />` :
+                            `<div class="template-icon">${template.icon || '🔧'}</div>`
+                        }
                     </div>
-                    ${template.sampleEndpoints ? `
-                        <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-muted);">
-                            ${template.sampleEndpoints.length} sample endpoints
-                        </div>
-                    ` : ''}
+                    
+                    <h3 class="template-title">${escapeHtml(template.name)}</h3>
+                    <p class="template-description">${escapeHtml(template.description)}</p>
                 </div>
+                <div class="template-card-body">
+                    <div class="template-category-corner ${this.getCategoryClass(template)}" data-category="${this.categorizeTemplate(template)}" ${customCategoryStyle}>${this.getCategoryDisplayName(template)}</div>
+                    
+                    <div class="template-content">
+                        <div class="template-auth-info">
+                            <span class="auth-label">Auth:</span>
+                            <span class="auth-value">${escapeHtml(template.authType)}</span>
+                        </div>
+                        
+                        ${template.tags && template.tags.length > 0 ? `
+                            <div class="template-tags">
+                                ${template.tags.slice(0, 2).map(tag => `
+                                    <span class="template-tag">${escapeHtml(tag)}</span>
+                                `).join('')}
+                                ${template.tags.length > 2 ? `<span class="template-tag">+${template.tags.length - 2}</span>` : ''}
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="template-stats">
+                        <div class="template-stat">
+                            <span class="template-stat-value">${endpointCount}</span>
+                            <span class="template-stat-label">Endpoints</span>
+                        </div>
+                        <div class="template-stat">
+                            <span class="template-stat-value">${secretCount}</span>
+                            <span class="template-stat-label">Keys</span>
+                        </div>
+                        ${isEnhanced ? `
+                            <div class="template-type-indicator enhanced" title="Enhanced Template">⭐</div>
+                        ` : template.isCustom ? `
+                            <div class="template-type-indicator custom" title="Custom Template">🔧</div>
+                        ` : ''}
+                    </div>
+                </div>
+                
                 ${template.isCustom ? `
                     <div class="template-actions" onclick="event.stopPropagation();">
-                        <button class="btn btn-sm btn-outline" onclick="templateManager.editTemplate('${template.id}')" title="Edit">
+                        <button class="template-action-btn" onclick="templateManager.editTemplate('${template.id}')" title="Edit Template">
                             ✏️
                         </button>
-                        <button class="btn btn-sm btn-danger" onclick="templateManager.deleteTemplate('${template.id}')" title="Delete">
+                        <button class="template-action-btn delete" onclick="templateManager.deleteTemplate('${template.id}')" title="Delete Template">
                             🗑️
                         </button>
                     </div>
                 ` : ''}
             </div>
-        `).join('');
+        `;
     }
 
     /**
@@ -129,196 +245,23 @@ class TemplateManager {
 
         this.selectedTemplate = template;
         this.showTemplateModal(template);
-    }
-
-    /**
-     * Show template details modal
+    }    /**
+     * Show template details modal (now uses DRY TemplateModal)
      */
     showTemplateModal(template) {
-        const modal = this.createTemplateModal(template);
-        document.body.appendChild(modal);
-        
-        // Show modal
-        setTimeout(() => {
-            modal.style.display = 'block';
-            modal.classList.add('show');
-        }, 10);
+        if (!this.templateModal) {
+            console.error('TemplateModal not initialized yet');
+            return;
+        }
+        this.templateModal.show({ template, mode: 'view', onSave: () => this.applyTemplate(template.id) });
     }
 
     /**
      * Create template details modal
      */
     createTemplateModal(template) {
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.id = 'template-details-modal';
-        
-        modal.innerHTML = `
-            <div class="modal-content large">
-                <div class="modal-header">
-                    <h3>${template.icon} ${escapeHtml(template.name)}</h3>
-                    <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="template-info">
-                        <p><strong>Description:</strong> ${escapeHtml(template.description)}</p>
-                        
-                        <div class="config-section">
-                            <h4>Configuration</h4>
-                            <div class="config-item">
-                                <span class="config-label">Base URL:</span>
-                                <span class="config-value">${escapeHtml(template.baseUrl)}</span>
-                            </div>
-                            <div class="config-item">
-                                <span class="config-label">Authentication:</span>
-                                <span class="config-value">${escapeHtml(template.authType)}</span>
-                            </div>
-                            ${template.paginationType ? `
-                                <div class="config-item">
-                                    <span class="config-label">Pagination:</span>
-                                    <span class="config-value">${escapeHtml(template.paginationType)}</span>
-                                </div>
-                            ` : ''}
-                        </div>
-
-                        ${this.renderTemplateHeaders(template)}
-                        ${this.renderTemplateCustomSettings(template)}
-                        ${this.renderTemplateRequiredSecrets(template)}
-                        ${this.renderTemplateSampleEndpoints(template)}
-                        ${this.renderTemplateCustomScript(template)}
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="this.closest('.modal').remove()">
-                        Close
-                    </button>
-                    <button type="button" class="btn btn-primary" onclick="templateManager.applyTemplate('${template.id}'); this.closest('.modal').remove();">
-                        🚀 Use This Template
-                    </button>
-                </div>
-            </div>
-        `;
-        
-        return modal;
-    }
-
-    /**
-     * Render template headers
-     */
-    renderTemplateHeaders(template) {
-        if (!template.defaultHeaders || Object.keys(template.defaultHeaders).length === 0) {
-            return '';
-        }
-
-        const headerItems = Object.entries(template.defaultHeaders).map(([key, value]) => `
-            <div class="config-item">
-                <span class="config-label">${escapeHtml(key)}:</span>
-                <span class="config-value">${escapeHtml(value)}</span>
-            </div>
-        `).join('');
-
-        return `
-            <div class="config-section">
-                <h4>Default Headers</h4>
-                ${headerItems}
-            </div>
-        `;
-    }
-
-    /**
-     * Render template custom settings
-     */
-    renderTemplateCustomSettings(template) {
-        if (!template.customSettings || Object.keys(template.customSettings).length === 0) {
-            return '';
-        }
-
-        const settingItems = Object.entries(template.customSettings).map(([key, value]) => `
-            <div class="config-item">
-                <span class="config-label">${escapeHtml(key)}:</span>
-                <span class="config-value">${escapeHtml(String(value))}</span>
-            </div>
-        `).join('');
-
-        return `
-            <div class="config-section">
-                <h4>Custom Settings</h4>
-                ${settingItems}
-            </div>
-        `;
-    }
-
-    /**
-     * Render required secrets
-     */
-    renderTemplateRequiredSecrets(template) {
-        if (!template.requiredSecrets || template.requiredSecrets.length === 0) {
-            return '';
-        }
-
-        const secretItems = template.requiredSecrets.map(secret => `
-            <li>${escapeHtml(secret)}</li>
-        `).join('');
-
-        return `
-            <div class="config-section">
-                <h4>Required Secrets</h4>
-                <p>This template requires the following secrets to be configured:</p>
-                <ul style="margin: 1rem 0; padding-left: 2rem;">
-                    ${secretItems}
-                </ul>
-                <p style="font-size: 0.875rem; color: var(--text-muted);">
-                    These secrets will be stored securely using your configured secret storage provider.
-                </p>
-            </div>
-        `;
-    }
-
-    /**
-     * Render sample endpoints
-     */
-    renderTemplateSampleEndpoints(template) {
-        if (!template.sampleEndpoints || template.sampleEndpoints.length === 0) {
-            return '';
-        }
-
-        const endpointItems = template.sampleEndpoints.map(endpoint => `
-            <div class="sample-endpoint">
-                <span class="method-badge ${endpoint.method.toLowerCase()}">${endpoint.method}</span>
-                <code>${escapeHtml(endpoint.endpoint)}</code>
-                <p>${escapeHtml(endpoint.description)}</p>
-            </div>
-        `).join('');
-
-        return `
-            <div class="config-section">
-                <h4>Sample Endpoints</h4>
-                <div class="sample-endpoints">
-                    ${endpointItems}
-                </div>
-            </div>
-        `;
-    }
-
-    /**
-     * Render custom authentication script
-     */
-    renderTemplateCustomScript(template) {
-        if (template.authType !== 'CustomScript' || !template.customAuthScript) {
-            return '';
-        }
-
-        return `
-            <div class="config-section">
-                <h4>Custom Authentication Script</h4>
-                <div class="code-block" style="max-height: 300px; overflow-y: auto;">
-                    <pre>${escapeHtml(template.customAuthScript)}</pre>
-                </div>
-                <p style="font-size: 0.875rem; color: var(--text-muted); margin-top: 1rem;">
-                    This script will be used for authentication. Make sure to configure the required secrets.
-                </p>
-            </div>
-        `;
+        // Deprecated: Use TemplateModal instead
+        this.showTemplateModal(template);
     }
 
     /**
@@ -498,19 +441,15 @@ class TemplateManager {
             console.error('Failed to refresh templates:', error);
             showNotification('Failed to refresh templates', 'error');
         }
-    }
-
-    /**
-     * Show create custom template modal
+    }    /**
+     * Show create custom template modal (now uses DRY TemplateModal)
      */
     showCreateTemplateModal() {
-        const modal = this.createCustomTemplateModal();
-        document.body.appendChild(modal);
-        
-        setTimeout(() => {
-            modal.style.display = 'block';
-            modal.classList.add('show');
-        }, 10);
+        if (!this.templateModal) {
+            console.error('TemplateModal not initialized yet');
+            return;
+        }
+        this.templateModal.showCreate((templateData) => this.saveCustomTemplate(templateData));
     }
 
     /**
@@ -603,40 +542,52 @@ class TemplateManager {
         `;
         
         return modal;
-    }
-
-    /**
-     * Save custom template
+    }    /**
+     * Save custom template (enhanced for TemplateModal)
      */
-    saveCustomTemplate(templateId = null) {
+    saveCustomTemplate(templateData) {
         try {
-            const formData = this.collectTemplateFormData();
-            
-            if (!this.validateTemplateForm(formData)) {
-                return;
+            // If called from old modal system, collect form data
+            if (typeof templateData === 'string' || !templateData) {
+                templateData = this.collectTemplateFormData();
+                if (!this.validateTemplateForm(templateData)) {
+                    return;
+                }
             }
-
+            
+            // Ensure required fields and structure
             const template = {
-                id: templateId || `custom_${Date.now()}`,
-                name: formData.name,
-                icon: formData.icon || '🔧',
-                description: formData.description,
-                baseUrl: formData.baseUrl,
-                authType: formData.authType,
-                paginationType: formData.paginationType || null,
-                defaultHeaders: formData.defaultHeaders,
-                customSettings: formData.customSettings,
+                id: templateData.id || `custom_${Date.now()}`,
+                name: templateData.name,
+                icon: templateData.icon || '📦',
+                description: templateData.description,
+                version: templateData.version || '1.0',
+                category: templateData.category || 'Custom',
+                tags: templateData.tags || [],
+                baseUrl: templateData.baseUrl,
+                authType: templateData.authType || '',
+                paginationType: templateData.paginationType || null,
+                ui: templateData.ui || {
+                    brandColor: '#007acc',
+                    accentColor: '#0066cc'
+                },
+                defaultHeaders: templateData.defaultHeaders || {},
+                requiredSecrets: templateData.requiredSecrets || [],
+                sampleEndpoints: templateData.sampleEndpoints || [],
+                documentation: templateData.documentation || null,
+                customSettings: templateData.customSettings || {},
                 isCustom: true,
-                createdAt: templateId ? undefined : new Date().toISOString(),
+                createdAt: templateData.createdAt || new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
 
-            if (templateId) {
-                // Update existing template
-                const index = this.customTemplates.findIndex(t => t.id === templateId);
-                if (index !== -1) {
-                    this.customTemplates[index] = { ...this.customTemplates[index], ...template };
-                }
+            // Check if updating existing template
+            const existingIndex = this.customTemplates.findIndex(t => t.id === template.id);
+            
+            if (existingIndex !== -1) {
+                // Update existing template, preserve createdAt
+                template.createdAt = this.customTemplates[existingIndex].createdAt;
+                this.customTemplates[existingIndex] = template;
             } else {
                 // Add new template
                 this.customTemplates.push(template);
@@ -649,7 +600,7 @@ class TemplateManager {
             this.loadTemplates();
             
             showNotification(
-                templateId ? 'Template updated successfully' : 'Template created successfully',
+                existingIndex !== -1 ? 'Template updated successfully' : 'Template created successfully',
                 'success'
             );
         } catch (error) {
@@ -729,22 +680,23 @@ class TemplateManager {
         }
 
         return true;
-    }
-
-    /**
-     * Edit custom template
+    }    /**
+     * Edit custom template (now uses DRY TemplateModal)
      */
     editTemplate(templateId) {
+        if (!this.templateModal) {
+            console.error('TemplateModal not initialized yet');
+            return;
+        }
+        
         const template = this.customTemplates.find(t => t.id === templateId);
         if (!template) return;
 
-        const modal = this.createCustomTemplateModal(template);
-        document.body.appendChild(modal);
-        
-        setTimeout(() => {
-            modal.style.display = 'block';
-            modal.classList.add('show');
-        }, 10);
+        this.templateModal.show({ 
+            template, 
+            mode: 'edit', 
+            onSave: (templateData) => this.saveCustomTemplate({ ...templateData, id: templateId })
+        });
     }
 
     /**
@@ -925,6 +877,404 @@ class TemplateManager {
 
         targetElement.appendChild(container);
     }
+
+    /**
+     * Add search and filtering capabilities
+     */
+    initializeSearchAndFilters() {
+        const container = document.getElementById('templates-grid');
+        if (!container || container.previousElementSibling?.classList.contains('template-search-bar')) {
+            return; // Already initialized
+        }
+
+        // Create search and filter bar
+        const searchBar = document.createElement('div');
+        searchBar.className = 'template-search-bar';        searchBar.innerHTML = `
+            <input type="text" 
+                   class="template-search-input" 
+                   placeholder="🔍 Search templates..." 
+                   id="template-search-input">
+            <div class="template-filter-chips">
+                <span class="template-filter-chip active" data-filter="all">All</span>
+                <span class="template-filter-chip" data-filter="enhanced">Enhanced</span>
+                <span class="template-filter-chip" data-filter="custom">Custom</span>
+                <span class="template-filter-chip" data-filter="api">API</span>
+                <span class="template-filter-chip" data-filter="database">Database</span>
+                <span class="template-filter-chip" data-filter="ai-ml">AI/ML</span>
+            </div>
+            <button class="btn btn-primary template-create-btn" onclick="templateManager.showCreateTemplateModal()">
+                ➕ Create Custom Template
+            </button>
+        `;
+
+        // Insert before templates grid
+        container.parentNode.insertBefore(searchBar, container);
+
+        // Add event listeners
+        this.setupSearchAndFilterListeners();
+    }
+
+    /**
+     * Setup search and filter event listeners
+     */
+    setupSearchAndFilterListeners() {
+        const searchInput = document.getElementById('template-search-input');
+        const filterChips = document.querySelectorAll('.template-filter-chip');
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                this.currentSearchQuery = e.target.value.toLowerCase();
+                this.filterTemplates();
+            });
+        }
+
+        filterChips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                // Update active filter
+                filterChips.forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                
+                this.currentFilter = chip.dataset.filter;
+                this.filterTemplates();
+            });
+        });
+    }
+
+    /**
+     * Filter templates based on search query and selected filter
+     */
+    filterTemplates() {
+        const allTemplates = [...this.allTemplates]; // Keep original list
+        let filteredTemplates = allTemplates;
+
+        // Apply search filter
+        if (this.currentSearchQuery) {
+            filteredTemplates = filteredTemplates.filter(template => {
+                const searchText = `${template.name} ${template.description} ${template.category || ''} ${(template.tags || []).join(' ')}`.toLowerCase();
+                return searchText.includes(this.currentSearchQuery);
+            });
+        }
+
+        // Apply category filter
+        if (this.currentFilter && this.currentFilter !== 'all') {
+            filteredTemplates = filteredTemplates.filter(template => {
+                switch (this.currentFilter) {
+                    case 'enhanced':
+                        return template.isEnhanced;
+                    case 'custom':
+                        return template.isCustom;
+                    case 'api':
+                        return (template.category || '').toLowerCase().includes('api');
+                    case 'database':
+                        return (template.category || '').toLowerCase().includes('database');
+                    case 'ai-ml':
+                        return (template.category || '').toLowerCase().includes('ai') || 
+                               (template.category || '').toLowerCase().includes('ml') ||
+                               (template.tags || []).some(tag => tag.toLowerCase().includes('ai') || tag.toLowerCase().includes('ml'));
+                    default:
+                        return true;
+                }
+            });
+        }
+
+        // Update displayed templates
+        this.templates = filteredTemplates;
+        this.renderTemplates();
+        
+        // Show/hide empty state
+        this.updateEmptyState();
+    }
+
+    /**
+     * Update empty state based on filters
+     */
+    updateEmptyState() {
+        const container = document.getElementById('templates-grid');
+        if (!container) return;
+
+        if (this.templates.length === 0 && (this.currentSearchQuery || this.currentFilter !== 'all')) {
+            container.innerHTML = `
+                <div class="templates-empty-state">
+                    <div class="empty-icon">🔍</div>
+                    <h3>No Templates Found</h3>
+                    <p>Try adjusting your search or filter criteria</p>
+                    <button class="btn btn-outline" onclick="templateManager.clearFilters()">
+                        Clear Filters
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    /**
+     * Clear all filters and search
+     */
+    clearFilters() {
+        this.currentSearchQuery = '';
+        this.currentFilter = 'all';
+        
+        const searchInput = document.getElementById('template-search-input');
+        const filterChips = document.querySelectorAll('.template-filter-chip');
+        
+        if (searchInput) searchInput.value = '';
+        
+        filterChips.forEach(chip => {
+            chip.classList.remove('active');
+            if (chip.dataset.filter === 'all') {
+                chip.classList.add('active');
+            }
+        });
+        
+        this.templates = [...this.allTemplates];
+        this.renderTemplates();
+    }
+
+    /**
+     * Validate template JSON schema
+     */
+    validateTemplate(template) {
+        const errors = [];
+        
+        // Required fields
+        if (!template.id) errors.push('Missing required field: id');
+        if (!template.name) errors.push('Missing required field: name');
+        if (!template.description) errors.push('Missing required field: description');
+        if (!template.baseUrl) errors.push('Missing required field: baseUrl');
+        if (!template.authType) errors.push('Missing required field: authType');
+        
+        // Validate URL format
+        if (template.baseUrl) {
+            try {
+                new URL(template.baseUrl);
+            } catch {
+                errors.push('Invalid baseUrl format');
+            }
+        }
+        
+        // Validate UI properties if present
+        if (template.ui) {
+            if (template.ui.brandColor && !/^#[0-9A-F]{6}$/i.test(template.ui.brandColor)) {
+                errors.push('Invalid brandColor format (must be hex color)');
+            }
+            if (template.ui.accentColor && !/^#[0-9A-F]{6}$/i.test(template.ui.accentColor)) {
+                errors.push('Invalid accentColor format (must be hex color)');
+            }
+        }
+        
+        // Validate required secrets
+        if (template.requiredSecrets) {
+            template.requiredSecrets.forEach((secret, index) => {
+                if (typeof secret === 'object') {
+                    if (!secret.name && !secret.key) {
+                        errors.push(`Required secret at index ${index} missing name/key`);
+                    }
+                }
+            });
+        }
+        
+        // Validate sample endpoints
+        if (template.sampleEndpoints) {
+            template.sampleEndpoints.forEach((endpoint, index) => {
+                if (!endpoint.method) errors.push(`Sample endpoint at index ${index} missing method`);
+                if (!endpoint.endpoint) errors.push(`Sample endpoint at index ${index} missing endpoint`);
+                if (!endpoint.description) errors.push(`Sample endpoint at index ${index} missing description`);
+            });
+        }
+        
+        return {
+            isValid: errors.length === 0,
+            errors
+        };
+    }
+
+    /**
+     * Add template sharing/export functionality
+     */
+    exportTemplates(templateIds = null) {
+        const templatesToExport = templateIds 
+            ? this.allTemplates.filter(t => templateIds.includes(t.id))
+            : this.customTemplates;
+            
+        const exportData = {
+            version: '1.0',
+            exported: new Date().toISOString(),
+            templates: templatesToExport
+        };
+        
+        const dataStr = JSON.stringify(exportData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(dataBlob);
+        link.download = `anyapi-templates-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showNotification(`Exported ${templatesToExport.length} template(s)`, 'success');
+    }
+
+    /**
+     * Get template statistics for dashboard
+     */
+    getTemplateStats() {
+        const stats = {
+            total: this.allTemplates.length,
+            builtIn: this.allTemplates.filter(t => t.isBuiltIn && !t.isEnhanced).length,
+            enhanced: this.allTemplates.filter(t => t.isEnhanced).length,
+            custom: this.allTemplates.filter(t => t.isCustom).length,
+            categories: {},
+            authTypes: {}
+        };
+        
+        // Count by category
+        this.allTemplates.forEach(template => {
+            const category = template.category || 'Other';
+            stats.categories[category] = (stats.categories[category] || 0) + 1;
+            
+            const authType = template.authType || 'Unknown';
+            stats.authTypes[authType] = (stats.authTypes[authType] || 0) + 1;
+        });
+        
+        return stats;
+    }
+
+    /**
+     * Refresh templates with animation
+     */
+    async refreshTemplates() {
+        const container = document.getElementById('templates-grid');
+        if (container) {
+            container.style.opacity = '0.5';
+            container.style.pointerEvents = 'none';
+        }
+        
+        try {
+            await this.loadTemplates();
+            showNotification('Templates refreshed', 'success');
+        } catch (error) {
+            showNotification('Failed to refresh templates', 'error');
+        } finally {
+            if (container) {
+                container.style.opacity = '1';
+                container.style.pointerEvents = 'auto';
+            }
+        }
+    }    /**
+     * Categorize template dynamically based on keywords and patterns
+     */
+    categorizeTemplate(template) {
+        if (!template.category && !template.name && !template.description) {
+            return 'default';
+        }
+
+        // Create a searchable text from template properties
+        const searchText = [
+            template.category || '',
+            template.name || '',
+            template.description || '',
+            ...(template.tags || [])
+        ].join(' ').toLowerCase();
+
+        // Expanded category mapping for more granular color coding
+        const categoryMappings = {
+            versioncontrol: [
+                'version control', 'github', 'git', 'bitbucket', 'repository', 'source control', 'commit', 'pull request', 'merge', 'branch'
+            ],
+            microsoft: [
+                'microsoft', 'msgraph', 'office', 'outlook', 'teams', 'sharepoint', 'onedrive', 'excel', 'word', 'powerpoint', 'azure', 'graph'
+            ],
+            crm: [
+                'crm', 'connectwise', 'salesforce', 'customer relationship', 'customer management', 'business management', 'ticket', 'client', 'workspace', 'enterprise', 'project management'
+            ],
+            ai: [
+                'openai', 'ai', 'artificial intelligence', 'machine learning', 'ml', 'gpt', 'neural', 'chatbot', 'language model', 'nlp', 'computer vision', 'deep learning'
+            ],
+            finance: [
+                'stripe', 'payment', 'billing', 'finance', 'money', 'transaction', 'invoice', 'subscription', 'checkout', 'banking', 'crypto', 'wallet', 'fintech'
+            ],
+            development: [
+                'developer', 'development', 'code', 'sdk', 'programming', 'software', 'build', 'deploy', 'ci/cd'
+            ],
+            business: [
+                'business', 'manage', 'support', 'sales', 'operations', 'erp', 'accounting', 'hr', 'admin'
+            ],
+            productivity: [
+                'productivity', 'calendar', 'email', 'tasks', 'notes', 'reminder', 'workflow'
+            ],
+            cloud: [
+                'cloud', 'infrastructure', 'server', 'hosting', 'storage', 'database', 'compute', 'kubernetes', 'docker', 'container', 'aws', 'gcp'
+            ],
+            ecommerce: [
+                'shopify', 'ecommerce', 'e-commerce', 'retail', 'store', 'product', 'inventory', 'order', 'shipping', 'marketplace', 'amazon', 'ebay', 'woocommerce'
+            ],
+            security: [
+                'auth', 'authentication', 'security', 'oauth', 'jwt', 'login', 'identity', 'access', 'permission', 'encryption', 'ssl', 'certificate', 'firewall'
+            ],
+            social: [
+                'social', 'twitter', 'facebook', 'instagram', 'linkedin', 'communication', 'messaging', 'chat', 'slack', 'discord', 'telegram', 'whatsapp'
+            ],
+            media: [
+                'video', 'audio', 'image', 'media', 'streaming', 'youtube', 'spotify', 'photo', 'graphics', 'content', 'cdn', 'upload', 'download'
+            ],
+            analytics: [
+                'analytics', 'tracking', 'metrics', 'data', 'statistics', 'reporting', 'dashboard', 'insights', 'monitoring', 'performance', 'logs'
+            ],
+            gaming: [
+                'gaming', 'game', 'steam', 'xbox', 'playstation', 'nintendo', 'esports', 'leaderboard', 'achievement', 'player', 'tournament'
+            ]
+        };
+
+        // Find the first matching category
+        for (const [category, keywords] of Object.entries(categoryMappings)) {
+            if (keywords.some(keyword => searchText.includes(keyword))) {
+                return category;
+            }
+        }
+
+        return 'default';
+    }    /**
+     * Get category class name for CSS styling
+     */
+    getCategoryClass(template) {
+        // If template.categoryColor is present, use a special override class
+        if (template.categoryColor) {
+            return 'category-customcolor';
+        }
+        const category = this.categorizeTemplate(template);
+        return `category-${category}`;
+    }
+
+    /**
+     * Get display name for category
+     */
+    getCategoryDisplayName(template) {
+        const category = this.categorizeTemplate(template);
+        
+        // If template has a specific category name, use it (formatted nicely)
+        if (template.category) {
+            return template.category;
+        }
+        
+        // Otherwise use the dynamic category name with proper capitalization
+        const categoryNames = {
+            development: 'Development',
+            business: 'Business',
+            ai: 'AI/ML',
+            finance: 'Finance',
+            productivity: 'Productivity', 
+            cloud: 'Cloud',
+            social: 'Social',
+            ecommerce: 'E-commerce',
+            security: 'Security',
+            media: 'Media',
+            analytics: 'Analytics',
+            gaming: 'Gaming',
+            default: 'General'
+        };
+        
+        return categoryNames[category] || 'General';
+    }
 }
 
 // CSS for template-specific styles (add to styles.css)
@@ -1025,6 +1375,56 @@ const templateStyles = `
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+.template-search-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.template-search-input {
+    flex: 1;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+}
+
+.template-filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.template-filter-chip {
+    padding: 0.5rem 1rem;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-radius: 16px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.template-filter-chip:hover {
+    background: var(--modal-accent-color, var(--color-primary));
+    color: white;
+}
+
+.template-filter-chip.active {
+    background: var(--modal-accent-color, var(--color-primary));
+    color: white;
+    pointer-events: none;
+}
+
+.category-customcolor {
+    background: var(--modal-accent-color, var(--color-primary)) !important;
+    color: white !important;
+    border-color: var(--modal-accent-color, var(--color-primary)) !important;
 }
 `;
 

@@ -1,0 +1,89 @@
+{
+  "id": "openai",
+  "name": "OpenAI API",
+  "description": "OpenAI REST API for GPT models, embeddings, and AI-powered applications",
+  "version": "1.0",
+  "category": "AI/ML",
+  "tags": ["ai", "gpt", "llm", "embeddings", "chat"],
+  "icon": "🤖",
+  "baseUrl": "https://api.openai.com/v1",
+  "authType": "BearerToken",
+  "ui": {
+    "brandColor": "#10a37f",
+    "accentColor": "#0d8c6c",
+    "logo": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjQ1IiBmaWxsPSIjMTBhMzdmIi8+CjxwYXRoIGZpbGw9IiNmZmZmZmYiIGQ9Ik01MCAyMGMxNi41NyAwIDMwIDEzLjQzIDMwIDMwcy0xMy40MyAzMC0zMCAzMC0zMC0xMy40My0zMC0zMCMwLTE2LjU3IDEzLjQzLTMwIDMwLTMweiIvPgo8L3N2Zz4=",
+    "gradient": "linear-gradient(135deg, #10a37f 0%, #0d8c6c 100%)",
+    "textColor": "#ffffff"
+  },
+  "defaultHeaders": {
+    "Content-Type": "application/json"
+  },
+  "requiredSecrets": [
+    {
+      "key": "apiKey",
+      "displayName": "API Key",
+      "description": "OpenAI API key from your OpenAI account",
+      "placeholder": "sk-proj-...",
+      "isRequired": true,
+      "helpUrl": "https://platform.openai.com/api-keys"
+    }
+  ],
+  "authFieldMapping": {
+    "BearerToken": "apiKey"
+  },
+  "customSettings": {
+    "organization": {
+      "displayName": "Organization ID (Optional)",
+      "description": "Your OpenAI organization ID",
+      "placeholder": "org-XXXXXXXX",
+      "defaultValue": "",
+      "isRequired": false
+    }
+  },
+  "sampleEndpoints": [
+    {
+      "method": "GET",
+      "endpoint": "/models",
+      "description": "List available models",
+      "category": "Models"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/chat/completions",
+      "description": "Create a chat completion",
+      "category": "Chat"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/completions",
+      "description": "Create a text completion",
+      "category": "Completions"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/embeddings",
+      "description": "Create embeddings",
+      "category": "Embeddings"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/images/generations",
+      "description": "Generate images with DALL-E",
+      "category": "Images"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/audio/transcriptions",
+      "description": "Transcribe audio to text",
+      "category": "Audio"
+    }
+  ],
+  "rateLimits": {
+    "description": "Rate limits vary by model and usage tier",
+    "documentation": "https://platform.openai.com/docs/guides/rate-limits"
+  },
+  "documentation": {
+    "url": "https://platform.openai.com/docs/",
+    "quickStart": "https://platform.openai.com/docs/quickstart"
+  }
+}

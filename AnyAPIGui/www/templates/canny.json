@@ -1,0 +1,88 @@
+{
+  "id": "canny",
+  "name": "Canny API",
+  "description": "Canny API for feature request and feedback management",
+  "version": "1.0",
+  "category": "Feedback",
+  "categoryColor": "#7C3AED",
+  "tags": ["feedback", "features", "roadmap", "voting"],
+  "icon": "💡",
+  "baseUrl": "https://canny.io/api/v1",
+  "authType": "ApiKey",
+  "ui": {
+    "brandColor": "#7C3AED",
+    "accentColor": "#8B5CF6",
+    "logo": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjQ1IiBmaWxsPSIjN0MzQUVEIi8+CjxwYXRoIGZpbGw9IiNmZmZmZmYiIGQ9Ik01MCAyNWMtOC4zIDAtMTUgNi43LTE1IDE1IDAgNC4xIDEuNyA3LjggNC40IDEwLjZMMzUgNjBsOS00IDRsNCAEGLTQtNGMtMi43LTIuOC00LjQtNi41LTQuNC0xMC42IDAtOC4zIDYuNy0xNSAxNS0xNXMxNSA2LjcgMTUgMTVjMCA0LjEtMS43IDcuOC00LjQgMTAuNkw2NSA2MGwtOS00LTQtNGMtMi43LTIuOC00LjQtNi41LTQuNC0xMC42IDAtOC4zIDYuNy0xNSAxNS0xNXoiLz4KPC9zdmc+",
+    "gradient": "linear-gradient(135deg, #7C3AED 0%, #8B5CF6 100%)",
+    "textColor": "#ffffff"
+  },
+  "defaultHeaders": {
+    "Accept": "application/json",
+    "Content-Type": "application/json"
+  },
+  "requiredSecrets": [
+    {
+      "key": "apiKey",
+      "displayName": "API Key",
+      "description": "Canny API key",
+      "placeholder": "your-api-key",
+      "isRequired": true,
+      "helpUrl": "https://developers.canny.io/api-reference#authentication"
+    }
+  ],
+  "authFieldMapping": {
+    "ApiKey": {
+      "queryParam": "apiKey"
+    }
+  },
+  "customSettings": {},
+  "sampleEndpoints": [
+    {
+      "method": "GET",
+      "endpoint": "/boards/list",
+      "description": "List all boards",
+      "category": "Boards"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/posts/list",
+      "description": "List posts",
+      "category": "Posts"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/posts/create",
+      "description": "Create a new post",
+      "category": "Posts"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/comments/list",
+      "description": "List comments",
+      "category": "Comments"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/votes/list",
+      "description": "List votes",
+      "category": "Votes"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/users/list",
+      "description": "List users",
+      "category": "Users"
+    }
+  ],
+  "paginationDetails": {
+    "type": "Simple",
+    "supportsPageSize": true,
+    "limitParameter": "limit",
+    "defaultLimit": 10,
+    "maxLimit": 100
+  },
+  "documentation": {
+    "url": "https://developers.canny.io/",
+    "quickStart": "https://developers.canny.io/api-reference"
+  }
+}

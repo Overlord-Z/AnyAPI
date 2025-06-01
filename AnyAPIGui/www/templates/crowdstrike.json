@@ -1,0 +1,89 @@
+{
+  "id": "crowdstrike",
+  "name": "CrowdStrike Falcon API",
+  "description": "CrowdStrike Falcon API for endpoint security and threat intelligence",
+  "version": "1.0",
+  "category": "Security",
+  "categoryColor": "#E3002B",
+  "tags": ["security", "endpoint", "threat", "detection"],
+  "icon": "🛡️",
+  "baseUrl": "https://api.crowdstrike.com",
+  "authType": "OAuth2",
+  "ui": {
+    "brandColor": "#E3002B",
+    "accentColor": "#FF1744",
+    "logo": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjQ1IiBmaWxsPSIjRTMwMDJCIi8+CjxwYXRoIGZpbGw9IiNmZmZmZmYiIGQ9Ik01MCAyNWwtMTUgMTVoMTBsMTAtMTBWMTVoLTVWMjV6bTE1IDE1aDEwbC0xNSAxNXYxMGg1VjU1aDEwbC0xMC0xNXoiLz4KPC9zdmc+",
+    "gradient": "linear-gradient(135deg, #E3002B 0%, #FF1744 100%)",
+    "textColor": "#ffffff"
+  },
+  "defaultHeaders": {
+    "Accept": "application/json",
+    "Content-Type": "application/json"
+  },
+  "requiredSecrets": [
+    {
+      "key": "clientId",
+      "displayName": "Client ID",
+      "description": "CrowdStrike API client ID",
+      "placeholder": "your-client-id",
+      "isRequired": true
+    },
+    {
+      "key": "clientSecret",
+      "displayName": "Client Secret",
+      "description": "CrowdStrike API client secret",
+      "placeholder": "your-client-secret",
+      "isRequired": true
+    }
+  ],
+  "customSettings": {},
+  "sampleEndpoints": [
+    {
+      "method": "GET",
+      "endpoint": "/devices/queries/devices/v1",
+      "description": "Query devices",
+      "category": "Devices"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/devices/entities/devices/v2",
+      "description": "Get device details",
+      "category": "Devices"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/detects/queries/detects/v1",
+      "description": "Query detections",
+      "category": "Detections"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/incidents/queries/incidents/v1",
+      "description": "Query incidents",
+      "category": "Incidents"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/intel/queries/indicators/v1",
+      "description": "Query threat intelligence indicators",
+      "category": "Threat Intel"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/prevention-policies/queries/prevention-policies/v1",
+      "description": "Query prevention policies",
+      "category": "Policies"
+    }
+  ],
+  "paginationDetails": {
+    "type": "OffsetBased",
+    "offsetParameter": "offset",
+    "limitParameter": "limit",
+    "defaultLimit": 100,
+    "maxLimit": 5000
+  },
+  "documentation": {
+    "url": "https://falcon.crowdstrike.com/documentation/",
+    "quickStart": "https://falcon.crowdstrike.com/documentation/page/a2a7fc0e/crowdstrike-oauth2-based-apis"
+  }
+}

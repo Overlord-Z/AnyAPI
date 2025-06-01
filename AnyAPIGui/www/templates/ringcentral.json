@@ -1,0 +1,111 @@
+{
+  "id": "ringcentral",
+  "name": "RingCentral API",
+  "description": "RingCentral Platform API for communications and telephony services",
+  "version": "1.0",
+  "category": "Communications",
+  "categoryColor": "#FF8800",
+  "tags": ["voip", "telephony", "communications", "messaging"],
+  "icon": "📞",
+  "baseUrl": "https://platform.ringcentral.com",
+  "authType": "OAuth2",
+  "ui": {
+    "brandColor": "#FF8800",
+    "accentColor": "#FF9933",
+    "logo": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjQ1IiBmaWxsPSIjRkY4ODAwIi8+CjxwYXRoIGZpbGw9IiNmZmZmZmYiIGQ9Ik00MCAzMGgyMHY0MEg0MHptMTAgNWMtMi44IDAtNSAyLjItNSA1czIuMiA1IDUgNSA1LTIuMiA1LTUtMi4yLTUtNS01eiIvPgo8L3N2Zz4=",
+    "gradient": "linear-gradient(135deg, #FF8800 0%, #FF9933 100%)",
+    "textColor": "#ffffff"
+  },
+  "defaultHeaders": {
+    "Accept": "application/json",
+    "Content-Type": "application/json"
+  },
+  "requiredSecrets": [
+    {
+      "key": "clientId",
+      "displayName": "Client ID",
+      "description": "RingCentral app client ID",
+      "placeholder": "your-client-id",
+      "isRequired": true
+    },
+    {
+      "key": "clientSecret",
+      "displayName": "Client Secret",
+      "description": "RingCentral app client secret",
+      "placeholder": "your-client-secret",
+      "isRequired": true
+    },
+    {
+      "key": "username",
+      "displayName": "Username",
+      "description": "RingCentral username/phone number",
+      "placeholder": "+1234567890",
+      "isRequired": true
+    },
+    {
+      "key": "password",
+      "displayName": "Password",
+      "description": "RingCentral password",
+      "placeholder": "your-password",
+      "isRequired": true
+    }
+  ],
+  "customSettings": {
+    "Environment": {
+      "displayName": "Environment",
+      "description": "RingCentral environment (sandbox or production)",
+      "placeholder": "production",
+      "defaultValue": "production",
+      "isRequired": true
+    }
+  },
+  "sampleEndpoints": [
+    {
+      "method": "GET",
+      "endpoint": "/restapi/v1.0/account/~/extension/~",
+      "description": "Get extension info",
+      "category": "Extensions"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/restapi/v1.0/account/~/call-log",
+      "description": "Get call log",
+      "category": "Call Logs"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/restapi/v1.0/account/~/extension/~/message-store",
+      "description": "Get messages",
+      "category": "Messages"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/restapi/v1.0/account/~/extension/~/sms",
+      "description": "Send SMS",
+      "category": "Messages"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/restapi/v1.0/account/~/presence",
+      "description": "Get presence status",
+      "category": "Presence"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/restapi/v1.0/account/~/phone-number",
+      "description": "Get phone numbers",
+      "category": "Phone Numbers"
+    }
+  ],
+  "paginationDetails": {
+    "type": "PageBased",
+    "pageParameter": "page",
+    "pageSizeParameter": "perPage",
+    "defaultPageSize": 100,
+    "maxPageSize": 1000
+  },
+  "documentation": {
+    "url": "https://developers.ringcentral.com/",
+    "quickStart": "https://developers.ringcentral.com/guide/getting-started"
+  }
+}

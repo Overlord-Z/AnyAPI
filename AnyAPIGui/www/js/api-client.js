@@ -200,7 +200,18 @@ async testSecretAccess() {
             });
             
             if (response.success) {
+                const wasConnected = this.isConnected;
                 this.setConnectionStatus(true);
+                
+                // Only trigger refresh if we were previously disconnected
+                if (!wasConnected) {
+                    console.log('🔄 Connection restored, triggering data refresh');
+                    // Emit specific event for connection restoration
+                    window.dispatchEvent(new CustomEvent('connectionRestored', {
+                        detail: { connected: true, wasDisconnected: true }
+                    }));
+                }
+                
                 return true;
             } else {
                 this.setConnectionStatus(false);
@@ -217,6 +228,7 @@ async testSecretAccess() {
      * Set connection status and update UI
      */
     setConnectionStatus(connected) {
+        const wasConnected = this.isConnected;
         this.isConnected = connected;
         
         const indicator = document.getElementById('status-indicator');
@@ -227,10 +239,13 @@ async testSecretAccess() {
             statusText.textContent = connected ? 'Connected' : 'Disconnected';
         }
 
-        // Emit custom event for other components
-        window.dispatchEvent(new CustomEvent('connectionStatusChanged', {
-            detail: { connected }
-        }));
+        // Only emit change event if status actually changed
+        if (wasConnected !== connected) {
+            console.log(`🔄 Connection status changed: ${wasConnected} → ${connected}`);
+            window.dispatchEvent(new CustomEvent('connectionStatusChanged', {
+                detail: { connected, previousState: wasConnected }
+            }));
+        }
     }    /**
      * Set SecretStore password for authenticated requests
      * WARNING: This creates a security vulnerability by storing password in plain text

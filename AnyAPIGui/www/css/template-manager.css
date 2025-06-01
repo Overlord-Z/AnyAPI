@@ -202,30 +202,38 @@
     opacity: 1;
 }
 
-/* Compact, unified tags style */
 .template-tags {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    margin-bottom: 0.375rem;
+    flex-wrap: nowrap;
+    gap: 0.375rem;
+    margin-bottom: 0.5rem;
     padding: 0;
     order: 1;
 }
 
 .template-tag {
-    font-size: 0.65rem;
-    padding: 0.15rem 0.5rem;
-    background: var(--bg-tertiary, #f3f4f6);
-    color: var(--text-muted, #6b7280);
-    border-radius: 6px;
-    border: 1px solid var(--border-color-light, #e5e7eb);
+    font-size: 0.75rem;
+    padding: 0.25rem 0.6rem;
+    background: transparent;
+    color: var(--color-primary, #6b7280);
+    border-radius: 8px;
+    border: 1px solid rgba(59, 130, 246, 0.2); /* #3b82f6 at 20% opacity */
     white-space: nowrap;
     font-weight: 500;
-    transition: background 0.2s, color 0.2s;
+    transition: all 0.2s ease;
     position: relative;
     z-index: 2;
-    line-height: 1.1;
+    line-height: 1.2;
     flex-shrink: 0;
+    cursor: pointer;
+}
+
+.template-tag:hover {
+    background: var(--purple-primary, #3b82f6);
+    color: white;
+    border-color: var(--purple-secondary, #3b82f6);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.15);
 }
 
 /* Auth info - Clean inline display */
@@ -295,32 +303,6 @@
     letter-spacing: 0.3px;
     margin-top: 0.05rem; /* Reduced from 0.1rem */
     font-weight: 500;
-}
-
-/* Compact, unified tags style */
-.template-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem; /* Reduced from 0.3rem */
-    margin-bottom: 0.375rem; /* Reduced from 0.5rem */
-    padding: 0;
-    order: 1; /* Ensure tags appear before other content */
-}
-
-.template-tag {
-    font-size: 0.65rem; /* Reduced from 0.7rem */
-    padding: 0.15rem 0.5rem; /* Reduced padding */
-    background: var(--bg-tertiary, #f3f4f6);
-    color: var(--text-muted, #6b7280);
-    border-radius: 6px; /* Reduced from 8px */
-    border: 1px solid var(--border-color-light, #e5e7eb);
-    white-space: nowrap;
-    font-weight: 500;
-    transition: background 0.2s, color 0.2s;
-    position: relative;
-    z-index: 2;
-    line-height: 1.1;
-    flex-shrink: 0; /* Prevent tags from shrinking */
 }
 
 /* Template type indicator - Small subtle indicator */
@@ -644,14 +626,6 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
-}
-
-/* Compact tags */
-.template-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    margin-bottom: 0.5rem;
 }
 
 .config-item {

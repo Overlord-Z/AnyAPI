@@ -228,8 +228,20 @@ updateDarkModeToggle() {
      * Set up global event listeners
      */
     setupEventListeners() {
-        // Listen for connection status changes
-        window.addEventListener('connectionStatusChanged', this.handleConnectionChange);
+        // Listen for connection status changes - improved with debouncing
+        let connectionChangeTimeout;
+        window.addEventListener('connectionStatusChanged', (event) => {
+            clearTimeout(connectionChangeTimeout);
+            connectionChangeTimeout = setTimeout(() => {
+                this.handleConnectionChange(event);
+            }, 100); // Short debounce to prevent rapid successive calls
+        });
+        
+        // Listen for connection restoration (only when actually restored)
+        window.addEventListener('connectionRestored', (event) => {
+            console.log('🔄 Connection restored, refreshing data...');
+            this.refreshData();
+        });
         
         // Listen for SecretStore events
         window.addEventListener('secretStoreUnlocked', () => {
@@ -432,7 +444,10 @@ updateDarkModeToggle() {
         const newConnectionState = event.detail.connected;
         const connectionStatus = document.getElementById('connection-status');
         
-        console.log(`🔄 Connection status changed: ${wasConnected} → ${newConnectionState}`);
+        // Don't log unless there's an actual state change
+        if (wasConnected !== newConnectionState) {
+            console.log(`🔄 Connection status changed: ${wasConnected} → ${newConnectionState}`);
+        }
         
         if (!connectionStatus) {
             console.warn('Connection status element not found');
@@ -450,9 +465,8 @@ updateDarkModeToggle() {
         } else if (newConnectionState === true || newConnectionState === 'connected') {
             // Connection established
             if (!wasConnected) {
-                // Connection restored
+                // Connection restored - refresh will be handled by connectionRestored event
                 showNotification('Connected to PowerShell backend', 'success');
-                this.refreshData();
             }
             this.setConnectionStatus('connected', 'Connected', 'wifi');
             
@@ -499,7 +513,7 @@ updateDarkModeToggle() {
     }
 
     /**
-     * Refresh all data - ENHANCED WITH BETTER ERROR HANDLING
+     * Refresh all data - ENHANCED WITH BETTER ERROR HANDLING AND CACHING
      */
     async refreshData() {
         if (!this.state.isConnected) {
@@ -510,26 +524,34 @@ updateDarkModeToggle() {
         console.log('🔄 Refreshing application data...');
         const refreshPromises = [];
         
-        // Refresh ProfileManager
+        // Refresh ProfileManager - only if not already loading
         if (typeof profileManager !== 'undefined' && profileManager.loadProfiles) {
-            refreshPromises.push(
-                profileManager.loadProfiles().then(() => {
-                    console.log('✅ Profiles refreshed');
-                }).catch(error => {
-                    console.warn('⚠️ Failed to refresh profiles:', error);
-                })
-            );
+            if (!profileManager.isLoading) {
+                refreshPromises.push(
+                    profileManager.loadProfiles().then(() => {
+                        console.log('✅ Profiles refreshed');
+                    }).catch(error => {
+                        console.warn('⚠️ Failed to refresh profiles:', error);
+                    })
+                );
+            } else {
+                console.log('⏳ Profiles already loading, skipping refresh');
+            }
         }
         
-        // Refresh TemplateManager
+        // Refresh TemplateManager - only if not already loading
         if (typeof templateManager !== 'undefined' && templateManager.loadTemplates) {
-            refreshPromises.push(
-                templateManager.loadTemplates().then(() => {
-                    console.log('✅ Templates refreshed');
-                }).catch(error => {
-                    console.warn('⚠️ Failed to refresh templates:', error);
-                })
-            );
+            if (!templateManager.isLoading) {
+                refreshPromises.push(
+                    templateManager.loadTemplates().then(() => {
+                        console.log('✅ Templates refreshed');
+                    }).catch(error => {
+                        console.warn('⚠️ Failed to refresh templates:', error);
+                    })
+                );
+            } else {
+                console.log('⏳ Templates already loading, skipping refresh');
+            }
         }
         
         await Promise.allSettled(refreshPromises);
@@ -677,55 +699,76 @@ updateDarkModeToggle() {
     }
 
     /**
-     * Handle section-specific actions when showing - ENHANCED WITH MANAGER CHECKS
+     * Handle section-specific actions when showing - ENHANCED WITH MANAGER CHECKS AND DEBOUNCING
      */
     onSectionShow(sectionName) {
+        // Clear any existing section timeout
+        if (this.sectionTimeout) {
+            clearTimeout(this.sectionTimeout);
+        }
+        
+        // Debounce section-specific actions
+        this.sectionTimeout = setTimeout(() => {
+            this.performSectionActions(sectionName);
+        }, 100);
+    }
+
+    /**
+     * Perform section-specific actions (debounced)
+     */
+    performSectionActions(sectionName) {
         switch (sectionName) {
             case 'profiles':
                 console.log('📋 Activating Profiles section');
-                // Refresh profiles if needed
-                if (this.state.isConnected && typeof profileManager !== 'undefined' && profileManager.loadProfiles) {
-                    profileManager.loadProfiles().catch(error => {
-                        console.warn('Failed to load profiles on section show:', error);
-                    });
+                // Only refresh if connected and not already loading
+                if (this.state.isConnected && 
+                    typeof profileManager !== 'undefined' && 
+                    profileManager.loadProfiles && 
+                    !profileManager.isLoading) {
+                    
+                    // Check if profiles are already loaded and fresh
+                    const needsRefresh = !this.state.profilesLoaded || 
+                                       (profileManager.profiles && profileManager.profiles.length === 0);
+                    
+                    if (needsRefresh) {
+                        console.log('📊 Loading profiles for section');
+                        profileManager.loadProfiles().catch(error => {
+                            console.warn('Failed to load profiles on section show:', error);
+                        });
+                    } else {
+                        console.log('📊 Profiles already loaded and fresh');
+                    }
+                } else if (profileManager && profileManager.isLoading) {
+                    console.log('⏳ Profiles already loading');
                 }
                 break;
                 
             case 'templates':
                 console.log('📋 Activating Templates section');
-                // Refresh templates if needed
-                if (this.state.isConnected && typeof templateManager !== 'undefined' && templateManager.loadTemplates) {
-                    templateManager.loadTemplates().catch(error => {
-                        console.warn('Failed to load templates on section show:', error);
-                    });
-                }
-                break;            case 'history':
-                console.log('📚 Activating History section');
-                // Update history display
-                if (typeof window.historyManager !== 'undefined' && window.historyManager.render) {
-                    window.historyManager.render();
-                } else if (typeof window.endpointTester !== 'undefined' && window.endpointTester.updateHistoryDisplay) {
-                    window.endpointTester.updateHistoryDisplay();
-                } else if (typeof window.initializeEndpointTester === 'function') {
-                    // Initialize if not already done
-                    const endpointTester = window.initializeEndpointTester();
-                    if (endpointTester && endpointTester.updateHistoryDisplay) {
-                        endpointTester.updateHistoryDisplay();
+                // Only refresh if connected and not already loading
+                if (this.state.isConnected && 
+                    typeof templateManager !== 'undefined' && 
+                    templateManager.loadTemplates &&
+                    !templateManager.isLoading) {
+                    
+                    // Check if templates are already loaded and fresh
+                    const needsRefresh = !this.state.templatesLoaded || 
+                                       (templateManager.templates && templateManager.templates.length === 0);
+                    
+                    if (needsRefresh) {
+                        console.log('📊 Loading templates for section');
+                        templateManager.loadTemplates().catch(error => {
+                            console.warn('Failed to load templates on section show:', error);
+                        });
+                    } else {
+                        console.log('📊 Templates already loaded and fresh');
                     }
-                }
-                // Update profile filter dropdown
-                if (typeof profileManager !== 'undefined' && profileManager.updateHistoryProfileFilter) {
-                    profileManager.updateHistoryProfileFilter();
+                } else if (templateManager && templateManager.isLoading) {
+                    console.log('⏳ Templates already loading');
                 }
                 break;
-                
-            case 'tester':
-                console.log('🧪 Activating Tester section');
-                // Update profile dropdown
-                if (typeof profileManager !== 'undefined' && profileManager.updateTestProfileDropdown) {
-                    profileManager.updateTestProfileDropdown();
-                }
-                break;
+
+            // ...existing code for other sections...
         }
     }
 

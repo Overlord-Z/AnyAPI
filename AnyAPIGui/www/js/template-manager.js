@@ -9,7 +9,14 @@ class TemplateManager {
         this.selectedTemplate = null;
         this.customTemplates = JSON.parse(localStorage.getItem('anyapi_custom_templates') || '[]');
         this.templateModal = null;
-        this.isLoading = false; // Add loading state
+        this.isLoading = false;
+        
+        // Add caching properties
+        this.templatesCache = null;
+        this.cacheExpiry = null;
+        this.CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+        this.initialLoadComplete = false;
+        this.wasDisconnected = false;
         
         this.init();
     } 
@@ -50,11 +57,24 @@ class TemplateManager {
      * Set up event listeners
      */
     setupEventListeners() {
-        // Listen for connection status changes with debouncing
+        // Listen for connection status changes with debouncing and caching
         let connectionChangeTimeout;
         window.addEventListener('connectionStatusChanged', (event) => {
-            if (event.detail.connected) {
-                // Debounce the call to prevent rapid successive calls
+            if (!event.detail.connected) {
+                // Track that we were disconnected
+                this.wasDisconnected = true;
+            } else if (this.wasDisconnected && this.initialLoadComplete) {
+                // Only reload if we were actually disconnected and initial load is complete
+                clearTimeout(connectionChangeTimeout);
+                connectionChangeTimeout = setTimeout(() => {
+                    if (!this.isLoading && !this.isCacheValid()) {
+                        console.log('[TemplateManager] Connection restored after disconnect, reloading templates...');
+                        this.loadTemplates();
+                    }
+                    this.wasDisconnected = false;
+                }, 500);
+            } else if (event.detail.connected && !this.initialLoadComplete) {
+                // First connection, load templates
                 clearTimeout(connectionChangeTimeout);
                 connectionChangeTimeout = setTimeout(() => {
                     if (!this.isLoading) {
@@ -64,6 +84,16 @@ class TemplateManager {
             }
         });
     }
+
+    /**
+     * Check if template cache is valid
+     */
+    isCacheValid() {
+        return this.templatesCache && 
+               this.cacheExpiry && 
+               Date.now() < this.cacheExpiry;
+    }
+
     /**
      * Load templates from backend and merge with custom templates
      */
@@ -71,6 +101,18 @@ class TemplateManager {
         // Prevent duplicate calls
         if (this.isLoading) {
             console.log('[TemplateManager] Already loading templates, skipping...');
+            return;
+        }
+
+        // Use cache if valid and not forced refresh
+        if (this.isCacheValid() && this.initialLoadComplete) {
+            console.log('[TemplateManager] Using cached templates');
+            this.allTemplates = [...this.templatesCache];
+            this.currentSearchQuery = '';
+            this.currentFilter = 'all';
+            this.templates = [...this.allTemplates];
+            this.renderTemplates();
+            this.initializeSearchAndFilters();
             return;
         }
         
@@ -88,6 +130,11 @@ class TemplateManager {
                 ...this.customTemplates.map(t => ({ ...t, isCustom: true }))
             ];
 
+            // Cache the templates
+            this.templatesCache = [...this.allTemplates];
+            this.cacheExpiry = Date.now() + this.CACHE_DURATION;
+            this.initialLoadComplete = true;
+
             // Initialize current filter state
             this.currentSearchQuery = '';
             this.currentFilter = 'all';
@@ -102,6 +149,12 @@ class TemplateManager {
             // Fall back to custom templates only
             this.allTemplates = this.customTemplates.map(t => ({ ...t, isCustom: true }));
             this.templates = [...this.allTemplates];
+            
+            // Cache the fallback
+            this.templatesCache = [...this.allTemplates];
+            this.cacheExpiry = Date.now() + (this.CACHE_DURATION / 2); // Shorter cache for fallback
+            this.initialLoadComplete = true;
+            
             this.renderTemplates();
             showNotification('Failed to load templates', 'error');
         } finally {
@@ -509,6 +562,9 @@ class TemplateManager {
             // Save to localStorage
             localStorage.setItem('anyapi_custom_templates', JSON.stringify(this.customTemplates));
             
+            // Invalidate cache to force reload
+            this.invalidateCache();
+            
             // Refresh display
             this.loadTemplates();
             
@@ -627,6 +683,9 @@ class TemplateManager {
             this.customTemplates = this.customTemplates.filter(t => t.id !== templateId);
             localStorage.setItem('anyapi_custom_templates', JSON.stringify(this.customTemplates));
             
+            // Invalidate cache to force reload
+            this.invalidateCache();
+            
             this.loadTemplates();
             showNotification('Template deleted successfully', 'success');
         } catch (error) {
@@ -701,6 +760,10 @@ class TemplateManager {
                         });
 
                         localStorage.setItem('anyapi_custom_templates', JSON.stringify(this.customTemplates));
+                        
+                        // Invalidate cache to force reload
+                        this.invalidateCache();
+                        
                         this.loadTemplates();
                         
                         showNotification(`Imported ${data.templates.length} template(s)`, 'success');
@@ -1053,7 +1116,7 @@ class TemplateManager {
     }
 
     /**
-     * Refresh templates with animation
+     * Refresh templates with animation - force reload
      */
     async refreshTemplates() {
         const container = document.getElementById('templates-grid');
@@ -1063,6 +1126,8 @@ class TemplateManager {
         }
         
         try {
+            // Invalidate cache to force fresh load
+            this.invalidateCache();
             await this.loadTemplates();
             showNotification('Templates refreshed', 'success');
         } catch (error) {
@@ -1073,7 +1138,18 @@ class TemplateManager {
                 container.style.pointerEvents = 'auto';
             }
         }
-    }    /**
+    }
+
+    /**
+     * Invalidate template cache
+     */
+    invalidateCache() {
+        this.templatesCache = null;
+        this.cacheExpiry = null;
+        console.log('[TemplateManager] Template cache invalidated');
+    }
+
+    /**
      * Categorize template dynamically based on keywords and patterns
      */
     categorizeTemplate(template) {

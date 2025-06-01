@@ -12,7 +12,7 @@
   "ui": {
     "brandColor": "#7C3AED",
     "accentColor": "#8B5CF6",
-    "logo": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjQ1IiBmaWxsPSIjN0MzQUVEIi8+CjxwYXRoIGZpbGw9IiNmZmZmZmYiIGQ9Ik01MCAyNWMtOC4zIDAtMTUgNi43LTE1IDE1IDAgNC4xIDEuNyA3LjggNC40IDEwLjZMMzUgNjBsOS00IDRsNCAEGLTQtNGMtMi43LTIuOC00LjQtNi41LTQuNC0xMC42IDAtOC4zIDYuNy0xNSAxNS0xNXMxNSA2LjcgMTUgMTVjMCA0LjEtMS43IDcuOC00LjQgMTAuNkw2NSA2MGwtOS00LTQtNGMtMi43LTIuOC00LjQtNi41LTQuNC0xMC42IDAtOC4zIDYuNy0xNSAxNS0xNXoiLz4KPC9zdmc+",
+    "logo": "https://assets.canny.io/5e6458a0849e16cb4aad3f7ef1cb8964adced47c/logo-icon.png",
     "gradient": "linear-gradient(135deg, #7C3AED 0%, #8B5CF6 100%)",
     "textColor": "#ffffff"
   },

@@ -3,16 +3,20 @@
  * Handles API templates, quick-start configurations, and template application
  */
 
-class TemplateManager {    constructor() {
+class TemplateManager {
+    constructor() {
         this.templates = [];
         this.selectedTemplate = null;
         this.customTemplates = JSON.parse(localStorage.getItem('anyapi_custom_templates') || '[]');
-        // Initialize template manager first, then attach TemplateModal
         this.templateModal = null;
+        this.isLoading = false; // Add loading state
         
-        // Initialize template manager
         this.init();
-    }    /**
+    } 
+    
+    
+    
+    /**
      * Initialize template manager
      */
     async init() {
@@ -46,17 +50,35 @@ class TemplateManager {    constructor() {
      * Set up event listeners
      */
     setupEventListeners() {
-        // Listen for connection status changes
+        // Listen for connection status changes with debouncing
+        let connectionChangeTimeout;
         window.addEventListener('connectionStatusChanged', (event) => {
             if (event.detail.connected) {
-                this.loadTemplates();
+                // Debounce the call to prevent rapid successive calls
+                clearTimeout(connectionChangeTimeout);
+                connectionChangeTimeout = setTimeout(() => {
+                    if (!this.isLoading) {
+                        this.loadTemplates();
+                    }
+                }, 500);
             }
         });
-    }    /**
+    }
+    /**
      * Load templates from backend and merge with custom templates
      */
     async loadTemplates() {
+        // Prevent duplicate calls
+        if (this.isLoading) {
+            console.log('[TemplateManager] Already loading templates, skipping...');
+            return;
+        }
+        
+        this.isLoading = true;
+        
         try {
+            console.log('[TemplateManager] Loading templates...');
+            
             // Load enhanced JSON templates dynamically from manifest
             const jsonTemplates = await this.loadJsonTemplates();
 
@@ -82,6 +104,8 @@ class TemplateManager {    constructor() {
             this.templates = [...this.allTemplates];
             this.renderTemplates();
             showNotification('Failed to load templates', 'error');
+        } finally {
+            this.isLoading = false;
         }
     }
 

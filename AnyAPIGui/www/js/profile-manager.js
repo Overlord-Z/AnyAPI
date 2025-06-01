@@ -31,19 +31,20 @@ class ProfileManager {
         '********', '••••••••', '***MASKED***', '***HIDDEN***'
     ]);
 
-    constructor() {
-        this.profiles = [];
-        this.currentProfile = null;
-        this.isEditing = false;
-        this.searchTerm = '';
-        this.templates = this.getProfileTemplates();
-        this.currentSharedProfile = null;
-        
-        // Initialize the edit modal component
-        this.editModal = null;
-        
-        this.init();
-    }
+constructor() {
+    this.profiles = [];
+    this.currentProfile = null;
+    this.isEditing = false;
+    this.searchTerm = '';
+    this.templates = this.getProfileTemplates();
+    this.currentSharedProfile = null;
+    this.isLoadingProfiles = false; // Add this line
+    
+    // Initialize the edit modal component
+    this.editModal = null;
+    
+    this.init();
+}
 
     // Enhanced error handling with consistent patterns
     async handleAsync(operation, errorMessage = 'Operation failed') {
@@ -315,23 +316,41 @@ $RequestContext.Headers["Accept"] = "application/json"`
     }
 
     // Enhanced event listener setup
-    setupEventListeners() {
-        const eventHandlers = [
-            ['connectionStatusChanged', ({ detail }) => {
-                if (detail.connected) {
-                    console.log('🔄 Connection restored, reloading profiles...');
-                    this.loadProfiles();
-                }
-            }]
-        ];
+setupEventListeners() {
+    let connectionChangeTimeout;
+    
+    const eventHandlers = [
+        ['connectionStatusChanged', ({ detail }) => {
+            if (detail.connected) {
+                console.log('🔄 Connection restored, reloading profiles...');
+                
+                // Debounce the call to prevent rapid successive calls
+                clearTimeout(connectionChangeTimeout);
+                connectionChangeTimeout = setTimeout(() => {
+                    if (!this.isLoadingProfiles) {
+                        this.loadProfiles();
+                    }
+                }, 500);
+            }
+        }]
+    ];
 
-        eventHandlers.forEach(([event, handler]) => {
-            window.addEventListener(event, handler);
-        });
-    }
+    eventHandlers.forEach(([event, handler]) => {
+        window.addEventListener(event, handler);
+    });
+}
 
     // Optimized profile loading
-    async loadProfiles() {
+async loadProfiles() {
+    // Prevent duplicate calls
+    if (this.isLoadingProfiles) {
+        console.log('[ProfileManager] Already loading profiles, skipping...');
+        return;
+    }
+    
+    this.isLoadingProfiles = true;
+    
+    try {
         await this.handleAsync(async () => {
             console.log('📡 Loading profiles from backend...');
             
@@ -347,7 +366,11 @@ $RequestContext.Headers["Accept"] = "application/json"`
                 this.updateGlobalProfileSelector();
                 this.initializeSharedProfileManagement();
             });
-        }, 'Failed to load profiles');    }
+        }, 'Failed to load profiles');
+    } finally {
+        this.isLoadingProfiles = false;
+    }
+}
 
     // Initialize shared profile management across components
     initializeSharedProfileManagement() {

@@ -1,0 +1,100 @@
+{
+  "id": "autotask",
+  "name": "Autotask PSA API",
+  "description": "Autotask REST API for professional services automation and ticketing",
+  "version": "1.0",
+  "category": "Business Management",
+  "categoryColor": "#E31837",
+  "tags": ["psa", "tickets", "crm", "business", "autotask"],
+  "icon": "🎯",
+  "baseUrl": "https://webservices{datacenter}.autotask.net/atservicesrest/v1.0",
+  "authType": "CustomScript",
+  "ui": {
+    "brandColor": "#E31837",
+    "accentColor": "#FF4C68",
+    "logo": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjQ1IiBmaWxsPSIjRTMxODM3Ii8+CjxwYXRoIGZpbGw9IiNmZmZmZmYiIGQ9Ik01MCAzMGMtMTEgMC0yMCA5LTIwIDIwczktMjAgMjAtMjAgMjAgOSAyMCAyMC05IDIwLTIwIDIweiIvPgo8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIxMCIgZmlsbD0iI0UzMTgzNyIvPgo8L3N2Zz4=",
+    "gradient": "linear-gradient(135deg, #E31837 0%, #FF4C68 100%)",
+    "textColor": "#ffffff"
+  },
+  "customAuthScript": "param($RequestContext, $Profile)\n\n# Autotask API authentication\n$username = $RequestContext.GetPlainTextSecret.Invoke('Username')\n$password = $RequestContext.GetPlainTextSecret.Invoke('Password')\n$integrationCode = $RequestContext.GetPlainTextSecret.Invoke('IntegrationCode')\n$datacenter = $Profile.CustomSettings.Datacenter\n\nif (-not $username -or -not $password -or -not $integrationCode) {\n    throw \"Missing required Autotask credentials\"\n}\n\n# Replace datacenter in base URL\n$RequestContext.BaseUrl = $RequestContext.BaseUrl -replace '{datacenter}', $datacenter\n\n# Create basic auth header\n$authString = \"$username`:$password\"\n$encodedAuth = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($authString))\n\n$RequestContext.Headers[\"Authorization\"] = \"Basic $encodedAuth\"\n$RequestContext.Headers[\"ApiIntegrationcode\"] = $integrationCode\n$RequestContext.Headers[\"Accept\"] = \"application/json\"",
+  "requiredSecrets": [
+    {
+      "key": "Username",
+      "displayName": "Username",
+      "description": "Autotask API username",
+      "placeholder": "your-username",
+      "isRequired": true
+    },
+    {
+      "key": "Password",
+      "displayName": "Password",
+      "description": "Autotask API password",
+      "placeholder": "your-password",
+      "isRequired": true
+    },
+    {
+      "key": "IntegrationCode",
+      "displayName": "Integration Code",
+      "description": "Autotask API integration code",
+      "placeholder": "your-integration-code",
+      "isRequired": true
+    }
+  ],
+  "customSettings": {
+    "Datacenter": {
+      "displayName": "Datacenter",
+      "description": "Your Autotask datacenter (e.g., 5, 12, etc.)",
+      "placeholder": "5",
+      "isRequired": true
+    }
+  },
+  "sampleEndpoints": [
+    {
+      "method": "GET",
+      "endpoint": "/CompanyInformation",
+      "description": "Get company information",
+      "category": "Company"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/Companies",
+      "description": "List companies",
+      "category": "Companies"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/Tickets",
+      "description": "List tickets",
+      "category": "Tickets"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/Tickets",
+      "description": "Create a new ticket",
+      "category": "Tickets"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/Contacts",
+      "description": "List contacts",
+      "category": "Contacts"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/TimeEntries",
+      "description": "List time entries",
+      "category": "Time Tracking"
+    }
+  ],
+  "paginationDetails": {
+    "type": "PageBased",
+    "pageParameter": "search",
+    "pageSizeParameter": "maxRecords",
+    "defaultPageSize": 500,
+    "maxPageSize": 500
+  },
+  "documentation": {
+    "url": "https://ww4.autotask.net/help/DeveloperHelp/Content/APIs/REST/API_Calls/REST_Basic_Query_Calls.htm",
+    "quickStart": "https://ww4.autotask.net/help/DeveloperHelp/Content/APIs/REST/Getting_Started_REST.htm"
+  }
+}

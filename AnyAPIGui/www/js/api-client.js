@@ -3,6 +3,116 @@
  * Handles all communication with the PowerShell backend
  */
 
+// Inline crypto utilities to avoid module import issues
+const CryptoUtils = {
+    /**
+     * Generate a secure random salt/IV
+     */
+    generateSalt(length = 16) {
+        const array = new Uint8Array(length);
+        crypto.getRandomValues(array);
+        return btoa(String.fromCharCode.apply(null, array));
+    },
+
+    /**
+     * Check if Web Crypto API is available
+     */
+    isCryptoAvailable() {
+        return typeof crypto !== 'undefined' && 
+               typeof crypto.subtle !== 'undefined' && 
+               typeof crypto.getRandomValues !== 'undefined';
+    },    /**
+     * Simple session-based encryption for SecretStore passwords using AES-GCM
+     */
+    async encryptSessionPassword(password) {
+        if (!this.isCryptoAvailable()) {
+            throw new Error('Web Crypto API not available');
+        }
+
+        // Capture actual browser characteristics
+        const browserData = {
+            userAgent: navigator.userAgent,
+            screenResolution: window.screen.width + 'x' + window.screen.height,
+            language: navigator.language,
+            timestamp: Date.now().toString()
+        };
+
+        // Generate a session-specific encryption key from browser characteristics
+        const sessionSeed = [
+            browserData.userAgent,
+            browserData.screenResolution,
+            browserData.language,
+            browserData.timestamp
+        ].join('|');
+        
+        // Generate session key (SHA-256 hash)
+        const encoder = new TextEncoder();
+        const data = encoder.encode(sessionSeed);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const sessionKey = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        
+        // Generate session fingerprint (without timestamp)
+        const baseSeed = sessionSeed.substring(0, sessionSeed.lastIndexOf('|'));
+        const fingerprintData = encoder.encode(baseSeed);
+        const fingerprintBuffer = await crypto.subtle.digest('SHA-256', fingerprintData);
+        const fingerprintArray = Array.from(new Uint8Array(fingerprintBuffer));
+        const sessionFingerprint = fingerprintArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        
+        // Generate salt and IV for AES-GCM
+        const salt = crypto.getRandomValues(new Uint8Array(16)); // 16 bytes salt
+        const iv = crypto.getRandomValues(new Uint8Array(12));   // 12 bytes IV for GCM
+        
+        // Derive AES key using PBKDF2
+        const keyMaterial = await crypto.subtle.importKey(
+            'raw',
+            encoder.encode(sessionKey.substring(0, 32)), // Use first 32 chars of session key
+            { name: 'PBKDF2' },
+            false,
+            ['deriveKey']
+        );
+        
+        const aesKey = await crypto.subtle.deriveKey(
+            {
+                name: 'PBKDF2',
+                salt: salt,
+                iterations: 100000,
+                hash: 'SHA-256'
+            },
+            keyMaterial,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt']
+        );
+        
+        // Encrypt the password using AES-GCM
+        const passwordBytes = encoder.encode(password);
+        const encryptedBuffer = await crypto.subtle.encrypt(
+            {
+                name: 'AES-GCM',
+                iv: iv
+            },
+            aesKey,
+            passwordBytes
+        );
+        
+        // Convert encrypted data to base64
+        const encryptedArray = new Uint8Array(encryptedBuffer);
+        const encryptedBase64 = btoa(String.fromCharCode.apply(null, encryptedArray));
+        
+        return {
+            encrypted: encryptedBase64,
+            metadata: btoa(JSON.stringify({
+                salt: btoa(String.fromCharCode.apply(null, salt)),
+                iv: btoa(String.fromCharCode.apply(null, iv)),
+                sessionFingerprint: sessionFingerprint,
+                // Include actual browser data for backend reconstruction
+                browserData: browserData
+            }))
+        };
+    }
+};
+
 class ApiClient {
     constructor() {
         this.baseUrl = ''; // Set baseUrl for same-origin or cross-origin as needed
@@ -121,20 +231,37 @@ async testSecretAccess() {
         window.dispatchEvent(new CustomEvent('connectionStatusChanged', {
             detail: { connected }
         }));
-    }
-
-    /**
+    }    /**
      * Set SecretStore password for authenticated requests
+     * WARNING: This creates a security vulnerability by storing password in plain text
+     * TODO: Implement secure session-based authentication tokens
      */
     setSecretStorePassword(password) {
+        // SECURITY ISSUE: Storing password in plain text
+        console.warn('🔓 SECURITY WARNING: Storing SecretStore password in plain text (temporary)');
         this.secretStorePassword = password;
+        
         // --- Also update sessionStorage for consistency ---
+        // SECURITY ISSUE: Browser storage contains plain text password
         if (typeof sessionStorage !== 'undefined') {
             if (password) {
+                console.warn('🔓 SECURITY WARNING: Storing password in sessionStorage (plain text)');
                 sessionStorage.setItem('anyapi_secretstore_password', password);
             } else {
                 sessionStorage.removeItem('anyapi_secretstore_password');
             }
+        }
+    }
+
+    /**
+     * Clear password cache (security improvement)
+     */
+    clearPasswordCache() {
+        console.log('🔒 Clearing password cache for security');
+        this.secretStorePassword = null;
+        
+        if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.removeItem('anyapi_secretstore_password');
         }
     }
 
@@ -146,8 +273,16 @@ async testSecretAccess() {
             'Content-Type': 'application/json'
         };
 
-        // Add SecretStore password if available
+        // Try to use secure session headers first
+        if (window.secureSession && window.secureSession.isAuthenticated) {
+            const authHeaders = window.secureSession.getAuthHeaders();
+            Object.assign(headers, authHeaders);
+            return headers;
+        }
+
+        // SECURITY ISSUE: Transmitting password in plain text header
         if (this.secretStorePassword) {
+            console.warn('🔓 SECURITY WARNING: Transmitting password in X-SecretStore-Password header (plain text)');
             headers['X-SecretStore-Password'] = this.secretStorePassword;
         }
 
@@ -196,9 +331,35 @@ async testSecretAccess() {
                     data = await response.json();
                 } else {
                     data = await response.text();
-                }
-
-                if (!response.ok) {
+                }                if (!response.ok) {
+                    // Handle authentication errors (401/403) - likely due to server restart or session expiry
+                    if (response.status === 401 || response.status === 403) {
+                        console.warn(`🔐 Authentication error (${response.status}): Session may be invalid due to server restart`);
+                        
+                        // Check if we have secure session and clear it
+                        if (window.secureSession) {
+                            console.log('🧹 Clearing invalid session data');
+                            window.secureSession.clearSession();
+                        }
+                        
+                        // Clear any cached password
+                        this.clearPasswordCache();
+                        
+                        // For SecretStore-related endpoints, trigger re-authentication
+                        if (endpoint.includes('/api/secrets') || endpoint.includes('/api/test') || endpoint.includes('/api/profiles')) {
+                            console.log('🔓 SecretStore access denied - triggering re-authentication');
+                            
+                            // Emit event to trigger unlock dialog
+                            window.dispatchEvent(new CustomEvent('secretStoreAuthRequired', {
+                                detail: { 
+                                    reason: 'Server restart detected - session invalid',
+                                    originalEndpoint: endpoint,
+                                    status: response.status
+                                }
+                            }));
+                        }
+                    }
+                    
                     // --- Add detailed logging for debugging 500 errors ---
                     console.error(`API fetch error: ${url}`, {
                         status: response.status,
@@ -320,22 +481,105 @@ async testSecretAccess() {
      */
     async getSecretInfo() {
         return await this.fetch('/api/secrets/info');
+    }    /**
+     * Unlock SecretStore with password using secure session authentication
+     */
+    async unlockSecretStore(password) {
+        try {
+            // Use the new secure session system if available
+            if (window.secureSession) {
+                console.log('🔐 Using secure session authentication');
+                const result = await window.secureSession.authenticate(password);
+                
+                if (result.success) {
+                    // Don't store the password - use session token instead
+                    this.clearPasswordCache();
+                    console.log('✅ Secure authentication successful');
+                }
+                
+                return result;
+            }
+            
+            // Fallback to existing encryption attempt
+            return await this.legacyUnlockSecretStore(password);
+            
+        } catch (error) {
+            console.error('🔓 SecretStore unlock failed:', error);
+            return { success: false, error: error.message };
+        }
     }
 
     /**
-     * Unlock SecretStore with password
+     * Legacy unlock method (with encryption attempt and fallback)
      */
-    async unlockSecretStore(password) {
-        const response = await this.fetch('/api/secrets/unlock', {
-            method: 'POST',
-            body: JSON.stringify({ password })
-        });
-        
-        if (response.success) {
-            this.setSecretStorePassword(password);
+    async legacyUnlockSecretStore(password) {
+        // Check if Web Crypto API is available
+        if (!CryptoUtils.isCryptoAvailable()) {
+            console.warn('🔓 Web Crypto API not available, sending password in plain text (insecure)');
+            // Fallback to original method for compatibility
+            const response = await this.fetch('/api/secrets/unlock', {
+                method: 'POST',
+                body: JSON.stringify({ password })
+            });
+            
+            if (response.success) {
+                this.setSecretStorePassword(password);
+            }
+            
+            return response;
         }
-        
-        return response;
+
+        try {
+            // Encrypt the password using session-based encryption
+            const { encrypted, metadata } = await CryptoUtils.encryptSessionPassword(password);
+            
+            console.log('🔐 Attempting encrypted password authentication');
+            
+            const response = await this.fetch('/api/secrets/unlock', {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    encryptedPassword: encrypted,
+                    encryptionMetadata: metadata,
+                    isEncrypted: true
+                })
+            });
+            
+            if (response.success) {
+                this.setSecretStorePassword(password);
+                return response;
+            }
+            
+            // Check if backend requires fallback to plain text
+            if (response.requiresFallback) {
+                console.log('🔄 Backend requires fallback authentication, retrying with plain text');
+                const fallbackResponse = await this.fetch('/api/secrets/unlock', {
+                    method: 'POST',
+                    body: JSON.stringify({ password })
+                });
+                
+                if (fallbackResponse.success) {
+                    this.setSecretStorePassword(password);
+                }
+                
+                return fallbackResponse;
+            }
+            
+            return response;
+        } catch (error) {
+            console.error('🔓 Encrypted authentication failed, falling back to plain text:', error);
+            
+            // Fallback to original method if encryption fails
+            const response = await this.fetch('/api/secrets/unlock', {
+                method: 'POST',
+                body: JSON.stringify({ password })
+            });
+            
+            if (response.success) {
+                this.setSecretStorePassword(password);
+            }
+            
+            return response;
+        }
     }
 
     /**

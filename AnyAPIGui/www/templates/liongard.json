@@ -1,0 +1,88 @@
+{
+  "id": "liongard",
+  "name": "Liongard API",
+  "description": "Liongard Roar Platform API for automated IT documentation and compliance",
+  "version": "1.0",
+  "category": "Documentation",
+  "categoryColor": "#1E3A8A",
+  "tags": ["documentation", "compliance", "automation", "msp"],
+  "icon": "🦁",
+  "baseUrl": "https://api.liongard.com",
+  "authType": "BearerToken",
+  "ui": {
+    "brandColor": "#1E3A8A",
+    "accentColor": "#3B82F6",
+    "logo": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjQ1IiBmaWxsPSIjMUUzQThBIi8+CjxwYXRoIGZpbGw9IiNmZmZmZmYiIGQ9Ik0zNSAzNWgzMHYxMEgzNXptMCAyMGgzMHYxMEgzNXptMCAyMGgyNXYxMEgzNXoiLz4KPC9zdmc+",
+    "gradient": "linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)",
+    "textColor": "#ffffff"
+  },
+  "defaultHeaders": {
+    "Accept": "application/json",
+    "Content-Type": "application/json"
+  },
+  "requiredSecrets": [
+    {
+      "key": "token",
+      "displayName": "API Token",
+      "description": "Liongard API access token",
+      "placeholder": "your-api-token",
+      "isRequired": true,
+      "helpUrl": "https://docs.liongard.com/docs/api-access"
+    }
+  ],
+  "authFieldMapping": {
+    "BearerToken": "token"
+  },
+  "customSettings": {},
+  "sampleEndpoints": [
+    {
+      "method": "GET",
+      "endpoint": "/v1/environments",
+      "description": "List all environments",
+      "category": "Environments"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/v1/systems",
+      "description": "List all systems",
+      "category": "Systems"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/v1/systems/{systemId}/inspectors",
+      "description": "Get system inspectors",
+      "category": "Inspectors",
+      "parameters": ["systemId"]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/v1/systems/{systemId}/data",
+      "description": "Get system data",
+      "category": "Data",
+      "parameters": ["systemId"]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/v1/metrics",
+      "description": "Get metrics",
+      "category": "Metrics"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/v1/timelines",
+      "description": "Get timeline data",
+      "category": "Timelines"
+    }
+  ],
+  "paginationDetails": {
+    "type": "PageBased",
+    "pageParameter": "page",
+    "pageSizeParameter": "per_page",
+    "defaultPageSize": 25,
+    "maxPageSize": 100
+  },
+  "documentation": {
+    "url": "https://docs.liongard.com/",
+    "quickStart": "https://docs.liongard.com/docs/getting-started"
+  }
+}

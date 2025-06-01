@@ -1,0 +1,98 @@
+{
+  "id": "meraki",
+  "name": "Cisco Meraki API",
+  "description": "Cisco Meraki Dashboard API for network management and monitoring",
+  "version": "1.0",
+  "category": "Networking",
+  "categoryColor": "#00BCEB",
+  "tags": ["networking", "wifi", "security", "cisco"],
+  "icon": "📡",
+  "baseUrl": "https://api.meraki.com/api/v1",
+  "authType": "ApiKey",
+  "ui": {
+    "brandColor": "#00BCEB",
+    "accentColor": "#0099CC",
+    "logo": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjQ1IiBmaWxsPSIjMDBCQ0VCIi8+CjxwYXRoIGZpbGw9IiNmZmZmZmYiIGQ9Ik01MCAyNWMtMTMuOCAwLTI1IDExLjItMjUgMjVzMTEuMiAyNSAyNSAyNSAyNS0xMS4yIDI1LTI1LTExLjItMjUtMjUtMjV6bTAgNDBjLTguMyAwLTE1LTYuNy0xNS0xNXM2LjctMTUgMTUtMTUgMTUgNi43IDE1IDE1LTYuNyAxNS0xNSAxNXoiLz4KPC9zdmc+",
+    "gradient": "linear-gradient(135deg, #00BCEB 0%, #0099CC 100%)",
+    "textColor": "#ffffff"
+  },
+  "defaultHeaders": {
+    "Accept": "application/json",
+    "Content-Type": "application/json"
+  },
+  "requiredSecrets": [
+    {
+      "key": "apiKey",
+      "displayName": "API Key",
+      "description": "Meraki Dashboard API key",
+      "placeholder": "your-api-key",
+      "isRequired": true,
+      "helpUrl": "https://documentation.meraki.com/General_Administration/Other_Topics/Cisco_Meraki_Dashboard_API"
+    }
+  ],
+  "authFieldMapping": {
+    "ApiKey": {
+      "header": "X-Cisco-Meraki-API-Key",
+      "value": "apiKey"
+    }
+  },
+  "customSettings": {},
+  "sampleEndpoints": [
+    {
+      "method": "GET",
+      "endpoint": "/organizations",
+      "description": "List organizations",
+      "category": "Organizations"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/organizations/{organizationId}/networks",
+      "description": "List networks in organization",
+      "category": "Networks",
+      "parameters": ["organizationId"]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/networks/{networkId}/devices",
+      "description": "List devices in network",
+      "category": "Devices",
+      "parameters": ["networkId"]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/networks/{networkId}/clients",
+      "description": "List clients on network",
+      "category": "Clients",
+      "parameters": ["networkId"]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/devices/{serial}/status",
+      "description": "Get device status",
+      "category": "Devices",
+      "parameters": ["serial"]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/organizations/{organizationId}/alerts",
+      "description": "Get organization alerts",
+      "category": "Alerts",
+      "parameters": ["organizationId"]
+    }
+  ],
+  "paginationDetails": {
+    "type": "LinkHeader",
+    "linkHeaderName": "Link",
+    "supportsPageSize": true,
+    "pageSizeParameter": "perPage",
+    "defaultPageSize": 1000,
+    "maxPageSize": 1000
+  },
+  "rateLimits": {
+    "default": "5 calls per second per organization"
+  },
+  "documentation": {
+    "url": "https://developer.cisco.com/meraki/",
+    "quickStart": "https://developer.cisco.com/meraki/api-latest/getting-started/"
+  }
+}

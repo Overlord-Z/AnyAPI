@@ -29,6 +29,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Prevent SecretStore password prompts
+$env:SECRETSTORE_SUPPRESS_PASSWORD_PROMPT = "1"
+
 # Import required modules
 try {
     Import-Module -Name (Resolve-Path $ModulePath) -Force
@@ -136,7 +139,78 @@ function Get-MimeType {
         ".jpg" { return "image/jpeg" }
         ".jpeg" { return "image/jpeg" }
         ".ico" { return "image/x-icon" }
-        default { return "application/octet-stream" }
+        default { return "application/octet-stream" }    }
+}
+
+# Session Management Helper Functions
+function Test-SessionAuthentication {
+    param($Request)
+    
+    # First, check if SecretStore is actually unlocked regardless of session tokens
+    $secretStoreUnlocked = $false
+    try {
+        if (Get-Module -ListAvailable -Name Microsoft.PowerShell.SecretManagement) {
+            # Try a simple test to see if SecretStore is unlocked
+            $testResult = Test-SecretVault -Name "AnyAPI" -ErrorAction SilentlyContinue
+            $secretStoreUnlocked = $testResult -eq $true
+        }
+    }
+    catch {
+        $secretStoreUnlocked = $false
+    }
+    
+    # If SecretStore is locked, all sessions are invalid
+    if (-not $secretStoreUnlocked) {
+        Write-Host "🔒 SecretStore is locked - invalidating all sessions" -ForegroundColor Yellow
+        
+        # Clear all sessions since they're useless without SecretStore access
+        if ($script:activeSessions) {
+            $script:activeSessions.Clear()
+        }
+        $script:secretStorePassword = $null
+        
+        return @{ 
+            success = $false
+            method = "none"
+            reason = "SecretStore is locked"
+            requiresAuth = $true
+        }
+    }
+    
+    # Check for session token in Authorization header
+    $authHeader = $Request.Headers['Authorization']
+    if ($authHeader -and $authHeader.StartsWith('Bearer ')) {
+        $sessionToken = $authHeader.Substring(7) # Remove "Bearer "
+        
+        # Check if session exists and is valid
+        if ($script:activeSessions -and $script:activeSessions.ContainsKey($sessionToken)) {
+            $session = $script:activeSessions[$sessionToken]
+            
+            # Check if session is expired (24 hours)
+            $sessionAge = (Get-Date) - $session.created
+            if ($sessionAge.TotalHours -lt 24 -and $session.authenticated) {
+                Write-Host "✅ Valid session token authenticated with unlocked SecretStore" -ForegroundColor Green
+                return @{ success = $true; method = "session" }
+            } else {
+                # Remove expired session
+                $script:activeSessions.Remove($sessionToken)
+                Write-Host "⏰ Session token expired, removed" -ForegroundColor Yellow
+            }
+        }
+    }
+    
+    # Fall back to checking if SecretStore password is available
+    if ($script:secretStorePassword) {
+        Write-Host "✅ SecretStore password available and store is unlocked" -ForegroundColor Green
+        return @{ success = $true; method = "secretstore" }
+    }
+    
+    Write-Host "❌ No valid authentication found" -ForegroundColor Red
+    return @{ 
+        success = $false
+        method = "none"
+        reason = "No valid session or password"
+        requiresAuth = $true
     }
 }
 
@@ -237,10 +311,21 @@ function Handle-CreateProfile {
     param($Request, $Response, $Body)
     
     try {
-        Write-Host "📝 Creating profile: $($Body.name)" -ForegroundColor Cyan
-        Write-Host "🔍 Request data: $($Body | ConvertTo-Json -Depth 2)" -ForegroundColor Gray
+        # --- Validate session authentication before processing ---
+        $authResult = Test-SessionAuthentication -Request $Request
+        if (-not $authResult.success) {
+            Write-Host "❌ Authentication required for profile creation: $($authResult.reason)" -ForegroundColor Red
+            Send-JsonResponse -Response $Response -Data @{
+                success = $false
+                error = "Authentication required"
+                requiresAuth = $true
+                reason = $authResult.reason
+            } -StatusCode 401
+            return
+        }
+        Write-Host "✅ Session authenticated ($($authResult.method)) - proceeding with profile creation" -ForegroundColor Green
         
-        # Extract SecretStore password from headers if provided
+        # Extract SecretStore password from headers if provided (legacy support)
         $secretStorePassword = $Request.Headers["X-SecretStore-Password"]
         if ($secretStorePassword) {
             $script:secretStorePassword = ConvertTo-SecureString $secretStorePassword -AsPlainText -Force
@@ -445,9 +530,25 @@ function Handle-UpdateProfile {
     param($Request, $Response, $Body, $ProfileName)
     
     try {
-        Write-Host "📝 Updating profile '$ProfileName' with data: $($Body | ConvertTo-Json -Depth 3)" -ForegroundColor Cyan
+        Write-Host "📝 Updating profile '$ProfileName'..." -ForegroundColor Cyan
         
-        # Extract SecretStore password from headers if provided
+        # --- Validate session authentication before processing ---
+        $authResult = Test-SessionAuthentication -Request $Request
+        if (-not $authResult.success) {
+            Write-Host "❌ Authentication required for profile update: $($authResult.reason)" -ForegroundColor Red
+            Send-JsonResponse -Response $Response -Data @{
+                success = $false
+                error = "Authentication required"
+                requiresAuth = $true
+                reason = $authResult.reason
+            } -StatusCode 401
+            return
+        }
+        Write-Host "✅ Session authenticated ($($authResult.method)) - proceeding with profile update" -ForegroundColor Green
+        
+        Write-Host "📋 Profile data: $($Body | ConvertTo-Json -Depth 3)" -ForegroundColor Gray
+        
+        # Extract SecretStore password from headers if provided (legacy support)
         $secretStorePassword = $Request.Headers["X-SecretStore-Password"]
         if ($secretStorePassword) {
             $script:secretStorePassword = ConvertTo-SecureString $secretStorePassword -AsPlainText -Force
@@ -520,32 +621,37 @@ function Handle-UpdateProfile {
                 if ($hasNewCredentials) {
             Write-Host "Processing credentials for update... (fetching secrets if needed)" -ForegroundColor Cyan
             foreach ($key in $Body.credentials.Keys) {
-                $newValue = $Body.credentials[$key]
-                # If masked or preserve marker, fetch from vault and use; fallback to existing profile if vault is missing
+                $newValue = $Body.credentials[$key]                # If masked or preserve marker, fetch from vault and use; fallback to existing profile if vault is missing
                 if ($newValue -in @('***HIDDEN***', '***MASKED***', '***SECRET***', '***PRESERVE_EXISTING***')) {
                     $vaultKey = "AnyAPI.$ProfileName.$key"
                     $secret = $null
-                    Write-Host "  [DEBUG] Attempting to fetch secret with key: '$vaultKey' from vault 'AnyAPI'" -ForegroundColor DarkGray
-                    try {
-                        $secret = Get-Secret -Name $vaultKey -Vault "AnyAPI" -ErrorAction Stop
-                        Write-Host "  $key`: fetched from vault and set for update (masked or preserve marker)" -ForegroundColor Yellow
-                    } catch {
-                        Write-Host "  $key`: could not fetch from vault with key '$vaultKey', will try alternate casing and existing profile value" -ForegroundColor Red
-                        # Try alternate casing (lowercase key)
-                        $altVaultKey = "AnyAPI.$ProfileName.$($key.ToLower())"
+                    
+                    # Only attempt to fetch from vault if SecretStore is unlocked (password cached)
+                    if ($script:secretStorePassword) {
+                        Write-Host "  [DEBUG] SecretStore is unlocked, attempting to fetch secret with key: '$vaultKey' from vault 'AnyAPI'" -ForegroundColor DarkGray
                         try {
-                            $secret = Get-Secret -Name $altVaultKey -Vault "AnyAPI" -ErrorAction Stop
-                            Write-Host "  $key`: fetched from vault with alternate key '$altVaultKey' (lowercase)" -ForegroundColor Yellow
+                            $secret = Get-Secret -Name $vaultKey -Vault "AnyAPI" -ErrorAction Stop
+                            Write-Host "  $key`: fetched from vault and set for update (masked or preserve marker)" -ForegroundColor Yellow
                         } catch {
-                            Write-Host "  $key`: still could not fetch from vault with alternate key, will try existing profile value" -ForegroundColor Red
-                            # For debugging, list all available keys in the vault
+                            Write-Host "  $key`: could not fetch from vault with key '$vaultKey', will try alternate casing" -ForegroundColor Red
+                            # Try alternate casing (lowercase key)
+                            $altVaultKey = "AnyAPI.$ProfileName.$($key.ToLower())"
                             try {
-                                $allVaultSecrets = Get-SecretInfo -Vault "AnyAPI" | Select-Object -ExpandProperty Name
-                                Write-Host "  [DEBUG] Available secrets in vault: $($allVaultSecrets -join ', ')" -ForegroundColor DarkGray
+                                $secret = Get-Secret -Name $altVaultKey -Vault "AnyAPI" -ErrorAction Stop
+                                Write-Host "  $key`: fetched from vault with alternate key '$altVaultKey' (lowercase)" -ForegroundColor Yellow
                             } catch {
-                                Write-Host "  [DEBUG] Could not list secrets in vault 'AnyAPI'" -ForegroundColor DarkGray
+                                Write-Host "  $key`: still could not fetch from vault with alternate key" -ForegroundColor Red
+                                # For debugging, list all available keys in the vault (only if unlocked)
+                                try {
+                                    $allVaultSecrets = Get-SecretInfo -Vault "AnyAPI" | Select-Object -ExpandProperty Name
+                                    Write-Host "  [DEBUG] Available secrets in vault: $($allVaultSecrets -join ', ')" -ForegroundColor DarkGray
+                                } catch {
+                                    Write-Host "  [DEBUG] Could not list secrets in vault 'AnyAPI'" -ForegroundColor DarkGray
+                                }
                             }
                         }
+                    } else {
+                        Write-Host "  [DEBUG] SecretStore is locked (no password cached), skipping vault access for key: '$vaultKey'" -ForegroundColor Yellow
                     }
                     if (-not $secret -and $existingProfile -and $existingProfile.AuthenticationDetails -and $existingProfile.AuthenticationDetails.ContainsKey($key)) {
                         $fallback = $existingProfile.AuthenticationDetails[$key]
@@ -751,15 +857,30 @@ catch {
     Send-JsonResponse -Response $Response -Data @{
         success = $false
         error   = $_.Exception.Message
-        details = $_.Exception.ToString()
-    } -StatusCode 500
+        details = $_.Exception.ToString()    } -StatusCode 500
 }
 }
+
 function Handle-TestEndpoint {
     param($Request, $Response, $Body)
     
     try {
         Write-Host "🔍 Processing test endpoint request..." -ForegroundColor Cyan
+        
+        # --- Validate session authentication before processing ---
+        $authResult = Test-SessionAuthentication -Request $Request
+        if (-not $authResult.success) {
+            Write-Host "❌ Authentication required for test endpoint: $($authResult.reason)" -ForegroundColor Red
+            Send-JsonResponse -Response $Response -Data @{
+                success = $false
+                error = "Authentication required"
+                requiresAuth = $true
+                reason = $authResult.reason
+            } -StatusCode 401
+            return
+        }
+        Write-Host "✅ Session authenticated ($($authResult.method)) - proceeding with test" -ForegroundColor Green
+        
         Write-Host "📋 Request body: $($Body | ConvertTo-Json -Depth 3)" -ForegroundColor Gray
         
         # --- Resolve profile name to actual stored key (case-insensitive, trimmed) ---
@@ -915,39 +1036,73 @@ function Handle-GetSecretInfo {
     param($Request, $Response)
     
     try {
-        # Get secret storage info
-        $storageInfo = @{
-            provider                    = Get-SecretStorageProvider
-            isSecretManagementAvailable = $null -ne (Get-Module Microsoft.PowerShell.SecretManagement -ListAvailable)
-            isSecretStoreAvailable      = $null -ne (Get-Module Microsoft.PowerShell.SecretStore -ListAvailable)
-        }
-        
-        # Get vault info if available
-        if ($storageInfo.provider -eq 'SecretManagement') {
-            try {
-                $vaults = Get-SecretVault -ErrorAction SilentlyContinue
-                $storageInfo.vaults = @()
-                foreach ($vault in $vaults) {
-                    $storageInfo.vaults += @{
-                        name       = $vault.Name
-                        moduleName = $vault.ModuleName
-                        isDefault  = $vault.IsDefault
+        $isSecretStoreAvailable = $false
+        $isSecretStoreUnlocked = $false
+        $provider = $null
+        $vaultName = $null
+        $vaultStatus = $null
+        $details = @{}
+
+        try {
+            # Check if SecretManagement module is available without triggering password prompts
+            if (Get-Module -ListAvailable -Name Microsoft.PowerShell.SecretManagement) {
+                # Check if SecretStore vault is registered without accessing it
+                $vaults = Get-SecretVault -ErrorAction SilentlyContinue | Where-Object { $_.Name -eq "AnyAPI" -or $_.ModuleName -eq "Microsoft.PowerShell.SecretStore" }
+                if ($vaults) {
+                    $isSecretStoreAvailable = $true
+                    $provider = 'SecretManagement'
+                    $vaultName = 'SecretStore'
+                    
+                    # Only check if unlocked based on our cached password state
+                    if ($script:secretStorePassword) {
+                        $isSecretStoreUnlocked = $true
+                        $vaultStatus = 'Unlocked'
+                        # Only get configuration when we know we're unlocked
+                        try {
+                            $config = Get-SecretStoreConfiguration -ErrorAction Stop
+                            $details = $config | Select-Object * | ConvertTo-Json -Depth 5 | ConvertFrom-Json
+                        } catch {
+                            # If we can't get config even when unlocked, just use basic details
+                            $details = @{ status = "Configuration not accessible" }
+                        }
+                    } else {
+                        $isSecretStoreUnlocked = $false
+                        $vaultStatus = 'Locked'
+                        $details = @{ status = "SecretStore is locked" }
                     }
+                } else {
+                    $isSecretStoreAvailable = $false
+                    $provider = 'None'
+                    $vaultStatus = 'No SecretStore vault found'
                 }
+            } else {
+                $isSecretStoreAvailable = $false
+                $provider = 'None'
+                $vaultStatus = 'SecretManagement module not available'
             }
-            catch {
-                $storageInfo.vaultError = $_.Exception.Message
-            }
+        } catch {
+            Write-Host "Error checking SecretStore availability: $_" -ForegroundColor Red
+            $isSecretStoreAvailable = $false
+            $provider = 'None'
+            $vaultStatus = 'Error checking availability'
+            $details = @{ error = $_.Exception.Message }
         }
-        
+
+        $storageInfo = @{
+            provider = $provider
+            vaultName = $vaultName
+            vaultStatus = $vaultStatus
+            isSecretStoreAvailable = $isSecretStoreAvailable
+            isSecretStoreUnlocked = $isSecretStoreUnlocked
+            details = $details
+        }
+
         Send-JsonResponse -Response $Response -Data @{
-            success     = $true
+            success = $true
             storageInfo = $storageInfo
         }
-    }
-    catch {
+    } catch {
         Send-JsonResponse -Response $Response -Data @{
-            success = $false
             error   = $_.Exception.Message
         } -StatusCode 500
     }
@@ -957,9 +1112,60 @@ function Handle-UnlockSecretStore {
     param($Request, $Response, $Body)
     
     try {
+        # Check if this is an encrypted password request
+        if ($Body.isEncrypted -eq $true -and $Body.encryptedPassword -and $Body.encryptionMetadata) {
+            Write-Host "🔐 Received encrypted password request" -ForegroundColor Green
+            
+            try {
+                # Decrypt the password using PowerShell cryptographic functions
+                $decryptedPassword = Decrypt-SessionPassword -EncryptedPassword $Body.encryptedPassword -EncryptionMetadata $Body.encryptionMetadata -UserAgent ($Request.Headers['User-Agent'])
+                
+                Write-Host "✅ Password decrypted successfully" -ForegroundColor Green
+                Write-Host "ℹ️ Processing SecretStore unlock with decrypted password" -ForegroundColor Blue
+                
+                # Convert decrypted password to SecureString
+                $securePassword = ConvertTo-SecureString $decryptedPassword -AsPlainText -Force
+                
+                # Clear the plain text password from memory
+                $decryptedPassword = $null
+                [System.GC]::Collect()
+                
+                # Try to unlock the secret store
+                Unlock-SecretStore -Password $securePassword -ErrorAction Stop
+                
+                # Store for future use in this session
+                $script:secretStorePassword = $securePassword
+                
+                Write-Host "✅ SecretStore unlocked successfully with encrypted password" -ForegroundColor Green
+                
+                Send-JsonResponse -Response $Response -Data @{
+                    success = $true
+                    message = "SecretStore unlocked successfully"
+                    encryptionUsed = $true
+                }
+                return
+            }
+            catch {
+                Write-Host "❌ Failed to decrypt password: $($_.Exception.Message)" -ForegroundColor Red
+                
+                # Fall back to legacy authentication
+                Send-JsonResponse -Response $Response -Data @{
+                    success = $false
+                    error   = "Failed to decrypt password. Please use fallback authentication."
+                    requiresFallback = $true
+                }
+                return
+            }
+        }
+        
+        # Legacy password-based authentication
         if (-not $Body.password) {
             throw "Password is required"
         }
+        
+        Write-Host "🔑 Processing authentication request" -ForegroundColor Yellow
+        # Don't log the actual password for security
+        Write-Host "ℹ️ Password length: $($Body.password.Length) characters" -ForegroundColor Blue
         
         $securePassword = ConvertTo-SecureString $Body.password -AsPlainText -Force
         
@@ -969,15 +1175,120 @@ function Handle-UnlockSecretStore {
         # Store for future use in this session
         $script:secretStorePassword = $securePassword
         
+        Write-Host "✅ SecretStore unlocked successfully" -ForegroundColor Green
+        
         Send-JsonResponse -Response $Response -Data @{
             success = $true
             message = "SecretStore unlocked successfully"
         }
     }
-    catch {
+    catch {        Write-Host "❌ SecretStore unlock failed: $($_.Exception.Message)" -ForegroundColor Red
         Send-JsonResponse -Response $Response -Data @{
             success = $false
             error   = $_.Exception.Message
+        } -StatusCode 500
+    }
+}
+
+function Handle-SecureUnlockSecretStore {
+    param($Request, $Response, $Body)
+    
+    try {
+        Write-Host "🔐 Processing secure unlock request" -ForegroundColor Green
+        
+        # Validate required fields
+        if (-not $Body.encryptedPassword -or -not $Body.encryptionMetadata) {
+            throw "Missing required encryption data"
+        }
+        
+        Write-Host "📊 Encryption metadata received:" -ForegroundColor Blue
+        Write-Host "  Algorithm: $($Body.encryptionMetadata.algorithm)" -ForegroundColor Blue
+        Write-Host "  Key length: $($Body.encryptionMetadata.keyLength)" -ForegroundColor Blue
+        Write-Host "  IV length: $($Body.encryptionMetadata.iv.Length)" -ForegroundColor Blue
+          # Decrypt the password
+        try {
+            # For simple secure auth, decrypt directly without complex fingerprinting
+            if ($Body.encryptionMetadata.algorithm -eq 'AES-GCM' -and $Body.encryptionMetadata.key) {
+                Write-Host "🔑 Using simplified secure decryption method" -ForegroundColor Blue
+                
+                # Decode the encryption components
+                $encryptedBytes = [System.Convert]::FromBase64String($Body.encryptedPassword)
+                $keyBytes = [System.Convert]::FromBase64String($Body.encryptionMetadata.key)
+                $ivBytes = [System.Convert]::FromBase64String($Body.encryptionMetadata.iv)
+                
+                # Use .NET AES-GCM decryption
+                $aes = [System.Security.Cryptography.AesGcm]::new($keyBytes)
+                
+                # Extract the encrypted data and authentication tag
+                # AES-GCM adds a 16-byte authentication tag at the end
+                $tagLength = 16
+                $cipherBytes = $encryptedBytes[0..($encryptedBytes.Length - $tagLength - 1)]
+                $tagBytes = $encryptedBytes[($encryptedBytes.Length - $tagLength)..($encryptedBytes.Length - 1)]
+                
+                # Decrypt
+                $plaintextBytes = New-Object byte[] $cipherBytes.Length
+                $aes.Decrypt($ivBytes, $cipherBytes, $tagBytes, $plaintextBytes)
+                
+                $decryptedPassword = [System.Text.Encoding]::UTF8.GetString($plaintextBytes)
+                
+                # Clean up
+                $aes.Dispose()
+            } else {
+                # Fall back to the complex decryption method
+                Write-Host "🔄 Using legacy decryption method" -ForegroundColor Yellow
+                $userAgent = $Request.Headers['User-Agent']
+                $decryptedPassword = Decrypt-SessionPassword -EncryptedPassword $Body.encryptedPassword -EncryptionMetadata $Body.encryptionMetadata -UserAgent $userAgent
+            }
+            
+            Write-Host "✅ Password decrypted successfully" -ForegroundColor Green
+            
+            # Convert to SecureString and unlock SecretStore
+            $securePassword = ConvertTo-SecureString $decryptedPassword -AsPlainText -Force
+            Unlock-SecretStore -Password $securePassword -ErrorAction Stop
+            
+            # Store for future use in this session
+            $script:secretStorePassword = $securePassword
+              # Generate session token
+            $sessionToken = [System.Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+            
+            # Store session token (in production, use secure storage)
+            if (-not $script:activeSessions) {
+                $script:activeSessions = @{}
+            }
+            $script:activeSessions[$sessionToken] = @{
+                created = Get-Date
+                userAgent = $userAgent
+                authenticated = $true
+            }
+            
+            Write-Host "✅ SecretStore unlocked with secure session" -ForegroundColor Green
+            Write-Host "🎟️ Session token generated: $($sessionToken.Substring(0,8))..." -ForegroundColor Blue
+            
+            # Clear the plain text password from memory
+            $decryptedPassword = $null
+            [System.GC]::Collect()
+            
+            Send-JsonResponse -Response $Response -Data @{
+                success = $true
+                message = "SecretStore unlocked successfully"
+                sessionToken = $sessionToken
+                secureAuth = $true
+            }
+        }
+        catch {
+            Write-Host "❌ Password decryption failed: $($_.Exception.Message)" -ForegroundColor Red
+            Send-JsonResponse -Response $Response -Data @{
+                success = $false
+                error = "Failed to decrypt password: $($_.Exception.Message)"
+                requiresFallback = $true
+            } -StatusCode 400
+        }
+    }
+    catch {
+        Write-Host "❌ Secure unlock failed: $($_.Exception.Message)" -ForegroundColor Red
+        Send-JsonResponse -Response $Response -Data @{
+            success = $false
+            error = $_.Exception.Message
         } -StatusCode 500
     }
 }
@@ -1116,10 +1427,48 @@ $RequestContext.Headers["Accept"] = "application/json"
             )
         }
     )
-    
-    Send-JsonResponse -Response $Response -Data @{
+      Send-JsonResponse -Response $Response -Data @{
         success   = $true
         templates = $templates
+    }
+}
+
+function Handle-ListTemplateFiles {
+    param($Request, $Response)
+    
+    try {
+        $templatesPath = Join-Path $script:wwwRoot "templates"
+        
+        if (-not (Test-Path $templatesPath)) {
+            Send-JsonResponse -Response $Response -Data @{
+                success = $false
+                error = "Templates directory not found"
+                files = @()
+            } -StatusCode 404
+            return
+        }
+        
+        # Get all .json files in the templates directory
+        $templateFiles = Get-ChildItem -Path $templatesPath -Filter "*.json" -File | ForEach-Object {
+            @{
+                name = $_.Name
+                path = "templates/$($_.Name)"
+                lastModified = $_.LastWriteTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+            }
+        }
+        
+        Send-JsonResponse -Response $Response -Data @{
+            success = $true
+            files = $templateFiles
+            count = $templateFiles.Count
+        }
+    }
+    catch {
+        Send-JsonResponse -Response $Response -Data @{
+            success = $false
+            error = $_.Exception.Message
+            files = @()
+        } -StatusCode 500
     }
 }
 
@@ -1201,8 +1550,7 @@ function Handle-Request {
             "^/api/secrets/info/?$" {
                 Handle-GetSecretInfo -Request $request -Response $response
             }
-            
-            "^/api/secrets/unlock/?$" {
+              "^/api/secrets/unlock/?$" {
                 if ($method -eq "POST") {
                     Handle-UnlockSecretStore -Request $request -Response $response -Body $body
                 }
@@ -1211,8 +1559,20 @@ function Handle-Request {
                 }
             }
             
-            "^/api/templates/?$" {
+            "^/api/auth/secure-unlock/?$" {
+                if ($method -eq "POST") {
+                    Handle-SecureUnlockSecretStore -Request $request -Response $response -Body $body
+                }
+                else {
+                    Send-JsonResponse -Response $response -Data @{ error = "Method not allowed" } -StatusCode 405
+                }
+            }
+              "^/api/templates/?$" {
                 Handle-GetTemplates -Request $request -Response $response
+            }
+            
+            "^/api/templates/list/?$" {
+                Handle-ListTemplateFiles -Request $request -Response $response
             }
             
             "^/api/export/?$" {
@@ -1259,9 +1619,8 @@ function Handle-Request {
                     timestamp = Get-Date -Format "yyyy-MM-ddTHH:mm:ss.fffZ"
                 }
             }
-            
-            # Static file serving
-            "^/(js|css|img|fonts)/(.+)$" {
+              # Static file serving
+            "^/(js|css|img|fonts|templates)/(.+)$" {
                 $filePath = Join-Path $script:wwwRoot $url.Substring(1)
                 Send-File -Response $response -FilePath $filePath
             }
@@ -1284,8 +1643,7 @@ function Handle-Request {
                 }
                 else {
                     Send-JsonResponse -Response $response -Data @{ error = "Method not allowed" } -StatusCode 405
-                }
-            }
+                }            }
 
             default {
                 Send-JsonResponse -Response $response -Data @{ error = "Not found" } -StatusCode 404
@@ -1479,6 +1837,187 @@ function Handle-UpdateCustomScript {
             error   = $_.Exception.Message
             details = $_.Exception.ToString()
         } -StatusCode 500
+    }
+}
+
+function Decrypt-SessionPassword {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$EncryptedPassword,
+        
+        [Parameter(Mandatory=$true)]
+        [string]$EncryptionMetadata,
+        
+        [Parameter(Mandatory=$false)]
+        [string]$UserAgent = ""
+    )
+    
+    try {
+        # Decode the metadata
+        $metadataBytes = [System.Convert]::FromBase64String($EncryptionMetadata)
+        $metadataJson = [System.Text.Encoding]::UTF8.GetString($metadataBytes)
+        $metadata = $metadataJson | ConvertFrom-Json
+        
+        # Extract browser data if available (new format)
+        $browserData = $null
+        if ($metadata.browserData) {
+            $browserData = $metadata.browserData
+            Write-Host "📊 Browser data found in metadata" -ForegroundColor Green
+        } else {
+            Write-Host "⚠️ No browser data in metadata, using fallback method" -ForegroundColor Yellow
+        }
+        
+        # Generate session key from fingerprint 
+        $sessionKey = Get-SessionKeyFromFingerprint -SessionFingerprint $metadata.sessionFingerprint -UserAgent $UserAgent -BrowserData $browserData
+        
+        # Decode encrypted data, salt, and IV
+        $encryptedBytes = [System.Convert]::FromBase64String($EncryptedPassword)
+        $saltBytes = [System.Convert]::FromBase64String($metadata.salt)
+        $ivBytes = [System.Convert]::FromBase64String($metadata.iv)
+        
+        # Derive decryption key using PBKDF2
+        $keyBytes = Get-PBKDF2Key -Password $sessionKey.Substring(0, [Math]::Min(32, $sessionKey.Length)) -Salt $saltBytes -Iterations 100000
+        
+        # Decrypt using AES-GCM
+        $decryptedPassword = Get-DecryptedAESGCM -EncryptedData $encryptedBytes -Key $keyBytes -IV $ivBytes
+        
+        return $decryptedPassword
+    }
+    catch {
+        throw "Failed to decrypt session password: $($_.Exception.Message)"
+    }
+}
+
+function Get-SessionKeyFromFingerprint {
+    param(
+        [string]$SessionFingerprint,
+        [string]$UserAgent,
+        [object]$BrowserData
+    )
+    
+    # Use actual browser data if provided in metadata
+    if ($BrowserData) {
+        Write-Host "🔍 Using actual browser data for session key reconstruction" -ForegroundColor Blue       
+        # Reconstruct the exact session seed used by frontend
+        $sessionSeed = @(
+            $BrowserData.userAgent,
+            $BrowserData.screenResolution,
+            $BrowserData.language,
+            $BrowserData.timestamp
+        ) -join '|'
+        
+        # Verify fingerprint matches
+        $baseSeed = $sessionSeed.Substring(0, $sessionSeed.LastIndexOf('|'))
+        $calculatedFingerprint = Get-SHA256Hash -InputString $baseSeed
+               
+        if ($calculatedFingerprint -eq $SessionFingerprint) {
+            Write-Host "✅ Fingerprint match! Generating session key" -ForegroundColor Green
+            return Get-SHA256Hash -InputString $sessionSeed
+        } else {
+            Write-Host "❌ Fingerprint mismatch!" -ForegroundColor Red
+            throw "Session fingerprint verification failed"
+        }
+    }
+    
+    # Fallback to old method (should not be needed with new implementation)
+    Write-Host "⚠️ No browser data provided, attempting timestamp brute force" -ForegroundColor Yellow
+    
+    # Try different timestamps to match the session fingerprint
+    # In practice, this should be within a reasonable time window (e.g., last few minutes)
+    $currentTime = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    
+    # Try timestamps within the last 5 minutes (300,000 ms)
+    for ($i = 0; $i -lt 300000; $i += 1000) {
+        $testTime = $currentTime - $i
+        
+        $testSessionSeed = @(
+            $UserAgent,
+            "1920x1080",
+            "en-US",
+            $testTime.ToString()
+        ) -join '|'
+        
+        $baseSeed = $testSessionSeed.Substring(0, $testSessionSeed.LastIndexOf('|'))
+        $testFingerprint = Get-SHA256Hash -InputString $baseSeed
+        
+        if ($testFingerprint -eq $SessionFingerprint) {
+            # Found matching timestamp, return the session key
+            return Get-SHA256Hash -InputString $testSessionSeed
+        }
+    }
+    
+    throw "Could not reconstruct session key from fingerprint"
+}
+
+function Get-SHA256Hash {
+    param([string]$InputString)
+    
+    $hasher = [System.Security.Cryptography.SHA256]::Create()
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($InputString)
+    $hashBytes = $hasher.ComputeHash($bytes)
+    $hasher.Dispose()
+    
+    return [System.BitConverter]::ToString($hashBytes).Replace('-', '').ToLower()
+}
+
+function Get-PBKDF2Key {
+    param(
+        [string]$Password,
+        [byte[]]$Salt,
+        [int]$Iterations = 100000
+    )
+    
+    $passwordBytes = [System.Text.Encoding]::UTF8.GetBytes($Password)
+    
+    # Use .NET's Rfc2898DeriveBytes for PBKDF2
+    $rfc2898 = New-Object System.Security.Cryptography.Rfc2898DeriveBytes($passwordBytes, $Salt, $Iterations, [System.Security.Cryptography.HashAlgorithmName]::SHA256)
+    $keyBytes = $rfc2898.GetBytes(32) # 256 bits = 32 bytes
+    $rfc2898.Dispose()
+    
+    return $keyBytes
+}
+
+function Get-DecryptedAESGCM {
+    param(
+        [byte[]]$EncryptedData,
+        [byte[]]$Key,
+        [byte[]]$IV
+    )
+    
+    try {
+       
+        # AES-GCM decryption in .NET
+        $aes = [System.Security.Cryptography.AesGcm]::new($Key)
+        
+        # Web Crypto API format: [ciphertext][16-byte authentication tag]
+        # The last 16 bytes are the authentication tag
+        $tagLength = 16
+        $cipherTextLength = $EncryptedData.Length - $tagLength
+        
+        
+        # Use proper array copying instead of slicing to avoid PowerShell array issues
+        $cipherText = New-Object byte[] $cipherTextLength
+        $tag = New-Object byte[] $tagLength
+        
+        # Copy ciphertext (first part)
+        [Array]::Copy($EncryptedData, 0, $cipherText, 0, $cipherTextLength)
+        
+        # Copy tag (last 16 bytes)
+        [Array]::Copy($EncryptedData, $cipherTextLength, $tag, 0, $tagLength)
+
+        # Debug: Show first few bytes of each part
+        $cipherHex = [System.BitConverter]::ToString($cipherText[0..([Math]::Min(7, $cipherText.Length-1))]).Replace('-', '')
+        $tagHex = [System.BitConverter]::ToString($tag[0..([Math]::Min(7, $tag.Length-1))]).Replace('-', '')
+        
+        $plainTextBytes = New-Object byte[] $cipherTextLength
+        $aes.Decrypt($IV, $cipherText, $tag, $plainTextBytes)
+        $aes.Dispose()
+        
+        $decryptedText = [System.Text.Encoding]::UTF8.GetString($plainTextBytes)
+        return $decryptedText
+    }
+    catch {
+        throw "AES-GCM decryption failed: $($_.Exception.Message)"
     }
 }
 

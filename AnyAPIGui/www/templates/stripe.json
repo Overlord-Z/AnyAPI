@@ -1,0 +1,98 @@
+{
+  "id": "stripe",
+  "name": "Stripe API",
+  "description": "Stripe Payment API for processing payments, managing customers, and handling subscriptions",
+  "version": "1.0",
+  "category": "Payments",
+  "tags": ["payments", "billing", "subscriptions", "customers"],
+  "icon": "💳",
+  "baseUrl": "https://api.stripe.com/v1",
+  "authType": "BearerToken",
+  "paginationType": "Cursor",
+  "ui": {
+    "brandColor": "#635bff",
+    "accentColor": "#4f46e5",
+    "logo": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiByeD0iMTAiIGZpbGw9IiM2MzViZmYiLz4KPHBhdGggZmlsbD0iI2ZmZmZmZiIgZD0iTTUwIDI1YzEzLjggMCAyNSAxMS4yIDI1IDI1cy0xMS4yIDI1LTI1IDI1LTI1LTExLjItMjUtMjVTMzYuMiAyNSA1MCAyNXoiLz4KPC9zdmc+",
+    "gradient": "linear-gradient(135deg, #635bff 0%, #4f46e5 100%)",
+    "textColor": "#ffffff"
+  },
+  "defaultHeaders": {
+    "Stripe-Version": "2023-10-16",
+    "Content-Type": "application/x-www-form-urlencoded"
+  },
+  "requiredSecrets": [
+    {
+      "key": "secretKey",
+      "displayName": "Secret Key",
+      "description": "Stripe secret key (starts with sk_)",
+      "placeholder": "sk_test_... or sk_live_...",
+      "isRequired": true,
+      "helpUrl": "https://stripe.com/docs/keys"
+    }
+  ],
+  "authFieldMapping": {
+    "BearerToken": "secretKey"
+  },
+  "customSettings": {},
+  "sampleEndpoints": [
+    {
+      "method": "GET",
+      "endpoint": "/customers",
+      "description": "List customers",
+      "category": "Customers"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/customers",
+      "description": "Create a customer",
+      "category": "Customers"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/charges",
+      "description": "List charges",
+      "category": "Payments"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/payment_intents",
+      "description": "Create a payment intent",
+      "category": "Payments"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/subscriptions",
+      "description": "List subscriptions",
+      "category": "Subscriptions"
+    },
+    {
+      "method": "POST",
+      "endpoint": "/subscriptions",
+      "description": "Create a subscription",
+      "category": "Subscriptions"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/products",
+      "description": "List products",
+      "category": "Products"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/invoices",
+      "description": "List invoices",
+      "category": "Billing"
+    }
+  ],
+  "paginationDetails": {
+    "type": "Cursor",
+    "cursorField": "starting_after",
+    "limitField": "limit",
+    "defaultPageSize": 10,
+    "maxPageSize": 100
+  },
+  "documentation": {
+    "url": "https://stripe.com/docs/api",
+    "quickStart": "https://stripe.com/docs/development/quickstart"
+  }
+}

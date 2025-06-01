@@ -101,8 +101,40 @@
     --z-modal-backdrop: 400;
     --z-modal: 500;
     --z-popover: 600;
-    --z-tooltip: 700;
-    --z-notification: 800;
+    --z-tooltip: 700;    --z-notification: 800;
+}
+
+/* ===== GLOBAL MODERN SCROLLBAR STYLING ===== */
+/* Apply modern scrollbar to all scrollable elements */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-primary) var(--bg-tertiary);
+}
+
+*::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 5px;
+    margin: 4px 0;
+    border: 1px solid var(--border-color);
+}
+
+*::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--color-primary-light), var(--color-primary));
+    border-radius: 5px;
+    border: 2px solid var(--bg-tertiary);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, var(--color-primary), var(--color-primary-dark));
+}
+
+*::-webkit-scrollbar-corner {
+    background: var(--bg-tertiary);
 }
 
 /* ===== DARK MODE VARIABLES ===== */
@@ -299,22 +331,67 @@ h6 { font-size: var(--font-size-base); }
 .connection-status {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm) var(--spacing-lg);
-    border-radius: var(--border-radius-2xl);
+    padding: var(--spacing-sm);
+    border-radius: var(--border-radius);
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-medium);
     transition: all var(--transition-fast);
+    cursor: default;
 }
 
 .connection-status.connected {
-    background: rgba(22, 163, 74, 0.1);
-    color: var(--color-success);
+    color: #27d645;
 }
 
 .connection-status.disconnected {
+    color: #dc2626;
+}
+
+.connection-status.connecting {
+    color: #f97316;
+}
+
+.connection-status i {
+    width: 18px;
+    height: 18px;
+}
+
+/* ===== SECRET STORE STATUS ===== */
+.secretstore-status {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--spacing-sm);
+    border-radius: var(--border-radius);
+    transition: all var(--transition-fast);
+    cursor: default;
+}
+
+.secretstore-status.unlocked {
+    color: #27d645;
+}
+
+.secretstore-status.locked {
+    color: #dc2626;
+}
+
+.secretstore-status.locked.clickable {
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.secretstore-status.locked.clickable:hover {
+    color: #ef4444;
     background: rgba(220, 38, 38, 0.1);
-    color: var(--color-danger);
+    transform: scale(1.05);
+}
+
+.secretstore-status.checking {
+    color: #f97316;
+}
+
+.secretstore-status i {
+    width: 18px;
+    height: 18px;
 }
 
 /* ===== MODERN BUTTONS ===== */

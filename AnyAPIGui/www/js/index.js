@@ -11,6 +11,9 @@ window.displayResponseData = displayResponseData;
 window.clearResponseData = clearResponseData;
 window.initResponseUI = initResponseUI;
 
+// updateSecretStoreStatusIndicator will be loaded from secret-utils.js as a regular script
+// and should be available globally
+
 /**
  * Wait for dependencies to be available
  */
@@ -37,9 +40,17 @@ async function waitForDependencies() {
 async function initializeApp() {
     try {
         console.log('🔧 Starting AnyAPI initialization...');
-        
-        // Wait for dependencies
+          // Wait for dependencies
         await waitForDependencies();
+        
+        // Initialize SecretManager first and wait for it to complete
+        if (window.secretManager && typeof window.secretManager.init === 'function') {
+            console.log('🔐 Initializing SecretManager...');
+            await window.secretManager.init();
+            console.log('✅ SecretManager initialization complete');
+        } else {
+            console.warn('⚠️ SecretManager not available');
+        }
           // Check for EndpointTester initialization function
         if (typeof window.initializeEndpointTester === 'function') {
             console.log('🔌 Initializing EndpointTester...');
@@ -139,8 +150,23 @@ window.addEventListener('DOMContentLoaded', () => {
     if (savedDarkMode) {
         document.documentElement.setAttribute('data-theme', 'dark');
     }
-    
-    initializeApp();
+      initializeApp();
+});
+
+window.addEventListener('info-updated', () => {
+    updateSecretStoreStatusIndicator();
+});
+
+window.addEventListener('secretStoreInfoUpdated', () => {
+    updateSecretStoreStatusIndicator();
+});
+
+window.addEventListener('secretStoreUnlocked', () => {
+    updateSecretStoreStatusIndicator();
+});
+
+window.addEventListener('secretStoreSkipped', () => {
+    updateSecretStoreStatusIndicator();
 });
 
 // Main application initialization

@@ -1,0 +1,94 @@
+{
+  "id": "github",
+  "name": "GitHub API",
+  "description": "GitHub REST API v3 for repository management, issues, and user operations",
+  "version": "1.0",
+  "category": "Version Control",
+  "tags": ["git", "repository", "issues", "development"],
+  "icon": "🐙",
+  "baseUrl": "https://api.github.com",
+  "authType": "BearerToken",
+  "paginationType": "LinkHeader",
+  "ui": {
+    "brandColor": "#24292e",
+    "accentColor": "#0366d6",
+    "logo": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iOTgiIGhlaWdodD0iOTYiIHZpZXdCb3g9IjAgMCA5OCA5NiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZmlsbD0iIzI0MjkyZSIgZD0ibTQ5IDAgYzI3LjEgMCA0OSAyMS45IDQ5IDQ5IDAgMjEuNi0xNCA0MC4xLTMzLjQgNDYuNi0yLjQuNC0zLjItMS0zLjItMi4zIDAtMS42LjEtNS45LjEtMTEuNiAwLTMuOS0xLjMtNi42LTIuOC03LjkgOS4yLTEgMTguOS00LjUgMTguOS0yMC40IDAtNC41LTEuNi04LjItNC4zLTExLjEuNC0xIDEuOS00LjktLjQtMTAuMiAwIDAtNC4xLTEuMy0xMy4zIDUgMy45LTEuMSA4LTEuNiAxMi4xLTEuNiA0LjEgMCA4LjIuNSAxMi4xIDEuNi05LjItNi4zLTEzLjMtNS0xMy4zLTUgMi4zIDUuMyAuOCA5LjItLjQgMTAuMi0yLjcgMi45LTQuMyA2LjYtNC4zIDExLjEgMCAxNS45IDkuNyAxOS40IDE4LjkgMjAuNC0xLjIgMS0yLjIgMi44LTIuNiA1LjQtMi4zIDEtOC4xIDIuOC0xMS43LTMuMyAwIDAtMi4xLTMuOC01LjgtMy44IDAgMC0zLjcgMC0uMiAyLjMgMCAwIDIuNSAxLjEgNC4yIDUuMyAwIDAgMi4yIDcuMyAxMi43IDQuOSAwIDMuNS4xIDYuOC4xIDcuOCAwIDEuMy0uOCAyLjctMy4yIDIuMy0xOS40LTYuNS0zMy40LTI1LTMzLjQtNDYuNiAwLTI3LjEgMjEuOS00OSA0OS00OXoiLz4KPC9zdmc+",
+    "gradient": "linear-gradient(135deg, #24292e 0%, #1b1f23 100%)",
+    "textColor": "#ffffff"
+  },
+  "defaultHeaders": {
+    "Accept": "application/vnd.github.v3+json",
+    "User-Agent": "AnyAPI-PowerShell"
+  },
+  "requiredSecrets": [
+    {
+      "key": "token",
+      "displayName": "Personal Access Token",
+      "description": "GitHub Personal Access Token with appropriate scopes",
+      "placeholder": "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "isRequired": true,
+      "helpUrl": "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token"
+    }
+  ],
+  "authFieldMapping": {
+    "BearerToken": "token"
+  },
+  "customSettings": {},
+  "sampleEndpoints": [
+    {
+      "method": "GET",
+      "endpoint": "/user",
+      "description": "Get the authenticated user",
+      "category": "User"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/user/repos",
+      "description": "List repositories for the authenticated user",
+      "category": "Repositories"
+    },
+    {
+      "method": "GET",
+      "endpoint": "/repos/{owner}/{repo}",
+      "description": "Get a repository",
+      "category": "Repositories",
+      "parameters": ["owner", "repo"]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/repos/{owner}/{repo}/issues",
+      "description": "List repository issues",
+      "category": "Issues",
+      "parameters": ["owner", "repo"]
+    },
+    {
+      "method": "POST",
+      "endpoint": "/repos/{owner}/{repo}/issues",
+      "description": "Create an issue",
+      "category": "Issues",
+      "parameters": ["owner", "repo"]
+    },
+    {
+      "method": "GET",
+      "endpoint": "/search/repositories",
+      "description": "Search repositories",
+      "category": "Search",
+      "queryParams": ["q", "sort", "order"]
+    }
+  ],
+  "paginationDetails": {
+    "type": "LinkHeader",
+    "linkHeaderName": "Link",
+    "supportsPageSize": true,
+    "defaultPageSize": 30,
+    "maxPageSize": 100
+  },
+  "rateLimits": {
+    "authenticated": "5000 requests per hour",
+    "unauthenticated": "60 requests per hour"
+  },
+  "documentation": {
+    "url": "https://docs.github.com/en/rest",
+    "quickStart": "https://docs.github.com/en/rest/quickstart"
+  }
+}
